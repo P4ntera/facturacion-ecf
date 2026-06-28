@@ -2,23 +2,18 @@
 
 namespace App\Repositories\Contracts;
 
-/**
- * Contrato para el repositorio de Productos.
- *
- * El patrón Repository aísla Eloquent (o cualquier ORM) del resto del sistema:
- * los Services y Controllers nunca llaman al ORM directamente, sino a esta
- * interfaz. Así se puede cambiar la capa de persistencia sin tocar la lógica
- * de negocio, y se pueden crear implementaciones alternativas (p. ej. para tests).
- */
-interface ProductoRepositoryInterface
+use App\Models\Producto;
+use Illuminate\Database\Eloquent\Collection;
+
+interface ProductoRepositoryInterface extends RepositoryInterface
 {
-    public function all(): iterable;
+    public function findByCodigo(string $codigo): ?Producto;
 
-    public function find(int|string $id): mixed;
+    /** @return Collection<int, Producto> */
+    public function activos(): Collection;
 
-    public function create(array $data): mixed;
+    /** @return Collection<int, Producto> */
+    public function bajoMinimo(): Collection;
 
-    public function update(int|string $id, array $data): mixed;
-
-    public function delete(int|string $id): bool;
+    public function lockById(int $id): ?Producto;
 }

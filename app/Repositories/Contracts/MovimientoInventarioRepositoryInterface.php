@@ -2,23 +2,21 @@
 
 namespace App\Repositories\Contracts;
 
-/**
- * Contrato para el repositorio de Movimientos de Inventario.
- *
- * El patrón Repository aísla Eloquent (o cualquier ORM) del resto del sistema:
- * los Services y Controllers nunca llaman al ORM directamente, sino a esta
- * interfaz. Así se puede cambiar la capa de persistencia sin tocar la lógica
- * de negocio, y se pueden crear implementaciones alternativas (p. ej. para tests).
- */
-interface MovimientoInventarioRepositoryInterface
+use App\Models\MovimientoInventario;
+use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Collection;
+
+interface MovimientoInventarioRepositoryInterface extends RepositoryInterface
 {
-    public function all(): iterable;
+    public function registrar(array $data): MovimientoInventario;
 
-    public function find(int|string $id): mixed;
+    /** @return Collection<int, MovimientoInventario> */
+    public function porProducto(int $productoId): Collection;
 
-    public function create(array $data): mixed;
-
-    public function update(int|string $id, array $data): mixed;
-
-    public function delete(int|string $id): bool;
+    /** @return Collection<int, MovimientoInventario> */
+    public function porProductoEntreFechas(
+        int $productoId,
+        CarbonInterface $desde,
+        CarbonInterface $hasta
+    ): Collection;
 }

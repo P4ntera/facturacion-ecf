@@ -2,23 +2,19 @@
 
 namespace App\Repositories\Contracts;
 
-/**
- * Contrato para el repositorio de Ventas.
- *
- * El patrón Repository aísla Eloquent (o cualquier ORM) del resto del sistema:
- * los Services y Controllers nunca llaman al ORM directamente, sino a esta
- * interfaz. Así se puede cambiar la capa de persistencia sin tocar la lógica
- * de negocio, y se pueden crear implementaciones alternativas (p. ej. para tests).
- */
-interface VentaRepositoryInterface
+use App\Models\DetalleVenta;
+use App\Models\Venta;
+use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Collection;
+
+interface VentaRepositoryInterface extends RepositoryInterface
 {
-    public function all(): iterable;
+    public function findConDetalles(int $id): ?Venta;
 
-    public function find(int|string $id): mixed;
+    /** @return Collection<int, Venta> */
+    public function porRango(CarbonInterface $desde, CarbonInterface $hasta): Collection;
 
-    public function create(array $data): mixed;
+    public function agregarDetalle(Venta $venta, array $linea): DetalleVenta;
 
-    public function update(int|string $id, array $data): mixed;
-
-    public function delete(int|string $id): bool;
+    public function agregarDetalles(Venta $venta, array $lineas): void;
 }
