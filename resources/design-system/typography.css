@@ -1,0 +1,13 @@
+:root{
+
+    --font-family:'Inter',sans-serif;
+
+    --fs-title:32px;
+    --fs-subtitle:24px;
+    --fs-section:20px;
+    --fs-card:18px;
+    --fs-body:16px;
+    --fs-small:14px;
+    --fs-caption:12px;
+
+}

@@ -4,6 +4,6 @@ namespace App\Enums;
 
 enum EstadoVenta: string
 {
-    case EMITIDA  = 'EMITIDA';
-    case ANULADA  = 'ANULADA';
+    case EMITIDA = 'emitida';
+    case ANULADA = 'anulada';
 }
