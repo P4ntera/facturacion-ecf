@@ -18,6 +18,7 @@ use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
+use Filament\Support\Enums\Width;
 
 class AdminPanelProvider extends PanelProvider
 {
@@ -36,6 +37,8 @@ class AdminPanelProvider extends PanelProvider
                 'danger'  => Color::hex('#EF4444'), // --danger
                 'gray'    => Color::Gray,
             ])
+            ->maxContentWidth(Width::Full)
+            ->sidebarCollapsibleOnDesktop() 
             ->font('Inter')
             ->brandName('Facturación e-CF')
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')
