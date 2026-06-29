@@ -29,8 +29,15 @@ class AdminPanelProvider extends PanelProvider
             ->path('admin')
             ->login()
             ->colors([
-                'primary' => Color::Amber,
+                'primary' => Color::hex('#2563EB'), // --primary
+                'success' => Color::hex('#10B981'), // --secondary
+                'info'    => Color::hex('#06B6D4'), // --info
+                'warning' => Color::hex('#F59E0B'), // --warning
+                'danger'  => Color::hex('#EF4444'), // --danger
+                'gray'    => Color::Gray,
             ])
+            ->font('Inter')
+            ->brandName('Facturación e-CF')
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')
             ->pages([
