@@ -6,6 +6,7 @@ use App\Enums\EstadoVenta;
 use App\Enums\OrigenMovimiento;
 use App\Enums\TasaItbis;
 use App\Enums\TipoComprobante;
+use App\Enums\TipoMovimiento;
 use App\Models\DetalleVenta;
 use App\Models\Producto;
 use App\Models\Venta;
@@ -81,11 +82,12 @@ class VentaService
                 ]);
 
                 $producto = Producto::find($linea['producto_id']);
-                if ($producto?->controla_stock) {
-                    $this->inventarioService->salida(
+                if ($producto) {
+                    $this->inventarioService->registrarMovimiento(
                         $producto,
-                        (float) $linea['cantidad'],
+                        TipoMovimiento::SALIDA,
                         OrigenMovimiento::VENTA,
+                        (float) $linea['cantidad'],
                         $venta->id,
                         $userId,
                     );
@@ -109,11 +111,12 @@ class VentaService
             // Revertir inventario de cada línea
             foreach ($venta->detalles as $detalle) {
                 $producto = $detalle->producto;
-                if ($producto?->controla_stock) {
-                    $this->inventarioService->entrada(
+                if ($producto) {
+                    $this->inventarioService->registrarMovimiento(
                         $producto,
-                        (float) $detalle->cantidad,
+                        TipoMovimiento::ENTRADA,
                         OrigenMovimiento::ANULACION,
+                        (float) $detalle->cantidad,
                         $venta->id,
                         $userId,
                         "Anulación venta #{$venta->id}",
