@@ -112,11 +112,14 @@ class ProductoResource extends Resource
                     ->live()
                     ->columnSpanFull(),
 
+                // Solo lectura: el stock se mueve exclusivamente vía InventarioService
+                // (acción "Ajustar stock", ventas, compras), nunca editando este campo a mano.
                 TextInput::make('stock')
                     ->label('Stock actual')
                     ->numeric()
-                    ->minValue(0)
                     ->default(0)
+                    ->disabled()
+                    ->dehydrated(false)
                     ->hidden(fn(Get $get): bool => ! $get('controla_stock')),
 
                 TextInput::make('stock_minimo')
