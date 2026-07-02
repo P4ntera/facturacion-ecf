@@ -42,6 +42,7 @@ class AdminPanelProvider extends PanelProvider
             // no de 'primary'. El design-system del proyecto es claro (--background #F9FAFB),
             // así que forzamos modo claro. Si en el futuro se quiere soportar oscuro, revertir.
             ->darkMode(false)
+            ->databaseNotifications()
             ->maxContentWidth(Width::Full)
             ->sidebarCollapsibleOnDesktop() 
             ->font('Inter')

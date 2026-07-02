@@ -4,12 +4,15 @@ namespace App\Models;
 
 use App\Enums\TasaItbis;
 use App\Enums\TipoProducto;
+use App\Observers\ProductoObserver;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+#[ObservedBy(ProductoObserver::class)]
 class Producto extends Model
 {
     use HasFactory;
