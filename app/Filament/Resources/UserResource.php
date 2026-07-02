@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\UserResource\Pages;
 use App\Models\User;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -49,6 +50,13 @@ class UserResource extends Resource
                 ->dehydrated(fn ($state) => filled($state))
                 ->dehydrateStateUsing(fn ($state) => Hash::make($state))
                 ->required(fn (string $operation): bool => $operation === 'create'),
+
+            Select::make('roles')
+                ->label('Roles')
+                ->relationship('roles', 'name')
+                ->multiple()
+                ->preload()
+                ->visible(fn (): bool => auth()->user()?->can('gestionar_usuarios') ?? false),
         ]);
     }
 
@@ -64,6 +72,11 @@ class UserResource extends Resource
                 ->label('Correo electrónico')
                 ->searchable()
                 ->sortable(),
+
+            TextColumn::make('roles.name')
+                ->label('Roles')
+                ->badge()
+                ->placeholder('—'),
 
             TextColumn::make('created_at')
                 ->label('Creado')
