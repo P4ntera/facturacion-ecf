@@ -19,11 +19,7 @@ class FilamentAdminSeeder extends Seeder
         );
 
         $this->command->info(
-<<<<<<< HEAD
-            ($user->wasRecentlyCreated ? 'Creado' : 'Ya existía') . ': admin@erp.local / password123'
-=======
             ($user->wasRecentlyCreated ? 'Creado' : 'Ya existía') . ': admin@erp.local /    '
->>>>>>> Lamar
         );
     }
 }

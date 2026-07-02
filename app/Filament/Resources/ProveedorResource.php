@@ -4,11 +4,6 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\ProveedorResource\Pages;
 use App\Models\Proveedor;
-<<<<<<< HEAD
-use Filament\Forms\Components\Textarea;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Toggle;
-=======
 use App\Services\DgiiRncService;
 use Filament\Schemas\Components\Section;
 use Filament\Actions\Action;
@@ -17,15 +12,10 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
->>>>>>> Lamar
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
-<<<<<<< HEAD
-use Filament\Tables\Filters\TernaryFilter;
-use Filament\Tables\Table;
-=======
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Filters\TrashedFilter;
@@ -38,7 +28,6 @@ use Filament\Actions\BulkActionGroup;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
->>>>>>> Lamar
 
 class ProveedorResource extends Resource
 {
@@ -58,42 +47,6 @@ class ProveedorResource extends Resource
 
     public static function form(Schema $schema): Schema
     {
-<<<<<<< HEAD
-        return $schema
-            ->columns(2)
-            ->components([
-                TextInput::make('rnc')
-                    ->label('RNC')
-                    ->required()
-                    ->unique(ignoreRecord: true)
-                    ->maxLength(11)
-                    ->mask('99999999999'),
-
-                TextInput::make('nombre')
-                    ->label('Nombre / Razón social')
-                    ->required()
-                    ->maxLength(255),
-
-                TextInput::make('telefono')
-                    ->label('Teléfono')
-                    ->tel()
-                    ->maxLength(20),
-
-                TextInput::make('email')
-                    ->label('Correo electrónico')
-                    ->email()
-                    ->maxLength(255),
-
-                Textarea::make('direccion')
-                    ->label('Dirección')
-                    ->rows(2)
-                    ->columnSpanFull(),
-
-                Toggle::make('activo')
-                    ->label('Activo')
-                    ->default(true),
-            ]);
-=======
         return $schema->columns(2)->components([
 
             Section::make('Identificación Fiscal')
@@ -203,7 +156,6 @@ class ProveedorResource extends Resource
                         ->default(true),
                 ]),
         ]);
->>>>>>> Lamar
     }
 
     public static function table(Table $table): Table
@@ -211,20 +163,6 @@ class ProveedorResource extends Resource
         return $table
             ->columns([
                 TextColumn::make('rnc')
-<<<<<<< HEAD
-                    ->label('RNC')
-                    ->searchable()
-                    ->sortable(),
-
-                TextColumn::make('nombre')
-                    ->label('Nombre')
-                    ->searchable()
-                    ->sortable(),
-
-                TextColumn::make('telefono')
-                    ->label('Teléfono')
-                    ->placeholder('—'),
-=======
                     ->label('RNC / Cédula')
                     ->searchable()
                     ->sortable()
@@ -257,26 +195,16 @@ class ProveedorResource extends Resource
                     ->label('Teléfono')
                     ->placeholder('—')
                     ->toggleable(isToggledHiddenByDefault: true),
->>>>>>> Lamar
 
                 TextColumn::make('email')
                     ->label('Correo')
                     ->placeholder('—')
-<<<<<<< HEAD
-                    ->toggleable(),
-=======
                     ->toggleable(isToggledHiddenByDefault: true),
->>>>>>> Lamar
 
                 IconColumn::make('activo')
                     ->label('Activo')
                     ->boolean()
                     ->sortable(),
-<<<<<<< HEAD
-            ])
-            ->filters([
-                TernaryFilter::make('activo')->label('Activo'),
-=======
 
                 TextColumn::make('created_at')
                     ->label('Registrado')
@@ -308,19 +236,15 @@ class ProveedorResource extends Resource
                     DeleteBulkAction::make(),
                     RestoreBulkAction::make(),
                 ]),
->>>>>>> Lamar
             ])
             ->defaultSort('nombre');
     }
 
-<<<<<<< HEAD
-=======
     public static function getRelations(): array
     {
         return [];
     }
 
->>>>>>> Lamar
     public static function getPages(): array
     {
         return [
@@ -329,13 +253,10 @@ class ProveedorResource extends Resource
             'edit'   => Pages\EditProveedor::route('/{record}/edit'),
         ];
     }
-<<<<<<< HEAD
-=======
 
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
             ->withoutGlobalScopes([SoftDeletingScope::class]);
     }
->>>>>>> Lamar
 }
