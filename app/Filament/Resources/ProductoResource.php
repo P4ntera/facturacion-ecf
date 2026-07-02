@@ -110,14 +110,22 @@ class ProductoResource extends Resource
                     ->numeric()
                     ->minValue(0)
                     ->default(0)
+<<<<<<< HEAD
                     ->hidden(fn (Get $get): bool => ! $get('controla_stock')),
+=======
+                    ->hidden(fn(Get $get): bool => ! $get('controla_stock')),
+>>>>>>> Lamar
 
                 TextInput::make('stock_minimo')
                     ->label('Stock mínimo')
                     ->numeric()
                     ->minValue(0)
                     ->default(0)
+<<<<<<< HEAD
                     ->hidden(fn (Get $get): bool => ! $get('controla_stock')),
+=======
+                    ->hidden(fn(Get $get): bool => ! $get('controla_stock')),
+>>>>>>> Lamar
 
                 Toggle::make('activo')
                     ->label('Activo')
@@ -147,7 +155,11 @@ class ProductoResource extends Resource
 
                 TextColumn::make('tipo')
                     ->label('Tipo')
+<<<<<<< HEAD
                     ->formatStateUsing(fn ($state) => match ($state) {
+=======
+                    ->formatStateUsing(fn($state) => match ($state) {
+>>>>>>> Lamar
                         TipoProducto::PRODUCTO => 'Producto',
                         TipoProducto::SERVICIO => 'Servicio',
                         default                => $state,
@@ -160,7 +172,11 @@ class ProductoResource extends Resource
 
                 TextColumn::make('tasa_itbis')
                     ->label('ITBIS')
+<<<<<<< HEAD
                     ->formatStateUsing(fn ($state) => match ($state) {
+=======
+                    ->formatStateUsing(fn($state) => match ($state) {
+>>>>>>> Lamar
                         TasaItbis::DIECIOCHO => '18 %',
                         TasaItbis::DIECISEIS => '16 %',
                         TasaItbis::CERO      => '0 %',

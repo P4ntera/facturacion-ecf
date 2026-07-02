@@ -8,4 +8,17 @@ use Filament\Resources\Pages\CreateRecord;
 class CreateProveedor extends CreateRecord
 {
     protected static string $resource = ProveedorResource::class;
+<<<<<<< HEAD
+=======
+
+    protected function getRedirectUrl(): string
+    {
+        return $this->getResource()::getUrl('index');
+    }
+
+    protected function getCreatedNotificationTitle(): ?string
+    {
+        return 'Proveedor creado exitosamente';
+    }
+>>>>>>> Lamar
 }
