@@ -37,6 +37,10 @@ class AdminPanelProvider extends PanelProvider
                 'danger'  => Color::hex('#EF4444'), // --danger
                 'gray'    => Color::Gray,
             ])
+            // El fondo/superficies del panel salen del slot 'gray' + el modo de color,
+            // no de 'primary'. El design-system del proyecto es claro (--background #F9FAFB),
+            // así que forzamos modo claro. Si en el futuro se quiere soportar oscuro, revertir.
+            ->darkMode(false)
             ->maxContentWidth(Width::Full)
             ->sidebarCollapsibleOnDesktop() 
             ->font('Inter')
