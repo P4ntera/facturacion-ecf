@@ -1,0 +1,19 @@
+@import '../../../../vendor/filament/filament/resources/css/theme.css';
+
+@source '../../../../app/Filament/**/*';
+@source '../../../../resources/views/filament/**/*';
+
+/* Tokens del design-system del proyecto (paleta, tipografía, sombras). No se
+   importan buttons/tables/components: Filament ya trae sus propios componentes. */
+@import '../../../design-system/variables.css';
+@import '../../../design-system/colors.css';
+@import '../../../design-system/typography.css';
+@import '../../../design-system/shadows.css';
+
+/* Ejemplo (a): escalar todo el panel cambiando el font-size base.
+   :root { font-size: 15px; } */
+
+/* Ejemplo (b): ajustar densidad de una tabla vía hook classes de Filament.
+   Inspecciona la tabla en el navegador para identificar la clase del hook
+   (p.ej. fi-ta-cell) y sobreescribe su padding:
+   .fi-ta-cell { padding-block: 0.375rem; } */
