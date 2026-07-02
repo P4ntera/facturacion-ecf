@@ -2,15 +2,21 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\OrigenMovimiento;
 use App\Enums\TasaItbis;
+use App\Enums\TipoMovimiento;
 use App\Enums\TipoProducto;
+use App\Exceptions\StockInsuficienteException;
 use App\Filament\Resources\ProductoResource\Pages;
 use App\Models\Producto;
+use App\Services\InventarioService;
+use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Get;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\IconColumn;
@@ -18,6 +24,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
+use Illuminate\Support\Facades\DB;
 
 class ProductoResource extends Resource
 {
@@ -190,6 +197,51 @@ class ProductoResource extends Resource
                     ->label('Categoría')
                     ->relationship('categoria', 'nombre'),
                 TernaryFilter::make('activo')->label('Activo'),
+            ])
+            ->recordActions([
+                Action::make('ajustarStock')
+                    ->label('Ajustar stock')
+                    ->icon('heroicon-o-adjustments-horizontal')
+                    ->visible(fn (): bool => auth()->user()?->can('gestionar_inventario') ?? false)
+                    ->schema([
+                        Select::make('tipo')
+                            ->label('Tipo')
+                            ->options([
+                                TipoMovimiento::ENTRADA->value => 'Entrada',
+                                TipoMovimiento::SALIDA->value  => 'Salida',
+                                TipoMovimiento::AJUSTE->value  => 'Ajuste',
+                            ])
+                            ->required(),
+
+                        TextInput::make('cantidad')
+                            ->label('Cantidad')
+                            ->numeric()
+                            ->required()
+                            ->minValue(0.001),
+
+                        Textarea::make('observacion')
+                            ->label('Observación')
+                            ->rows(2),
+                    ])
+                    ->action(function (Producto $record, array $data): void {
+                        try {
+                            DB::transaction(fn () => app(InventarioService::class)->registrarMovimiento(
+                                $record,
+                                TipoMovimiento::from($data['tipo']),
+                                OrigenMovimiento::AJUSTE,
+                                (float) $data['cantidad'],
+                                null,
+                                auth()->id(),
+                                $data['observacion'] ?? null,
+                            ));
+                        } catch (StockInsuficienteException $e) {
+                            Notification::make()->title($e->getMessage())->danger()->send();
+
+                            return;
+                        }
+
+                        Notification::make()->title('Stock ajustado')->success()->send();
+                    }),
             ])
             ->defaultSort('nombre');
     }
