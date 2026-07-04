@@ -13,7 +13,7 @@ class SecuenciaNcf extends Model
     protected $table = 'secuencias_ncf';
 
     protected $fillable = [
-        'tipo_comprobante', 'prefijo', 'secuencia_actual',
+        'tipo_comprobante', 'prefijo', 'secuencia_desde', 'secuencia_actual',
         'secuencia_hasta', 'vencimiento', 'activa',
     ];
 
