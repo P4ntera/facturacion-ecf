@@ -23,6 +23,7 @@ class RolePermissionSeeder extends Seeder
             'ver_reportes',
             'administrar_secuencias',
             'ver_auditoria',
+            'administrar_configuracion',
         ];
 
         foreach ($permisos as $permiso) {
