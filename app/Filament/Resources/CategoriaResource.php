@@ -9,8 +9,8 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
-use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\ToggleColumn;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 
@@ -68,9 +68,9 @@ class CategoriaResource extends Resource
                     ->counts('productos')
                     ->sortable(),
 
-                IconColumn::make('activo')
+                ToggleColumn::make('activo')
                     ->label('Activo')
-                    ->boolean()
+                    ->disabled(fn (): bool => ! auth()->user()?->can('gestionar_maestros'))
                     ->sortable(),
 
                 TextColumn::make('created_at')
@@ -80,7 +80,7 @@ class CategoriaResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                TernaryFilter::make('activo')->label('Activo'),
+                TernaryFilter::make('activo')->label('Activo')->default(true),
             ])
             ->defaultSort('nombre');
     }
@@ -88,9 +88,9 @@ class CategoriaResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index'  => Pages\ListCategorias::route('/'),
+            'index' => Pages\ListCategorias::route('/'),
             'create' => Pages\CreateCategoria::route('/create'),
-            'edit'   => Pages\EditCategoria::route('/{record}/edit'),
+            'edit' => Pages\EditCategoria::route('/{record}/edit'),
         ];
     }
 }

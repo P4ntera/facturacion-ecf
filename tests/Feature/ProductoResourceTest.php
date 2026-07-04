@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Enums\TasaItbis;
 use App\Enums\TipoProducto;
 use App\Filament\Resources\ProductoResource\Pages\CreateProducto;
-use App\Models\Producto;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -29,15 +28,15 @@ class ProductoResourceTest extends TestCase
         Livewire::actingAs($usuario)
             ->test(CreateProducto::class)
             ->fillForm([
-                'codigo'         => 'TEST-001',
-                'nombre'         => 'Producto de prueba',
-                'tipo'           => TipoProducto::PRODUCTO->value,
-                'precio'         => 100,
-                'costo'          => 50,
-                'tasa_itbis'     => TasaItbis::DIECIOCHO->value,
+                'codigo' => 'TEST-001',
+                'nombre' => 'Producto de prueba',
+                'tipo' => TipoProducto::PRODUCTO->value,
+                'precio' => 100,
+                'costo' => 50,
+                'tasa_itbis' => TasaItbis::DIECIOCHO->value,
                 'controla_stock' => true,
-                'stock_minimo'   => 5,
-                'activo'         => true,
+                'stock_minimo' => 5,
+                'activo' => true,
             ])
             ->call('create')
             ->assertHasNoFormErrors();

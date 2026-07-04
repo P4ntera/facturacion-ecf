@@ -15,12 +15,12 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
-use Filament\Schemas\Components\Utilities\Get;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
-use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\ToggleColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
@@ -99,8 +99,8 @@ class ProductoResource extends Resource
                     ->options([
                         TasaItbis::DIECIOCHO->value => '18 %',
                         TasaItbis::DIECISEIS->value => '16 %',
-                        TasaItbis::CERO->value      => '0 %',
-                        TasaItbis::EXENTO->value    => 'Exento',
+                        TasaItbis::CERO->value => '0 %',
+                        TasaItbis::EXENTO->value => 'Exento',
                     ])
                     ->required()
                     ->default(TasaItbis::DIECIOCHO->value),
@@ -120,14 +120,14 @@ class ProductoResource extends Resource
                     ->default(0)
                     ->disabled()
                     ->dehydrated(false)
-                    ->hidden(fn(Get $get): bool => ! $get('controla_stock')),
+                    ->hidden(fn (Get $get): bool => ! $get('controla_stock')),
 
                 TextInput::make('stock_minimo')
                     ->label('Stock mínimo')
                     ->numeric()
                     ->minValue(0)
                     ->default(0)
-                    ->hidden(fn(Get $get): bool => ! $get('controla_stock')),
+                    ->hidden(fn (Get $get): bool => ! $get('controla_stock')),
 
                 Toggle::make('activo')
                     ->label('Activo')
@@ -157,10 +157,10 @@ class ProductoResource extends Resource
 
                 TextColumn::make('tipo')
                     ->label('Tipo')
-                    ->formatStateUsing(fn($state) => match ($state) {
+                    ->formatStateUsing(fn ($state) => match ($state) {
                         TipoProducto::PRODUCTO => 'Producto',
                         TipoProducto::SERVICIO => 'Servicio',
-                        default                => $state,
+                        default => $state,
                     }),
 
                 TextColumn::make('precio')
@@ -170,12 +170,12 @@ class ProductoResource extends Resource
 
                 TextColumn::make('tasa_itbis')
                     ->label('ITBIS')
-                    ->formatStateUsing(fn($state) => match ($state) {
+                    ->formatStateUsing(fn ($state) => match ($state) {
                         TasaItbis::DIECIOCHO => '18 %',
                         TasaItbis::DIECISEIS => '16 %',
-                        TasaItbis::CERO      => '0 %',
-                        TasaItbis::EXENTO    => 'Exento',
-                        default              => $state,
+                        TasaItbis::CERO => '0 %',
+                        TasaItbis::EXENTO => 'Exento',
+                        default => $state,
                     }),
 
                 TextColumn::make('stock')
@@ -184,9 +184,9 @@ class ProductoResource extends Resource
                     ->sortable()
                     ->placeholder('—'),
 
-                IconColumn::make('activo')
+                ToggleColumn::make('activo')
                     ->label('Activo')
-                    ->boolean()
+                    ->disabled(fn (): bool => ! auth()->user()?->can('gestionar_maestros'))
                     ->sortable(),
             ])
             ->filters([
@@ -199,7 +199,7 @@ class ProductoResource extends Resource
                 SelectFilter::make('categoria_id')
                     ->label('Categoría')
                     ->relationship('categoria', 'nombre'),
-                TernaryFilter::make('activo')->label('Activo'),
+                TernaryFilter::make('activo')->label('Activo')->default(true),
             ])
             ->recordActions([
                 Action::make('ajustarStock')
@@ -211,8 +211,8 @@ class ProductoResource extends Resource
                             ->label('Tipo')
                             ->options([
                                 TipoMovimiento::ENTRADA->value => 'Entrada',
-                                TipoMovimiento::SALIDA->value  => 'Salida',
-                                TipoMovimiento::AJUSTE->value  => 'Ajuste',
+                                TipoMovimiento::SALIDA->value => 'Salida',
+                                TipoMovimiento::AJUSTE->value => 'Ajuste',
                             ])
                             ->required(),
 
@@ -252,9 +252,9 @@ class ProductoResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index'  => Pages\ListProductos::route('/'),
+            'index' => Pages\ListProductos::route('/'),
             'create' => Pages\CreateProducto::route('/create'),
-            'edit'   => Pages\EditProducto::route('/{record}/edit'),
+            'edit' => Pages\EditProducto::route('/{record}/edit'),
         ];
     }
 }
