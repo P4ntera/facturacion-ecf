@@ -10,6 +10,7 @@ use App\Enums\TipoMovimiento;
 use App\Models\DetalleVenta;
 use App\Models\Producto;
 use App\Models\Venta;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -17,7 +18,7 @@ class VentaService
 {
     public function __construct(
         private readonly SecuenciaNcfService $ncfService,
-        private readonly InventarioService   $inventarioService,
+        private readonly InventarioService $inventarioService,
     ) {}
 
     /**
@@ -26,7 +27,7 @@ class VentaService
      * @param  array{
      *   cliente_id:       int,
      *   tipo_comprobante: TipoComprobante,
-     *   fecha:            \Carbon\Carbon,
+     *   fecha:            Carbon,
      *   moneda:           string,
      *   tasa_cambio:      float,
      *   descuento:        float,
@@ -52,33 +53,33 @@ class VentaService
 
             // 2. Calcular totales por línea
             $detallesCalc = $this->calcularLineas($datos['lineas']);
-            $totales      = $this->calcularTotales($detallesCalc, (float) ($datos['descuento'] ?? 0));
+            $totales = $this->calcularTotales($detallesCalc, (float) ($datos['descuento'] ?? 0));
 
             // 3. Crear cabecera de venta
             $venta = Venta::create([
-                'cliente_id'       => $datos['cliente_id'],
-                'user_id'          => $userId,
+                'cliente_id' => $datos['cliente_id'],
+                'user_id' => $userId,
                 'tipo_comprobante' => $datos['tipo_comprobante'],
-                'ncf'              => $ncf,
-                'fecha'            => $datos['fecha'],
-                'moneda'           => $datos['moneda'] ?? 'DOP',
-                'tasa_cambio'      => $datos['tasa_cambio'] ?? 1,
-                'estado'           => EstadoVenta::EMITIDA,
+                'ncf' => $ncf,
+                'fecha' => $datos['fecha'],
+                'moneda' => $datos['moneda'] ?? 'DOP',
+                'tasa_cambio' => $datos['tasa_cambio'] ?? 1,
+                'estado' => EstadoVenta::EMITIDA,
                 ...$totales,
             ]);
 
             // 4. Crear detalles y mover inventario
             foreach ($detallesCalc as $linea) {
                 DetalleVenta::create([
-                    'venta_id'       => $venta->id,
-                    'producto_id'    => $linea['producto_id'],
-                    'descripcion'    => $linea['descripcion'],
-                    'cantidad'       => $linea['cantidad'],
-                    'precio_unitario'=> $linea['precio_unitario'],
-                    'descuento'      => $linea['descuento'],
-                    'tasa_itbis'     => $linea['tasa_itbis'],
-                    'itbis_monto'    => $linea['itbis_monto'],
-                    'subtotal'       => $linea['subtotal'],
+                    'venta_id' => $venta->id,
+                    'producto_id' => $linea['producto_id'],
+                    'descripcion' => $linea['descripcion'],
+                    'cantidad' => $linea['cantidad'],
+                    'precio_unitario' => $linea['precio_unitario'],
+                    'descuento' => $linea['descuento'],
+                    'tasa_itbis' => $linea['tasa_itbis'],
+                    'itbis_monto' => $linea['itbis_monto'],
+                    'subtotal' => $linea['subtotal'],
                 ]);
 
                 $producto = Producto::find($linea['producto_id']);
@@ -125,9 +126,9 @@ class VentaService
             }
 
             $venta->update([
-                'estado'           => EstadoVenta::ANULADA,
+                'estado' => EstadoVenta::ANULADA,
                 'motivo_anulacion' => $motivo,
-                'anulada_en'       => now(),
+                'anulada_en' => now(),
             ]);
 
             return $venta->refresh();
@@ -140,19 +141,19 @@ class VentaService
     private function calcularLineas(array $lineas): array
     {
         return array_map(function (array $l) {
-            $subtotal   = round((float) $l['cantidad'] * (float) $l['precio_unitario'] - (float) ($l['descuento'] ?? 0), 2);
+            $subtotal = round((float) $l['cantidad'] * (float) $l['precio_unitario'] - (float) ($l['descuento'] ?? 0), 2);
             $porcentaje = $this->porcentajeItbis($l['tasa_itbis']);
             $itbisMonto = round($subtotal * $porcentaje / 100, 2);
 
             return [
-                'producto_id'     => $l['producto_id'],
-                'descripcion'     => $l['descripcion'] ?? null,
-                'cantidad'        => $l['cantidad'],
+                'producto_id' => $l['producto_id'],
+                'descripcion' => $l['descripcion'] ?? null,
+                'cantidad' => $l['cantidad'],
                 'precio_unitario' => $l['precio_unitario'],
-                'descuento'       => (float) ($l['descuento'] ?? 0),
-                'tasa_itbis'      => $l['tasa_itbis'],
-                'subtotal'        => $subtotal,
-                'itbis_monto'     => $itbisMonto,
+                'descuento' => (float) ($l['descuento'] ?? 0),
+                'tasa_itbis' => $l['tasa_itbis'],
+                'subtotal' => $subtotal,
+                'itbis_monto' => $itbisMonto,
             ];
         }, $lineas);
     }
@@ -162,35 +163,33 @@ class VentaService
     {
         $montoGravado18 = 0.0;
         $montoGravado16 = 0.0;
-        $montoGravado0  = 0.0;
-        $montoExento    = 0.0;
+        $montoGravado0 = 0.0;
 
         foreach ($lineas as $l) {
             match ($l['tasa_itbis']) {
                 TasaItbis::DIECIOCHO => $montoGravado18 += $l['subtotal'],
                 TasaItbis::DIECISEIS => $montoGravado16 += $l['subtotal'],
-                TasaItbis::CERO      => $montoGravado0  += $l['subtotal'],
-                TasaItbis::EXENTO    => $montoExento     += $l['subtotal'],
+                TasaItbis::CERO => $montoGravado0 += $l['subtotal'],
             };
         }
 
-        $subtotal   = round(array_sum(array_column($lineas, 'subtotal')), 2);
-        $itbis18    = round($montoGravado18 * 0.18, 2);
-        $itbis16    = round($montoGravado16 * 0.16, 2);
+        $subtotal = round(array_sum(array_column($lineas, 'subtotal')), 2);
+        $itbis18 = round($montoGravado18 * 0.18, 2);
+        $itbis16 = round($montoGravado16 * 0.16, 2);
         $totalItbis = round($itbis18 + $itbis16, 2);
-        $total      = round($subtotal - $descuentoGlobal + $totalItbis, 2);
+        $total = round($subtotal - $descuentoGlobal + $totalItbis, 2);
 
         return [
-            'subtotal'         => $subtotal,
-            'descuento'        => $descuentoGlobal,
+            'subtotal' => $subtotal,
+            'descuento' => $descuentoGlobal,
             'monto_gravado_18' => round($montoGravado18, 2),
             'monto_gravado_16' => round($montoGravado16, 2),
-            'monto_gravado_0'  => round($montoGravado0, 2),
-            'monto_exento'     => round($montoExento, 2),
-            'itbis_18'         => $itbis18,
-            'itbis_16'         => $itbis16,
-            'total_itbis'      => $totalItbis,
-            'total'            => $total,
+            'monto_gravado_0' => round($montoGravado0, 2),
+            'monto_exento' => 0.0,
+            'itbis_18' => $itbis18,
+            'itbis_16' => $itbis16,
+            'total_itbis' => $totalItbis,
+            'total' => $total,
         ];
     }
 
@@ -199,7 +198,7 @@ class VentaService
         return match ($tasa) {
             TasaItbis::DIECIOCHO => 18.0,
             TasaItbis::DIECISEIS => 16.0,
-            default              => 0.0,
+            default => 0.0,
         };
     }
 }

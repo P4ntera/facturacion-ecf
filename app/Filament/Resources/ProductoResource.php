@@ -99,8 +99,7 @@ class ProductoResource extends Resource
                     ->options([
                         TasaItbis::DIECIOCHO->value => '18 %',
                         TasaItbis::DIECISEIS->value => '16 %',
-                        TasaItbis::CERO->value => '0 %',
-                        TasaItbis::EXENTO->value => 'Exento',
+                        TasaItbis::CERO->value => '0 % (Exento)',
                     ])
                     ->required()
                     ->default(TasaItbis::DIECIOCHO->value),
@@ -173,8 +172,7 @@ class ProductoResource extends Resource
                     ->formatStateUsing(fn ($state) => match ($state) {
                         TasaItbis::DIECIOCHO => '18 %',
                         TasaItbis::DIECISEIS => '16 %',
-                        TasaItbis::CERO => '0 %',
-                        TasaItbis::EXENTO => 'Exento',
+                        TasaItbis::CERO => '0 % (Exento)',
                         default => $state,
                     }),
 
