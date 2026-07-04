@@ -22,6 +22,7 @@ class RolePermissionSeeder extends Seeder
             'gestionar_compras',
             'ver_reportes',
             'administrar_secuencias',
+            'ver_auditoria',
         ];
 
         foreach ($permisos as $permiso) {
