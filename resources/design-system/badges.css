@@ -1,0 +1,17 @@
+.badge{
+    display:inline-flex;
+    align-items:center;
+    padding:0.125rem var(--space-sm);
+    border-radius:9999px;
+    font-family:var(--font-family);
+    font-size:var(--fs-caption);
+    font-weight:600;
+    line-height:1.25;
+    background-color:var(--gray-100);
+    color:var(--gray-700);
+}
+
+.badge-primary{ background-color:var(--primary-dark); color:var(--white); }
+.badge-success{ background-color:var(--secondary-dark); color:var(--white); }
+.badge-warning{ background-color:var(--warning-dark); color:var(--white); }
+.badge-danger{ background-color:var(--danger-dark); color:var(--white); }

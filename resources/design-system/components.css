@@ -1,0 +1,14 @@
+.card{
+    padding:var(--space-lg);
+    background-color:var(--white);
+    border:1px solid var(--gray-200);
+    border-radius:0.5rem;
+    box-shadow:var(--shadow-card);
+}
+
+.card-title{
+    margin-bottom:var(--space-sm);
+    font-size:var(--fs-card);
+    font-weight:600;
+    color:var(--gray-900);
+}

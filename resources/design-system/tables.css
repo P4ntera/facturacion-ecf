@@ -1,0 +1,25 @@
+.table{
+    width:100%;
+    border-collapse:collapse;
+    font-family:var(--font-family);
+    font-size:var(--fs-small);
+}
+
+.table th{
+    padding:var(--space-sm) var(--space-md);
+    text-align:left;
+    background-color:var(--gray-100);
+    color:var(--gray-700);
+    font-weight:600;
+    border-bottom:1px solid var(--gray-200);
+}
+
+.table td{
+    padding:var(--space-sm) var(--space-md);
+    color:var(--gray-900);
+    border-bottom:1px solid var(--gray-100);
+}
+
+.table tbody tr:hover{
+    background-color:var(--gray-100);
+}
