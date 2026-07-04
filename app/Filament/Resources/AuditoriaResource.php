@@ -67,7 +67,12 @@ class AuditoriaResource extends Resource
                 TextColumn::make('causer.name')
                     ->label('Usuario')
                     ->placeholder('Sistema')
-                    ->sortable(),
+                    // causer es polimórfico (morphTo): Filament no puede inferir el join para
+                    // ordenar automáticamente, hay que indicarle la subconsulta explícitamente.
+                    ->sortable(query: fn (Builder $query, string $direction): Builder => $query->orderBy(
+                        User::select('name')->whereColumn('users.id', 'activity_log.causer_id'),
+                        $direction,
+                    )),
 
                 TextColumn::make('log_name')
                     ->label('Módulo')
