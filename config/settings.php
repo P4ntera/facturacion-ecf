@@ -7,7 +7,8 @@ return [
      * put them (manually) here.
      */
     'settings' => [
-
+        App\Settings\EmpresaSettings::class,
+        App\Settings\FacturacionSettings::class,
     ],
 
     /*
