@@ -13,6 +13,7 @@ use App\Enums\TipoMovimiento;
 use App\Exceptions\SecuenciaNcfAgotadaException;
 use App\Exceptions\StockInsuficienteException;
 use App\Exceptions\VentaInvalidaException;
+use App\Exceptions\VentaYaAnuladaException;
 use App\Models\Cliente;
 use App\Models\Producto;
 use App\Models\Venta;
@@ -21,7 +22,6 @@ use App\Strategies\Impuesto\ConItbisIncluido;
 use App\Strategies\Impuesto\ImpuestoStrategy;
 use App\Strategies\Impuesto\SinItbisIncluido;
 use Illuminate\Support\Facades\DB;
-use RuntimeException;
 
 class VentaService
 {
@@ -119,18 +119,22 @@ class VentaService
     }
 
     /**
-     * Anula una venta: revierte inventario y marca como ANULADA.
+     * Anula una venta: repone el stock de cada línea y marca la venta como ANULADA.
+     *
+     * El e-NCF no se libera ni se borra: queda como comprobante anulado (internamente). La
+     * anulación fiscal correcta de un e-CF ya emitido es una Nota de Crédito (Fase 9).
      */
-    public function anular(Venta $venta, string $motivo, int $userId): Venta
+    public function anular(Venta $venta, string $motivo, ?int $userId = null): Venta
     {
-        if ($venta->estaAnulada()) {
-            throw new RuntimeException('La venta ya está anulada.');
-        }
-
         return DB::transaction(function () use ($venta, $motivo, $userId) {
+            if ($venta->estaAnulada()) {
+                throw new VentaYaAnuladaException("La venta #{$venta->id} ya fue anulada anteriormente.");
+            }
+
             foreach ($venta->detalles as $detalle) {
                 $producto = $detalle->producto;
-                if ($producto) {
+
+                if ($producto !== null) {
                     $this->inventarioService->registrarMovimiento(
                         $producto,
                         TipoMovimiento::ENTRADA,
@@ -138,7 +142,7 @@ class VentaService
                         (float) $detalle->cantidad,
                         $venta->id,
                         $userId,
-                        "Anulación venta #{$venta->id}",
+                        $motivo,
                     );
                 }
             }
