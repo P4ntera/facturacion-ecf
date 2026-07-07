@@ -11,7 +11,39 @@
 
 .pos-screen{
     font-family:var(--font-family);
+    font-size:var(--fs-small);
     color:var(--text);
+    line-height:1.35;
+}
+
+/*======== LAYOUT: dos columnas, panel de totales pegajoso ========*/
+
+.pos-grid{
+    display:grid;
+    grid-template-columns:2fr 1fr;
+    align-items:start;
+    gap:var(--space-md);
+}
+
+.pos-main{
+    display:flex;
+    flex-direction:column;
+    gap:var(--space-sm);
+    min-width:0;
+}
+
+.pos-side{
+    position:sticky;
+    top:var(--space-md);
+}
+
+@media (max-width:1024px){
+    .pos-grid{
+        grid-template-columns:1fr;
+    }
+    .pos-side{
+        position:static;
+    }
 }
 
 /*======== BOTONES (ver buttons.css) ========*/
@@ -21,7 +53,7 @@
     align-items:center;
     justify-content:center;
     gap:var(--space-xs);
-    padding:var(--space-sm) var(--space-md);
+    padding:var(--space-xs) var(--space-sm);
     border-radius:var(--radius-md);
     border:1px solid transparent;
     font-family:var(--font-family);
@@ -64,6 +96,7 @@
 
 .pos-screen .btn-cobrar{
     width:100%;
+    padding:var(--space-sm) var(--space-md);
     font-size:var(--fs-body);
 }
 
@@ -77,7 +110,7 @@
 }
 
 .pos-screen .table th{
-    padding:var(--space-sm) var(--space-md);
+    padding:var(--space-xs) var(--space-sm);
     text-align:left;
     background-color:var(--gray-100);
     color:var(--gray-700);
@@ -86,7 +119,7 @@
 }
 
 .pos-screen .table td{
-    padding:var(--space-sm) var(--space-md);
+    padding:var(--space-xs) var(--space-sm);
     color:var(--gray-900);
     border-bottom:1px solid var(--gray-100);
 }
@@ -111,9 +144,9 @@
 
 .pos-screen .form-label{
     display:block;
-    margin-bottom:var(--space-xs);
+    margin-bottom:2px;
     font-family:var(--font-family);
-    font-size:var(--fs-small);
+    font-size:var(--fs-caption);
     font-weight:500;
     color:var(--gray-700);
 }
@@ -123,11 +156,11 @@
 .pos-screen .form-textarea{
     display:block;
     width:100%;
-    padding:var(--space-sm) var(--space-md);
+    padding:var(--space-xs) var(--space-sm);
     border:1px solid var(--gray-300);
     border-radius:var(--radius-md);
     font-family:var(--font-family);
-    font-size:var(--fs-body);
+    font-size:var(--fs-small);
     color:var(--gray-900);
     background-color:var(--white);
 }
@@ -167,7 +200,7 @@
 /*======== TARJETAS (ver components.css) ========*/
 
 .pos-screen .card{
-    padding:var(--space-lg);
+    padding:var(--space-md);
     background-color:var(--white);
     border:1px solid var(--gray-200);
     border-radius:var(--radius-lg);
@@ -176,7 +209,7 @@
 
 .pos-screen .card-title{
     margin-bottom:var(--space-sm);
-    font-size:var(--fs-card);
+    font-size:var(--fs-body);
     font-weight:600;
     color:var(--gray-900);
 }
@@ -201,7 +234,7 @@
     align-items:center;
     justify-content:space-between;
     gap:var(--space-sm);
-    padding:var(--space-sm) var(--space-md);
+    padding:var(--space-xs) var(--space-sm);
     text-align:left;
     background:none;
     border:none;
@@ -215,7 +248,7 @@
 }
 
 .pos-screen .pos-vacio{
-    padding:var(--space-sm) var(--space-md);
+    padding:var(--space-xs) var(--space-sm);
     font-size:var(--fs-small);
     color:var(--text-muted);
 }
@@ -241,7 +274,7 @@
 
 .pos-screen .pos-total-final .pos-total-label{
     font-weight:600;
-    font-size:var(--fs-card);
+    font-size:var(--fs-body);
 }
 
 .pos-screen .pos-total-final .pos-total-valor{

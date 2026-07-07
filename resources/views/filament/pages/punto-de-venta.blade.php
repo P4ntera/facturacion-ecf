@@ -24,8 +24,8 @@
       document.addEventListener('livewire:navigate', posRestaurarSidebar);
     "
   >
-    <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
-      <div class="space-y-4 lg:col-span-2">
+    <div class="pos-grid">
+      <div class="pos-main">
         {{-- Cliente --}}
         <div class="card">
           <h3 class="card-title">Cliente</h3>
@@ -200,11 +200,11 @@
       </div>
 
       {{-- Totales --}}
-      <div class="space-y-4">
+      <div class="pos-side">
         <div class="card pos-totales">
           <h3 class="card-title">Totales</h3>
 
-          <div class="mb-4">
+          <div class="mb-2">
             <label class="form-label">Descuento global</label>
             <input type="number" min="0" step="0.01" class="form-input" wire:model.live.debounce.400ms="descuentoGlobal" />
           </div>
@@ -234,14 +234,14 @@
           </div>
 
           @if ($this->hayLineasConStockInsuficiente())
-            <p class="mt-3 pos-alerta">
+            <p class="mt-2 pos-alerta">
               Hay líneas con stock insuficiente; corrígelas para poder cobrar.
             </p>
           @endif
 
           <button
             type="button"
-            class="btn btn-primary btn-cobrar mt-4"
+            class="btn btn-primary btn-cobrar mt-2"
             wire:click="cobrar"
             @disabled(! $this->puedeCobrar())
           >
