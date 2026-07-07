@@ -111,4 +111,19 @@ class PuntoDeVentaTest extends TestCase
             ->get(PuntoDeVenta::getUrl())
             ->assertForbidden();
     }
+
+    public function test_la_pagina_trae_el_wrapper_del_design_system_y_el_script_de_sidebar(): void
+    {
+        $response = $this->actingAs($this->vendedor())->get(PuntoDeVenta::getUrl());
+
+        $response->assertOk();
+        $response->assertSee('class="pos-screen"', false);
+        $response->assertSee('$store.sidebar.close()', false);
+        $response->assertSee('livewire:navigate', false);
+        $response->assertSee('class="pos-grid"', false);
+        $response->assertSee('class="pos-main"', false);
+        $response->assertSee('class="pos-side"', false);
+        $response->assertSee('<thead>', false);
+        $response->assertSee('btn-cobrar', false);
+    }
 }
