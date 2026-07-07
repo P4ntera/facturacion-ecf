@@ -11,8 +11,8 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
-use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\ToggleColumn;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 
@@ -38,8 +38,8 @@ class ClienteResource extends Resource
                 Select::make('tipo_documento')
                     ->label('Tipo de documento')
                     ->options([
-                        TipoDocumentoCliente::RNC->value           => 'RNC',
-                        TipoDocumentoCliente::CEDULA->value        => 'Cédula',
+                        TipoDocumentoCliente::RNC->value => 'RNC',
+                        TipoDocumentoCliente::CEDULA->value => 'Cédula',
                         TipoDocumentoCliente::SIN_DOCUMENTO->value => 'Sin documento',
                     ])
                     ->required()
@@ -88,10 +88,10 @@ class ClienteResource extends Resource
                 TextColumn::make('tipo_documento')
                     ->label('Tipo doc.')
                     ->formatStateUsing(fn ($state) => match ($state) {
-                        TipoDocumentoCliente::RNC           => 'RNC',
-                        TipoDocumentoCliente::CEDULA        => 'Cédula',
+                        TipoDocumentoCliente::RNC => 'RNC',
+                        TipoDocumentoCliente::CEDULA => 'Cédula',
                         TipoDocumentoCliente::SIN_DOCUMENTO => '—',
-                        default                             => $state,
+                        default => $state,
                     }),
 
                 TextColumn::make('documento')
@@ -108,13 +108,13 @@ class ClienteResource extends Resource
                     ->placeholder('—')
                     ->toggleable(),
 
-                IconColumn::make('activo')
+                ToggleColumn::make('activo')
                     ->label('Activo')
-                    ->boolean()
+                    ->disabled(fn (): bool => ! auth()->user()?->can('gestionar_maestros'))
                     ->sortable(),
             ])
             ->filters([
-                TernaryFilter::make('activo')->label('Activo'),
+                TernaryFilter::make('activo')->label('Activo')->default(true),
             ])
             ->defaultSort('nombre');
     }
@@ -122,9 +122,9 @@ class ClienteResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index'  => Pages\ListClientes::route('/'),
+            'index' => Pages\ListClientes::route('/'),
             'create' => Pages\CreateCliente::route('/create'),
-            'edit'   => Pages\EditCliente::route('/{record}/edit'),
+            'edit' => Pages\EditCliente::route('/{record}/edit'),
         ];
     }
 }

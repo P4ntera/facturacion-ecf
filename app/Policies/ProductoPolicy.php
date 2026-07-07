@@ -29,8 +29,9 @@ class ProductoPolicy
         return $user->can('gestionar_maestros');
     }
 
+    // Los maestros con historial no se borran físicamente: se desactivan (campo 'activo').
     public function delete(User $user, Producto $producto): bool
     {
-        return $user->can('gestionar_maestros');
+        return false;
     }
 }

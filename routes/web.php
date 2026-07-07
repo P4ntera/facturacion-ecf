@@ -1,8 +1,9 @@
 <?php
 
 use App\Http\Controllers\ProfileController;
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\RncController;
+use App\Http\Controllers\VentaComprobanteController;
+use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
     return view('welcome');
@@ -21,4 +22,8 @@ Route::get('/rnc/{rnc}', [RncController::class, 'consultar'])
     ->where('rnc', '[0-9]{9,11}')
     ->name('rnc.consultar');
 
-require __DIR__ . '/auth.php';
+Route::get('/ventas/{venta}/pdf', VentaComprobanteController::class)
+    ->middleware(['auth', 'can:registrar_ventas'])
+    ->name('ventas.pdf');
+
+require __DIR__.'/auth.php';

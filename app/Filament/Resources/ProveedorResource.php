@@ -5,29 +5,21 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\ProveedorResource\Pages;
 use App\Models\Proveedor;
 use App\Services\DgiiRncService;
-use Filament\Schemas\Components\Section;
 use Filament\Actions\Action;
+use Filament\Actions\EditAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
-use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\ToggleColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
-use Filament\Tables\Filters\TrashedFilter;
-use Filament\Actions\EditAction;
-use Filament\Actions\DeleteAction;
-use Filament\Actions\RestoreAction;
-use Filament\Actions\DeleteBulkAction;
-use Filament\Actions\RestoreBulkAction;
-use Filament\Actions\BulkActionGroup;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class ProveedorResource extends Resource
 {
@@ -68,30 +60,33 @@ class ProveedorResource extends Resource
                                 ->action(function ($get, $set) {
                                     $rnc = preg_replace('/[^0-9]/', '', $get('rnc') ?? '');
 
-                                    if (!$rnc) {
+                                    if (! $rnc) {
                                         Notification::make()->title('Ingresa un RNC o Cédula primero.')->warning()->send();
+
                                         return;
                                     }
 
                                     $service = app(DgiiRncService::class);
 
-                                    if (!$service->esRncValido($rnc)) {
+                                    if (! $service->esRncValido($rnc)) {
                                         Notification::make()->title('RNC inválido')->body('Debe tener 9 dígitos (RNC) u 11 dígitos (Cédula).')->danger()->send();
+
                                         return;
                                     }
 
                                     $datos = $service->consultarRnc($rnc);
 
-                                    if (!$datos) {
+                                    if (! $datos) {
                                         Notification::make()->title('No encontrado')->body('El RNC/Cédula no está registrado en la DGII.')->warning()->send();
+
                                         return;
                                     }
 
-                                    $set('rnc',                 $datos['rnc']);
-                                    $set('nombre',              $datos['nombre']);
-                                    $set('nombre_comercial',    $datos['nombre_comercial']);
+                                    $set('rnc', $datos['rnc']);
+                                    $set('nombre', $datos['nombre']);
+                                    $set('nombre_comercial', $datos['nombre_comercial']);
                                     $set('actividad_economica', $datos['actividad_economica']);
-                                    $set('estado',              $datos['estado']);
+                                    $set('estado', $datos['estado']);
 
                                     Notification::make()->title('¡Datos cargados!')->body('Información obtenida de la DGII correctamente.')->success()->send();
                                 })
@@ -100,9 +95,9 @@ class ProveedorResource extends Resource
                     Select::make('estado')
                         ->label('Estado DGII')
                         ->options([
-                            'ACTIVO'       => 'Activo',
-                            'INACTIVO'     => 'Inactivo',
-                            'SUSPENDIDO'   => 'Suspendido',
+                            'ACTIVO' => 'Activo',
+                            'INACTIVO' => 'Inactivo',
+                            'SUSPENDIDO' => 'Suspendido',
                             'DADO DE BAJA' => 'Dado de Baja',
                         ])
                         ->default('ACTIVO')
@@ -183,12 +178,12 @@ class ProveedorResource extends Resource
                 TextColumn::make('estado')
                     ->label('Estado DGII')
                     ->badge()
-                    ->color(fn(string $state) => match ($state) {
-                        'ACTIVO'       => 'success',
-                        'INACTIVO'     => 'gray',
-                        'SUSPENDIDO'   => 'danger',
+                    ->color(fn (string $state) => match ($state) {
+                        'ACTIVO' => 'success',
+                        'INACTIVO' => 'gray',
+                        'SUSPENDIDO' => 'danger',
                         'DADO DE BAJA' => 'warning',
-                        default        => 'gray',
+                        default => 'gray',
                     }),
 
                 TextColumn::make('telefono')
@@ -201,9 +196,9 @@ class ProveedorResource extends Resource
                     ->placeholder('—')
                     ->toggleable(isToggledHiddenByDefault: true),
 
-                IconColumn::make('activo')
+                ToggleColumn::make('activo')
                     ->label('Activo')
-                    ->boolean()
+                    ->disabled(fn (): bool => ! auth()->user()?->can('gestionar_maestros'))
                     ->sortable(),
 
                 TextColumn::make('created_at')
@@ -216,26 +211,16 @@ class ProveedorResource extends Resource
                 SelectFilter::make('estado')
                     ->label('Estado DGII')
                     ->options([
-                        'ACTIVO'       => 'Activo',
-                        'INACTIVO'     => 'Inactivo',
-                        'SUSPENDIDO'   => 'Suspendido',
+                        'ACTIVO' => 'Activo',
+                        'INACTIVO' => 'Inactivo',
+                        'SUSPENDIDO' => 'Suspendido',
                         'DADO DE BAJA' => 'Dado de Baja',
                     ]),
 
-                TernaryFilter::make('activo')->label('Activo en sistema'),
-
-                TrashedFilter::make(),
+                TernaryFilter::make('activo')->label('Activo en sistema')->default(true),
             ])
             ->recordActions([
                 EditAction::make(),
-                DeleteAction::make(),
-                RestoreAction::make(),
-            ])
-            ->toolbarActions([
-                BulkActionGroup::make([
-                    DeleteBulkAction::make(),
-                    RestoreBulkAction::make(),
-                ]),
             ])
             ->defaultSort('nombre');
     }
@@ -248,15 +233,9 @@ class ProveedorResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index'  => Pages\ListProveedores::route('/'),
+            'index' => Pages\ListProveedores::route('/'),
             'create' => Pages\CreateProveedor::route('/create'),
-            'edit'   => Pages\EditProveedor::route('/{record}/edit'),
+            'edit' => Pages\EditProveedor::route('/{record}/edit'),
         ];
-    }
-
-    public static function getEloquentQuery(): Builder
-    {
-        return parent::getEloquentQuery()
-            ->withoutGlobalScopes([SoftDeletingScope::class]);
     }
 }

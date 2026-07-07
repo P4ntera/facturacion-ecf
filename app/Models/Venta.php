@@ -9,10 +9,13 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 class Venta extends Model
 {
     use HasFactory;
+    use LogsActivity;
 
     protected $fillable = [
         'cliente_id', 'user_id', 'tipo_comprobante', 'ncf', 'ncf_modifica',
@@ -26,24 +29,24 @@ class Venta extends Model
     ];
 
     protected $casts = [
-        'tipo_comprobante'  => TipoComprobante::class,
-        'estado'            => EstadoVenta::class,
-        'estado_fiscal'     => EstadoFiscal::class,
-        'fecha'             => 'datetime',
-        'ecf_enviado_en'    => 'datetime',
-        'anulada_en'        => 'datetime',
-        'ecf_respuesta'     => 'array',
-        'tasa_cambio'       => 'decimal:4',
-        'subtotal'          => 'decimal:2',
-        'descuento'         => 'decimal:2',
-        'monto_gravado_18'  => 'decimal:2',
-        'monto_gravado_16'  => 'decimal:2',
-        'monto_gravado_0'   => 'decimal:2',
-        'monto_exento'      => 'decimal:2',
-        'itbis_18'          => 'decimal:2',
-        'itbis_16'          => 'decimal:2',
-        'total_itbis'       => 'decimal:2',
-        'total'             => 'decimal:2',
+        'tipo_comprobante' => TipoComprobante::class,
+        'estado' => EstadoVenta::class,
+        'estado_fiscal' => EstadoFiscal::class,
+        'fecha' => 'datetime',
+        'ecf_enviado_en' => 'datetime',
+        'anulada_en' => 'datetime',
+        'ecf_respuesta' => 'array',
+        'tasa_cambio' => 'decimal:4',
+        'subtotal' => 'decimal:2',
+        'descuento' => 'decimal:2',
+        'monto_gravado_18' => 'decimal:2',
+        'monto_gravado_16' => 'decimal:2',
+        'monto_gravado_0' => 'decimal:2',
+        'monto_exento' => 'decimal:2',
+        'itbis_18' => 'decimal:2',
+        'itbis_16' => 'decimal:2',
+        'total_itbis' => 'decimal:2',
+        'total' => 'decimal:2',
     ];
 
     public function cliente(): BelongsTo
@@ -69,5 +72,14 @@ class Venta extends Model
     public function esElectronica(): bool
     {
         return $this->ncf !== null;
+    }
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly(['cliente_id', 'tipo_comprobante', 'ncf', 'total', 'estado', 'estado_fiscal', 'motivo_anulacion'])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->useLogName('Ventas');
     }
 }

@@ -11,11 +11,14 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 #[ObservedBy(ProductoObserver::class)]
 class Producto extends Model
 {
     use HasFactory;
+    use LogsActivity;
 
     protected $fillable = [
         'codigo', 'nombre', 'descripcion', 'tipo', 'categoria_id',
@@ -24,14 +27,14 @@ class Producto extends Model
     ];
 
     protected $casts = [
-        'tipo'           => TipoProducto::class,
-        'tasa_itbis'     => TasaItbis::class,
+        'tipo' => TipoProducto::class,
+        'tasa_itbis' => TasaItbis::class,
         'controla_stock' => 'boolean',
-        'activo'         => 'boolean',
-        'costo'          => 'decimal:2',
-        'precio'         => 'decimal:2',
-        'stock'          => 'decimal:3',
-        'stock_minimo'   => 'decimal:3',
+        'activo' => 'boolean',
+        'costo' => 'decimal:2',
+        'precio' => 'decimal:2',
+        'stock' => 'decimal:3',
+        'stock_minimo' => 'decimal:3',
     ];
 
     public function categoria(): BelongsTo
@@ -73,5 +76,14 @@ class Producto extends Model
     public function scopeActivos(Builder $query): Builder
     {
         return $query->where('activo', true);
+    }
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly(['codigo', 'nombre', 'tipo', 'categoria_id', 'costo', 'precio', 'tasa_itbis', 'controla_stock', 'stock_minimo', 'activo'])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->useLogName('Productos');
     }
 }

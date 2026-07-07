@@ -29,8 +29,9 @@ class ClientePolicy
         return $user->can('gestionar_maestros');
     }
 
+    // Los maestros con historial no se borran físicamente: se desactivan (campo 'activo').
     public function delete(User $user, Cliente $cliente): bool
     {
-        return $user->can('gestionar_maestros');
+        return false;
     }
 }
