@@ -35,7 +35,7 @@
               <div>
                 <p class="font-semibold">{{ $this->clienteSeleccionado()->nombre }}</p>
                 @if ($this->clienteSeleccionado()->documento)
-                  <p class="text-sm" style="color:var(--text-muted)">{{ $this->clienteSeleccionado()->documento }}</p>
+                  <p class="pos-muted">{{ $this->clienteSeleccionado()->documento }}</p>
                 @endif
               </div>
               <button type="button" class="btn btn-secondary" wire:click="quitarCliente">Cambiar</button>
@@ -49,28 +49,24 @@
                   placeholder="Buscar cliente por nombre o documento..."
                   wire:model.live.debounce.300ms="busquedaCliente"
                 />
-                <button type="button" class="btn btn-secondary" style="white-space:nowrap" wire:click="seleccionarConsumidorFinal">
+                <button type="button" class="btn btn-secondary pos-nowrap" wire:click="seleccionarConsumidorFinal">
                   Consumidor Final
                 </button>
               </div>
 
               @if ($busquedaCliente !== '')
-                <ul class="divide-y rounded" style="border:1px solid var(--border)">
+                <ul class="pos-resultados">
                   @forelse ($this->clientesSugeridos() as $cliente)
                     <li>
-                      <button
-                        type="button"
-                        class="flex w-full items-center justify-between px-3 py-2 text-left"
-                        wire:click="seleccionarCliente({{ $cliente->id }})"
-                      >
+                      <button type="button" wire:click="seleccionarCliente({{ $cliente->id }})">
                         <span>{{ $cliente->nombre }}</span>
                         @if ($cliente->documento)
-                          <span class="text-sm" style="color:var(--text-muted)">{{ $cliente->documento }}</span>
+                          <span class="pos-muted">{{ $cliente->documento }}</span>
                         @endif
                       </button>
                     </li>
                   @empty
-                    <li class="px-3 py-2 text-sm" style="color:var(--text-muted)">Sin resultados.</li>
+                    <li class="pos-vacio">Sin resultados.</li>
                   @endforelse
                 </ul>
               @endif
@@ -92,9 +88,13 @@
             </div>
             <div>
               <label class="form-label">Próximo e-NCF</label>
-              <p class="form-input" style="background-color:var(--surface-muted)">
-                {{ $this->proximoNcf() ?? 'No disponible: carga un rango de NCF' }}
-              </p>
+              <div>
+                @if ($this->proximoNcf())
+                  <span class="badge badge-success">{{ $this->proximoNcf() }}</span>
+                @else
+                  <span class="badge badge-danger">No disponible: carga un rango de NCF</span>
+                @endif
+              </div>
             </div>
           </div>
         </div>
@@ -110,25 +110,23 @@
           />
 
           @if ($busquedaProducto !== '')
-            <ul class="mt-2 divide-y rounded" style="border:1px solid var(--border)">
+            <ul class="pos-resultados">
               @forelse ($this->productosSugeridos() as $producto)
                 <li>
-                  <button
-                    type="button"
-                    class="flex w-full items-center justify-between px-3 py-2 text-left"
-                    wire:click="agregarProducto({{ $producto->id }})"
-                  >
+                  <button type="button" wire:click="agregarProducto({{ $producto->id }})">
                     <span>{{ $producto->codigo }} — {{ $producto->nombre }}</span>
-                    <span class="text-sm" style="color:var(--text-muted)">
-                      RD$ {{ $producto->precio }}
+                    <span class="flex items-center gap-2 pos-muted">
+                      RD$ {{ number_format((float) $producto->precio, 2) }}
                       @if ($producto->controla_stock)
-                        · stock {{ $producto->stock }}
+                        <span class="badge {{ (float) $producto->stock > 0 ? 'badge-success' : 'badge-danger' }}">
+                          stock {{ number_format((float) $producto->stock, 2) }}
+                        </span>
                       @endif
                     </span>
                   </button>
                 </li>
               @empty
-                <li class="px-3 py-2 text-sm" style="color:var(--text-muted)">Sin resultados.</li>
+                <li class="pos-vacio">Sin resultados.</li>
               @endforelse
             </ul>
           @endif
@@ -142,11 +140,11 @@
               <thead>
                 <tr>
                   <th>Descripción</th>
-                  <th>Cantidad</th>
-                  <th>Precio</th>
-                  <th>Descuento</th>
-                  <th>Subtotal</th>
-                  <th></th>
+                  <th class="pos-num">Cantidad</th>
+                  <th class="pos-num">Precio</th>
+                  <th class="pos-num">Descuento</th>
+                  <th class="pos-num">Subtotal</th>
+                  <th>Acción</th>
                 </tr>
               </thead>
               <tbody>
@@ -157,12 +155,12 @@
                       @if ($this->lineaConStockInsuficiente($linea))
                         <div class="mt-1">
                           <span class="badge badge-danger">
-                            Stock insuficiente (disponible {{ $this->stockDeLinea($linea) }})
+                            Stock insuficiente (disponible {{ number_format((float) $this->stockDeLinea($linea), 2) }})
                           </span>
                         </div>
                       @endif
                     </td>
-                    <td style="width:7rem">
+                    <td class="pos-num">
                       <input
                         type="number"
                         min="0.001"
@@ -171,8 +169,8 @@
                         wire:model.live.debounce.400ms="carrito.{{ $indice }}.cantidad"
                       />
                     </td>
-                    <td>{{ $linea['precio_unitario'] }}</td>
-                    <td style="width:7rem">
+                    <td class="pos-num">RD$ {{ number_format((float) $linea['precio_unitario'], 2) }}</td>
+                    <td class="pos-num">
                       <input
                         type="number"
                         min="0"
@@ -181,7 +179,7 @@
                         wire:model.live.debounce.400ms="carrito.{{ $indice }}.descuento"
                       />
                     </td>
-                    <td>{{ $this->subtotalLinea($linea) }}</td>
+                    <td class="pos-num">RD$ {{ number_format((float) $this->subtotalLinea($linea), 2) }}</td>
                     <td>
                       <button type="button" class="btn btn-danger" wire:click="quitarLinea({{ $indice }})">
                         Quitar
@@ -190,7 +188,7 @@
                   </tr>
                 @empty
                   <tr>
-                    <td colspan="6" class="text-center" style="color:var(--text-muted)">
+                    <td colspan="6" class="text-center pos-muted">
                       Agrega productos al carrito buscándolos arriba.
                     </td>
                   </tr>
@@ -203,7 +201,7 @@
 
       {{-- Totales --}}
       <div class="space-y-4">
-        <div class="card">
+        <div class="card pos-totales">
           <h3 class="card-title">Totales</h3>
 
           <div class="mb-4">
@@ -211,39 +209,39 @@
             <input type="number" min="0" step="0.01" class="form-input" wire:model.live.debounce.400ms="descuentoGlobal" />
           </div>
 
-          <dl class="space-y-1 text-sm">
-            <div class="flex items-center justify-between">
+          <dl>
+            <div>
               <dt>Subtotal</dt>
-              <dd>{{ $totales['subtotal'] }}</dd>
+              <dd>RD$ {{ number_format((float) $totales['subtotal'], 2) }}</dd>
             </div>
-            <div class="flex items-center justify-between">
+            <div>
               <dt>ITBIS 18%</dt>
-              <dd>{{ $totales['itbis_18'] }}</dd>
+              <dd>RD$ {{ number_format((float) $totales['itbis_18'], 2) }}</dd>
             </div>
-            <div class="flex items-center justify-between">
+            <div>
               <dt>ITBIS 16%</dt>
-              <dd>{{ $totales['itbis_16'] }}</dd>
+              <dd>RD$ {{ number_format((float) $totales['itbis_16'], 2) }}</dd>
             </div>
-            <div class="flex items-center justify-between">
+            <div>
               <dt>Descuento</dt>
-              <dd>-{{ $totales['descuento'] }}</dd>
+              <dd>-RD$ {{ number_format((float) $totales['descuento'], 2) }}</dd>
             </div>
           </dl>
 
-          <div class="mt-3 flex items-center justify-between border-t pt-3" style="border-color:var(--border)">
-            <span class="font-semibold" style="font-size:var(--fs-card)">Total</span>
-            <span class="font-semibold" style="font-size:var(--fs-card)">{{ $totales['total'] }}</span>
+          <div class="pos-total-final">
+            <span class="pos-total-label">Total</span>
+            <span class="pos-total-valor">RD$ {{ number_format((float) $totales['total'], 2) }}</span>
           </div>
 
           @if ($this->hayLineasConStockInsuficiente())
-            <p class="mt-3 text-sm" style="color:var(--danger)">
+            <p class="mt-3 pos-alerta">
               Hay líneas con stock insuficiente; corrígelas para poder cobrar.
             </p>
           @endif
 
           <button
             type="button"
-            class="btn btn-primary mt-4 w-full"
+            class="btn btn-primary btn-cobrar mt-4"
             wire:click="cobrar"
             @disabled(! $this->puedeCobrar())
           >

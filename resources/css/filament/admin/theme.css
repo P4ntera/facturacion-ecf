@@ -10,6 +10,12 @@
 @import '../../../design-system/typography.css';
 @import '../../../design-system/shadows.css';
 
+/* Excepción: el Punto de Venta (app/Filament/Pages/PuntoDeVenta.php) es una pantalla de
+   trabajo propia que sí usa los componentes .card/.table/.btn/.badge/.form-input del
+   design-system. pos.css los trae scopeados bajo `.pos-screen` para no afectar el resto
+   del panel. */
+@import '../../../design-system/pos.css';
+
 /* Ejemplo (a): escalar todo el panel cambiando el font-size base.
    :root { font-size: 15px; } */
 
