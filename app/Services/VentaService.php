@@ -78,7 +78,7 @@ class VentaService
             // rollback, el e-NCF no se "quema" (el contador también se revierte).
             $ncf = $this->ncfService->siguiente($tipoComprobante);
 
-            $total = bcadd(bcsub($acumulado['subtotal'], $descuentoGlobal, 2), $acumulado['total_itbis'], 2);
+            $total = $this->calcularTotalFinal($acumulado, $descuentoGlobal);
 
             $venta = Venta::create([
                 'cliente_id' => $cliente->id,
@@ -116,6 +116,45 @@ class VentaService
 
             return $venta->load('detalles.producto', 'cliente');
         });
+    }
+
+    /**
+     * Calcula el mismo desglose de ITBIS y totales que produciría registrar(), SIN persistir
+     * nada (no asigna e-NCF, no crea Venta/DetalleVenta, no mueve stock). Pensado para previews
+     * de UI (p. ej. el POS) que deben coincidir exactamente con lo que se guardará.
+     *
+     * @param  array{
+     *   descuento_global?: string|float|int|null,
+     *   lineas: array<int, array{
+     *     producto_id: int,
+     *     cantidad: float,
+     *     precio_unitario?: string|float|int|null,
+     *     descuento?: string|float|int|null,
+     *   }>,
+     * } $datos
+     * @return array<string, string>
+     *
+     * @throws VentaInvalidaException
+     */
+    public function previsualizar(array $datos): array
+    {
+        $settings = app(FacturacionSettings::class);
+        $lineas = $datos['lineas'] ?? [];
+
+        if (empty($lineas)) {
+            throw new VentaInvalidaException('La venta debe tener al menos una línea.');
+        }
+
+        $estrategia = $settings->precio_incluye_itbis ? new ConItbisIncluido : new SinItbisIncluido;
+        $descuentoGlobal = $this->aMoneda($datos['descuento_global'] ?? '0');
+
+        [, , $acumulado] = $this->procesarLineas($lineas, $settings, $estrategia);
+
+        return [
+            ...$acumulado,
+            'descuento' => $descuentoGlobal,
+            'total' => $this->calcularTotalFinal($acumulado, $descuentoGlobal),
+        ];
     }
 
     /**
@@ -252,5 +291,11 @@ class VentaService
     private function aMoneda(string|int|float $valor): string
     {
         return bcadd((string) $valor, '0', 2);
+    }
+
+    /** @param  array<string, string>  $acumulado */
+    private function calcularTotalFinal(array $acumulado, string $descuentoGlobal): string
+    {
+        return bcadd(bcsub($acumulado['subtotal'], $descuentoGlobal, 2), $acumulado['total_itbis'], 2);
     }
 }
