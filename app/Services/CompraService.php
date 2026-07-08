@@ -182,14 +182,12 @@ class CompraService
         $montoGravado18 = 0.0;
         $montoGravado16 = 0.0;
         $montoGravado0  = 0.0;
-        $montoExento    = 0.0;
 
         foreach ($lineas as $l) {
             match ($l['tasa_itbis']) {
                 TasaItbis::DIECIOCHO => $montoGravado18 += $l['subtotal'],
                 TasaItbis::DIECISEIS => $montoGravado16 += $l['subtotal'],
                 TasaItbis::CERO      => $montoGravado0  += $l['subtotal'],
-                TasaItbis::EXENTO    => $montoExento     += $l['subtotal'],
             };
         }
 
@@ -203,7 +201,7 @@ class CompraService
             'monto_gravado_18' => round($montoGravado18, 2),
             'monto_gravado_16' => round($montoGravado16, 2),
             'monto_gravado_0'  => round($montoGravado0, 2),
-            'monto_exento'     => round($montoExento, 2),
+            'monto_exento'     => 0.00,
             'itbis_18'         => $itbis18,
             'itbis_16'         => $itbis16,
             'itbis'            => $totalItbis,

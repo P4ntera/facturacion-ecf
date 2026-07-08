@@ -102,7 +102,7 @@ class CompraServiceTest extends TestCase
     public function test_producto_sin_tasa_gravada_no_genera_itbis(): void
     {
         $proveedor = Proveedor::factory()->create();
-        $producto  = $this->crearProducto(['tasa_itbis' => TasaItbis::EXENTO->value]);
+        $producto  = $this->crearProducto(['tasa_itbis' => TasaItbis::CERO->value]);
         $user      = User::factory()->create();
 
         $compra = app(CompraService::class)->crear([
@@ -204,7 +204,7 @@ class CompraServiceTest extends TestCase
         SecuenciaNcf::create([
             'tipo_comprobante' => TipoComprobante::COMPRAS->value,
             'prefijo'          => 'B41',
-            'secuencia_actual' => 0,
+            'secuencia_actual' => 1,
             'secuencia_hasta'  => 100,
             'vencimiento'      => today()->addYear(),
             'activa'           => true,
@@ -226,7 +226,7 @@ class CompraServiceTest extends TestCase
         ], $user->id);
 
         $this->assertEquals(TipoComprobante::COMPRAS, $compra->tipo_comprobante);
-        $this->assertEquals('B4100000001', $compra->ncf);
+        $this->assertEquals('B410000000001', $compra->ncf);
     }
 
     public function test_proveedor_formal_usa_ncf_digitado_manualmente(): void
