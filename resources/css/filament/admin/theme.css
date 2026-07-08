@@ -3,11 +3,12 @@
 @source '../../../../app/Filament/**/*';
 @source '../../../../resources/views/filament/**/*';
 
-/* Tokens del design-system del proyecto (paleta, tipografía, sombras). No se
+/* Tokens del design-system del proyecto (paleta, tipografía, espaciado, sombras). No se
    importan buttons/tables/components: Filament ya trae sus propios componentes. */
 @import '../../../design-system/variables.css';
 @import '../../../design-system/colors.css';
 @import '../../../design-system/typography.css';
+@import '../../../design-system/spacing.css';
 @import '../../../design-system/shadows.css';
 
 /* Excepción: el Punto de Venta (app/Filament/Pages/PuntoDeVenta.php) es una pantalla de
