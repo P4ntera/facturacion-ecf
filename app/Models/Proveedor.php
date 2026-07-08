@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
+use App\Enums\TipoProveedor;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
@@ -17,6 +19,7 @@ class Proveedor extends Model
 
     protected $fillable = [
         'rnc',
+        'tipo',
         'nombre',
         'nombre_comercial',
         'actividad_economica',
@@ -28,6 +31,7 @@ class Proveedor extends Model
     ];
 
     protected $casts = [
+        'tipo'   => TipoProveedor::class,
         'activo' => 'boolean',
     ];
 
@@ -38,5 +42,15 @@ class Proveedor extends Model
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs()
             ->useLogName('Proveedores');
+    }
+
+    public function esInformal(): bool
+    {
+        return $this->tipo === TipoProveedor::INFORMAL;
+    }
+
+    public function compras(): HasMany
+    {
+        return $this->hasMany(Compra::class);
     }
 }

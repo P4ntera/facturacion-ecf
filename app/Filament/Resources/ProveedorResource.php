@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\TipoProveedor;
 use App\Filament\Resources\ProveedorResource\Pages;
 use App\Models\Proveedor;
 use App\Services\DgiiRncService;
@@ -19,6 +20,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\ToggleColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
+use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 
 class ProveedorResource extends Resource
@@ -102,6 +104,17 @@ class ProveedorResource extends Resource
                         ])
                         ->default('ACTIVO')
                         ->required(),
+
+                    Select::make('tipo')
+                        ->label('Tipo de proveedor')
+                        ->options([
+                            TipoProveedor::FORMAL->value   => TipoProveedor::FORMAL->etiqueta(),
+                            TipoProveedor::INFORMAL->value => TipoProveedor::INFORMAL->etiqueta(),
+                        ])
+                        ->default(TipoProveedor::FORMAL->value)
+                        ->required()
+                        ->helperText('Informal: no emite comprobante fiscal propio; el sistema le genera uno (tipo 41) al comprarle.')
+                        ->columnSpanFull(),
                 ]),
 
             Section::make('Información General')
@@ -186,6 +199,15 @@ class ProveedorResource extends Resource
                         default => 'gray',
                     }),
 
+                TextColumn::make('tipo')
+                    ->label('Tipo')
+                    ->badge()
+                    ->formatStateUsing(fn (TipoProveedor $state) => match ($state) {
+                        TipoProveedor::FORMAL   => 'Formal',
+                        TipoProveedor::INFORMAL => 'Informal',
+                    })
+                    ->color(fn (TipoProveedor $state) => $state === TipoProveedor::INFORMAL ? 'warning' : 'gray'),
+
                 TextColumn::make('telefono')
                     ->label('Teléfono')
                     ->placeholder('—')
@@ -217,7 +239,16 @@ class ProveedorResource extends Resource
                         'DADO DE BAJA' => 'Dado de Baja',
                     ]),
 
+                SelectFilter::make('tipo')
+                    ->label('Tipo')
+                    ->options([
+                        TipoProveedor::FORMAL->value   => 'Formal',
+                        TipoProveedor::INFORMAL->value => 'Informal',
+                    ]),
+
                 TernaryFilter::make('activo')->label('Activo en sistema')->default(true),
+
+                TrashedFilter::make(),
             ])
             ->recordActions([
                 EditAction::make(),

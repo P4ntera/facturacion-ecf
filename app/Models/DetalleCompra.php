@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\TasaItbis;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -12,10 +13,11 @@ class DetalleCompra extends Model
 
     protected $fillable = [
         'compra_id', 'producto_id',
-        'cantidad', 'costo_unitario', 'itbis_monto', 'subtotal',
+        'cantidad', 'costo_unitario', 'tasa_itbis', 'itbis_monto', 'subtotal',
     ];
 
     protected $casts = [
+        'tasa_itbis'     => TasaItbis::class,
         'cantidad'       => 'decimal:3',
         'costo_unitario' => 'decimal:2',
         'itbis_monto'    => 'decimal:2',
