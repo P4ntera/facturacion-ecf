@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Enums\TipoComprobante;
+use App\Exceptions\RangoNcfSolapadoException;
 use App\Filament\Resources\SecuenciaNcfResource\Pages;
 use App\Models\SecuenciaNcf;
 use App\Services\SecuenciaNcfService;
@@ -16,7 +17,6 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
-use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
@@ -51,9 +51,20 @@ class SecuenciaNcfResource extends Resource
                     ))
                     ->required()
                     ->live()
-                    ->afterStateUpdated(function (?string $state, Set $set, Get $get): void {
-                        if ($state !== null && blank($get('prefijo'))) {
+                    ->afterStateUpdated(function (?string $state, Set $set, Get $get, string $operation): void {
+                        if ($state === null) {
+                            return;
+                        }
+
+                        if (blank($get('prefijo'))) {
                             $set('prefijo', 'E'.$state);
+                        }
+
+                        if ($operation === 'create') {
+                            $set('secuencia_desde', app(SecuenciaNcfService::class)->sugerirSecuenciaDesde(
+                                TipoComprobante::from($state),
+                                (string) $get('prefijo'),
+                            ));
                         }
                     }),
 
@@ -63,8 +74,20 @@ class SecuenciaNcfResource extends Resource
                     ->maxLength(3)
                     ->regex('/^E\d{2}$/')
                     ->validationMessages(['regex' => 'El prefijo debe tener el formato "E" seguido de 2 dígitos (ej. E31).'])
-                    ->afterStateUpdated(fn (?string $state, Set $set) => $set('prefijo', strtoupper((string) $state)))
-                    ->live(onBlur: true),
+                    ->live(onBlur: true)
+                    ->afterStateUpdated(function (?string $state, Set $set, Get $get, string $operation): void {
+                        $state = strtoupper((string) $state);
+                        $set('prefijo', $state);
+
+                        $tipo = $get('tipo_comprobante');
+
+                        if ($operation === 'create' && $tipo !== null && preg_match('/^E\d{2}$/', $state) === 1) {
+                            $set('secuencia_desde', app(SecuenciaNcfService::class)->sugerirSecuenciaDesde(
+                                TipoComprobante::from($tipo),
+                                $state,
+                            ));
+                        }
+                    }),
 
                 TextInput::make('secuencia_desde')
                     ->label('Secuencia desde')
@@ -86,6 +109,7 @@ class SecuenciaNcfResource extends Resource
                     ->numeric()
                     ->integer()
                     ->required()
+                    ->live(onBlur: true)
                     ->rule(function (Get $get, ?SecuenciaNcf $record) {
                         return function (string $attribute, $value, \Closure $fail) use ($get, $record): void {
                             $desde = (int) $get('secuencia_desde');
@@ -98,6 +122,27 @@ class SecuenciaNcfResource extends Resource
 
                             if ($record !== null && (int) $value < (int) $record->secuencia_actual - 1) {
                                 $fail('El "hasta" no puede ser menor que la secuencia ya consumida.');
+
+                                return;
+                            }
+
+                            $tipo = $get('tipo_comprobante');
+                            $prefijo = $get('prefijo');
+
+                            if ($tipo === null || blank($prefijo)) {
+                                return;
+                            }
+
+                            try {
+                                app(SecuenciaNcfService::class)->validarSinSolapamiento(
+                                    TipoComprobante::from($tipo),
+                                    $prefijo,
+                                    $desde,
+                                    (int) $value,
+                                    ignorarId: $record?->id,
+                                );
+                            } catch (RangoNcfSolapadoException $e) {
+                                $fail($e->getMessage());
                             }
                         };
                     }),
@@ -129,9 +174,16 @@ class SecuenciaNcfResource extends Resource
                     ->label('Activa')
                     ->default(true)
                     ->live()
-                    ->rule(function (Get $get, ?SecuenciaNcf $record) {
-                        return function (string $attribute, $value, \Closure $fail) use ($get, $record): void {
-                            if (! $value) {
+                    ->helperText(
+                        'Si ya hay un rango activo para este comprobante, este se guardará ENCOLADO '
+                        .'(se activará automáticamente cuando se agote el actual).'
+                    )
+                    ->rule(function (Get $get, ?SecuenciaNcf $record, string $operation) {
+                        return function (string $attribute, $value, \Closure $fail) use ($get, $record, $operation): void {
+                            // Al crear, un rango en conflicto simplemente queda encolado (sin error);
+                            // ver CreateSecuenciaNcf::mutateFormDataBeforeCreate. Esta validación solo
+                            // aplica a la activación manual explícita de un rango ya existente.
+                            if ($operation === 'create' || ! $value) {
                                 return;
                             }
 
@@ -196,11 +248,23 @@ class SecuenciaNcfResource extends Resource
                     ->color(fn (?SecuenciaNcf $record) => $record?->vencimiento?->isPast() ? 'danger' : null)
                     ->sortable(),
 
-                IconColumn::make('activa')
-                    ->label('Activa')
-                    ->boolean()
-                    ->sortable(),
+                TextColumn::make('estado')
+                    ->label('Estado')
+                    ->badge()
+                    ->getStateUsing(fn (SecuenciaNcf $record) => match (app(SecuenciaNcfService::class)->estado($record)) {
+                        'activa' => 'Activa',
+                        'encolada' => 'Encolada',
+                        'agotada' => 'Agotada',
+                        'vencida' => 'Vencida',
+                    })
+                    ->color(fn (SecuenciaNcf $record) => match (app(SecuenciaNcfService::class)->estado($record)) {
+                        'activa' => 'success',
+                        'encolada' => 'info',
+                        'agotada' => 'warning',
+                        'vencida' => 'danger',
+                    }),
             ])
+            ->modifyQueryUsing(fn (Builder $query) => $query->orderBy('tipo_comprobante')->orderBy('secuencia_desde'))
             ->filters([
                 SelectFilter::make('tipo_comprobante')
                     ->label('Comprobante')
@@ -223,6 +287,26 @@ class SecuenciaNcfResource extends Resource
                         ->where('vencimiento', '<', today())),
             ])
             ->recordActions([
+                Action::make('activar')
+                    ->label('Activar')
+                    ->icon('heroicon-o-play')
+                    ->color('success')
+                    ->requiresConfirmation()
+                    ->visible(fn (SecuenciaNcf $record) => ! $record->activa)
+                    ->disabled(fn (SecuenciaNcf $record) => app(SecuenciaNcfService::class)
+                        ->existeRangoActivo($record->tipo_comprobante, ignorarId: $record->id))
+                    ->action(function (SecuenciaNcf $record): void {
+                        try {
+                            app(SecuenciaNcfService::class)->activarManualmente($record);
+                        } catch (RangoNcfSolapadoException $e) {
+                            Notification::make()->title($e->getMessage())->danger()->send();
+
+                            return;
+                        }
+
+                        Notification::make()->title('Rango activado')->success()->send();
+                    }),
+
                 Action::make('verProximo')
                     ->label('Ver próximo NCF')
                     ->icon('heroicon-o-eye')
@@ -240,8 +324,7 @@ class SecuenciaNcfResource extends Resource
 
                         $notificacion->send();
                     }),
-            ])
-            ->defaultSort('tipo_comprobante');
+            ]);
     }
 
     public static function getPages(): array
