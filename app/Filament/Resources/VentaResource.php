@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\AmbienteEcf;
 use App\Enums\EstadoFiscal;
 use App\Enums\EstadoVenta;
 use App\Enums\TipoComprobante;
@@ -65,7 +66,8 @@ class VentaResource extends Resource
                     TextEntry::make('estado_fiscal')
                         ->label('Estado fiscal')
                         ->badge()
-                        ->formatStateUsing(fn (EstadoFiscal $state) => self::etiquetaEstadoFiscal($state)),
+                        ->formatStateUsing(fn (EstadoFiscal $state) => self::etiquetaEstadoFiscal($state))
+                        ->color(fn (EstadoFiscal $state) => self::colorEstadoFiscal($state)),
                     TextEntry::make('motivo_anulacion')
                         ->label('Motivo de anulación')
                         ->visible(fn (Venta $record) => $record->estaAnulada())
@@ -143,12 +145,7 @@ class VentaResource extends Resource
                     ->label('Estado fiscal')
                     ->badge()
                     ->formatStateUsing(fn (EstadoFiscal $state) => self::etiquetaEstadoFiscal($state))
-                    ->color(fn (EstadoFiscal $state) => match ($state) {
-                        EstadoFiscal::ACEPTADO, EstadoFiscal::ACEPTADO_CONDICIONAL => 'success',
-                        EstadoFiscal::RECHAZADO => 'danger',
-                        EstadoFiscal::PENDIENTE, EstadoFiscal::EN_PROCESO => 'warning',
-                        EstadoFiscal::NO_APLICA => 'gray',
-                    }),
+                    ->color(fn (EstadoFiscal $state) => self::colorEstadoFiscal($state)),
             ])
             ->filters([
                 SelectFilter::make('estado')
@@ -168,6 +165,12 @@ class VentaResource extends Resource
                     ->label('Tipo de comprobante')
                     ->options(collect(TipoComprobante::cases())->mapWithKeys(
                         fn (TipoComprobante $tipo) => [$tipo->value => $tipo->etiqueta()]
+                    )),
+
+                SelectFilter::make('ambiente')
+                    ->label('Ambiente DGII')
+                    ->options(collect(AmbienteEcf::cases())->mapWithKeys(
+                        fn (AmbienteEcf $ambiente) => [$ambiente->value => $ambiente->etiqueta()]
                     )),
 
                 SelectFilter::make('cliente_id')
@@ -241,6 +244,17 @@ class VentaResource extends Resource
             EstadoFiscal::ACEPTADO => 'Aceptado',
             EstadoFiscal::ACEPTADO_CONDICIONAL => 'Aceptado condicional',
             EstadoFiscal::RECHAZADO => 'Rechazado',
+        };
+    }
+
+    private static function colorEstadoFiscal(EstadoFiscal $estado): string
+    {
+        return match ($estado) {
+            EstadoFiscal::ACEPTADO => 'success',
+            EstadoFiscal::ACEPTADO_CONDICIONAL => 'warning',
+            EstadoFiscal::RECHAZADO => 'danger',
+            EstadoFiscal::EN_PROCESO => 'info',
+            EstadoFiscal::PENDIENTE, EstadoFiscal::NO_APLICA => 'gray',
         };
     }
 }

@@ -29,12 +29,32 @@ class EnvioEcfService
         }
 
         $respuesta = $this->gateway->enviar($ecf);
+        $this->guardar($venta, $respuesta);
 
+        return $respuesta;
+    }
+
+    /**
+     * Refresca el estado fiscal consultando el track del PAC (acción "Refrescar estado" del
+     * Resource). Reutiliza el mismo mapeo/guardado que enviar().
+     */
+    public function refrescarEstado(Venta $venta): RespuestaEcf
+    {
+        if ($venta->pac_id === null) {
+            return new RespuestaEcf(exito: false, errorMessage: 'Esta venta todavía no se ha enviado al PAC.');
+        }
+
+        $respuesta = $this->gateway->consultarTrack($venta->pac_id);
+        $this->guardar($venta, $respuesta);
+
+        return $respuesta;
+    }
+
+    private function guardar(Venta $venta, RespuestaEcf $respuesta): void
+    {
         DB::transaction(function () use ($venta, $respuesta) {
             $venta->update($this->atributosParaGuardar($venta, $respuesta));
         });
-
-        return $respuesta;
     }
 
     private function rechazarPorDatosInvalidos(Venta $venta, EcfInvalidoException $e): RespuestaEcf
@@ -68,6 +88,7 @@ class EnvioEcfService
             'codigo_seguridad' => $respuesta->codigoSeguridad ?? $venta->codigo_seguridad,
             'dgii_url' => $respuesta->dgiiUrl ?? $venta->dgii_url,
             'xml_url' => $respuesta->xmlUrl ?? $venta->xml_url,
+            'ambiente' => $respuesta->ambiente ?? $venta->ambiente,
             'ecf_enviado_en' => now(),
             'ecf_respuesta' => $respuesta->responseJson,
         ];

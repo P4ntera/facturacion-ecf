@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\AmbienteEcf;
 use App\Enums\EstadoFiscal;
 use App\Enums\EstadoVenta;
 use App\Enums\TipoComprobante;
@@ -29,7 +30,7 @@ class Venta extends Model
         'monto_gravado_18', 'monto_gravado_16', 'monto_gravado_0', 'monto_exento',
         'itbis_18', 'itbis_16', 'total_itbis', 'total',
         'estado', 'estado_fiscal', 'ecf_track_id',
-        'pac_id', 'codigo_seguridad', 'dgii_url', 'xml_url',
+        'pac_id', 'codigo_seguridad', 'dgii_url', 'xml_url', 'ambiente',
         'ecf_enviado_en', 'ecf_respuesta',
         'motivo_anulacion', 'anulada_en',
     ];
@@ -39,6 +40,7 @@ class Venta extends Model
         'estado' => EstadoVenta::class,
         'estado_fiscal' => EstadoFiscal::class,
         'tipo_pago' => TipoPago::class,
+        'ambiente' => AmbienteEcf::class,
         'fecha_limite_pago' => 'date',
         'fecha' => 'datetime',
         'ecf_enviado_en' => 'datetime',

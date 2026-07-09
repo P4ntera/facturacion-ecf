@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Enums\AmbienteEcf;
+use App\Enums\EstadoFiscal;
 use App\Enums\TasaItbis;
 use App\Enums\TipoComprobante;
 use App\Enums\TipoProducto;
@@ -120,6 +122,26 @@ class VentaResourceTest extends TestCase
         Livewire::actingAs($this->usuarioConPermisos(['registrar_ventas', 'anular_ventas']))
             ->test(ListVentas::class)
             ->assertTableActionHidden('anular', $venta->refresh());
+    }
+
+    public function test_filtra_por_estado_fiscal_y_por_ambiente(): void
+    {
+        // El FakeGateway (cola 'sync' en pruebas) acepta la venta automáticamente al cobrar.
+        $venta = $this->crearVenta()->refresh();
+        $this->assertSame(EstadoFiscal::ACEPTADO, $venta->estado_fiscal);
+        $this->assertSame(AmbienteEcf::TESTECF, $venta->ambiente);
+
+        Livewire::actingAs($this->usuarioConPermisos(['registrar_ventas']))
+            ->test(ListVentas::class)
+            ->filterTable('estado_fiscal', EstadoFiscal::ACEPTADO->value)
+            ->assertCanSeeTableRecords([$venta])
+            ->filterTable('estado_fiscal', EstadoFiscal::RECHAZADO->value)
+            ->assertCanNotSeeTableRecords([$venta])
+            ->removeTableFilter('estado_fiscal')
+            ->filterTable('ambiente', AmbienteEcf::TESTECF->value)
+            ->assertCanSeeTableRecords([$venta])
+            ->filterTable('ambiente', AmbienteEcf::ECF->value)
+            ->assertCanNotSeeTableRecords([$venta]);
     }
 
     public function test_la_pagina_de_ver_muestra_cabecera_y_lineas(): void
