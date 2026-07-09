@@ -2,11 +2,14 @@
 
 namespace App\Filament\Pages;
 
+use App\Enums\AmbienteEcf;
 use App\Settings\EmpresaSettings;
 use BackedEnum;
 use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Pages\SettingsPage;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use UnitEnum;
@@ -71,6 +74,34 @@ class ManageEmpresa extends SettingsPage
                     ->disk('public')
                     ->directory('logos')
                     ->columnSpanFull(),
+
+                Section::make('Integración e-CF (PAC)')
+                    ->description('Credenciales del proveedor autorizado de servicios (PAC) para emitir e-CF ante la DGII.')
+                    ->columnSpanFull()
+                    ->columns(2)
+                    ->components([
+                        TextInput::make('dgii_api_key')
+                            ->label('API Key del PAC')
+                            ->password()
+                            ->revealable()
+                            ->maxLength(255)
+                            ->helperText('Se guarda cifrada; nunca se muestra en reportes ni registros del sistema.')
+                            ->columnSpanFull(),
+
+                        Select::make('dgii_ambiente')
+                            ->label('Ambiente')
+                            ->options(collect(AmbienteEcf::cases())->mapWithKeys(
+                                fn (AmbienteEcf $ambiente) => [$ambiente->value => $ambiente->etiqueta()]
+                            ))
+                            ->required(),
+
+                        TextInput::make('dgii_base_url')
+                            ->label('Base URL del PAC')
+                            ->helperText('Avanzado: solo cámbiala si el PAC te asignó una URL distinta.')
+                            ->url()
+                            ->required()
+                            ->maxLength(255),
+                    ]),
             ]);
     }
 }
