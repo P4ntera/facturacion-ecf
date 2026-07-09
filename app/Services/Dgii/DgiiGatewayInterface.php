@@ -32,8 +32,14 @@ interface DgiiGatewayInterface
 
     /**
      * POST {base}/{rnc}/fe/aprobacioncomercial/api/ecf — reenvía tal cual una aprobación
-     * comercial recibida en nuestro endpoint público, o la que nosotros emitimos sobre un e-CF
-     * de un proveedor.
+     * comercial que otra empresa nos envió sobre un e-CF que nosotros emitimos.
      */
     public function reenviarAprobacionComercial(string $xml): RespuestaEcf;
+
+    /**
+     * POST /aprobacion-comercial — registra ante el PAC NUESTRA decisión (como compradores) sobre
+     * un e-CF recibido de un proveedor: distinto de reenviarAprobacionComercial(), que reenvía una
+     * aprobación que YA nos llegó de un tercero.
+     */
+    public function registrarAprobacionComercial(array $datos): RespuestaEcf;
 }

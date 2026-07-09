@@ -51,6 +51,11 @@ final class FakeGateway implements DgiiGatewayInterface
         return $this->respuestaAceptada();
     }
 
+    public function registrarAprobacionComercial(array $datos): RespuestaEcf
+    {
+        return $this->respuestaAceptada($datos['encf'] ?? null);
+    }
+
     /**
      * @param  bool  $incluirTrack  El "track" del PAC devuelve el historial completo hasta el
      *                              momento de la consulta, así que agrega un evento más al final.

@@ -78,6 +78,11 @@ final class EcfPlatformGateway implements DgiiGatewayInterface
         return $this->reenviarXml(CanalRecepcionEcf::APROBACION_COMERCIAL, $xml);
     }
 
+    public function registrarAprobacionComercial(array $datos): RespuestaEcf
+    {
+        return $this->peticion(fn (PendingRequest $cliente) => $cliente->post('/aprobacion-comercial', $datos));
+    }
+
     /** El XML se reenvía tal cual, sin transformarlo: el cuerpo del POST es el XML recibido. */
     private function reenviarXml(CanalRecepcionEcf $canal, string $xml): RespuestaEcf
     {

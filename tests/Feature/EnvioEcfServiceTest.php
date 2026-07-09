@@ -108,6 +108,11 @@ class EnvioEcfServiceTest extends TestCase
             {
                 return $this->respuesta;
             }
+
+            public function registrarAprobacionComercial(array $datos): RespuestaEcf
+            {
+                return $this->respuesta;
+            }
         });
     }
 
@@ -211,6 +216,11 @@ class EnvioEcfServiceTest extends TestCase
             }
 
             public function reenviarAprobacionComercial(string $xml): RespuestaEcf
+            {
+                throw new \RuntimeException('no usado');
+            }
+
+            public function registrarAprobacionComercial(array $datos): RespuestaEcf
             {
                 throw new \RuntimeException('no usado');
             }
