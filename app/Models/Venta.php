@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\EstadoFiscal;
 use App\Enums\EstadoVenta;
 use App\Enums\TipoComprobante;
+use App\Enums\TipoPago;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -19,11 +20,13 @@ class Venta extends Model
 
     protected $fillable = [
         'cliente_id', 'user_id', 'tipo_comprobante', 'ncf', 'ncf_modifica',
+        'tipo_pago', 'fecha_limite_pago',
         'fecha', 'moneda', 'tasa_cambio',
         'subtotal', 'descuento',
         'monto_gravado_18', 'monto_gravado_16', 'monto_gravado_0', 'monto_exento',
         'itbis_18', 'itbis_16', 'total_itbis', 'total',
         'estado', 'estado_fiscal', 'ecf_track_id',
+        'pac_id', 'codigo_seguridad', 'dgii_url', 'xml_url',
         'ecf_enviado_en', 'ecf_respuesta',
         'motivo_anulacion', 'anulada_en',
     ];
@@ -32,6 +35,8 @@ class Venta extends Model
         'tipo_comprobante' => TipoComprobante::class,
         'estado' => EstadoVenta::class,
         'estado_fiscal' => EstadoFiscal::class,
+        'tipo_pago' => TipoPago::class,
+        'fecha_limite_pago' => 'date',
         'fecha' => 'datetime',
         'ecf_enviado_en' => 'datetime',
         'anulada_en' => 'datetime',
