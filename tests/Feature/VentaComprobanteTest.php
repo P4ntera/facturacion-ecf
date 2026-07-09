@@ -11,7 +11,9 @@ use App\Models\SecuenciaNcf;
 use App\Models\User;
 use App\Models\Venta;
 use App\Services\VentaService;
+use App\Settings\EmpresaSettings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use SimpleSoftwareIO\QrCode\Facades\QrCode;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -85,5 +87,39 @@ class VentaComprobanteTest extends TestCase
             ->get(route('ventas.pdf', $venta));
 
         $response->assertForbidden();
+    }
+
+    /**
+     * Se prueba el Blade directamente (no el PDF binario ya comprimido por dompdf): la venta
+     * viene ACEPTADA del FakeGateway (cola 'sync' en pruebas), así que ya tiene dgii_url y
+     * codigo_seguridad para el timbre.
+     */
+    public function test_el_comprobante_incluye_el_qr_y_el_codigo_de_seguridad_cuando_esta_aceptada(): void
+    {
+        $venta = $this->crearVenta()->refresh()->load('detalles.producto', 'cliente');
+        $this->assertNotNull($venta->dgii_url);
+
+        $html = view('ventas.comprobante', [
+            'venta' => $venta,
+            'empresa' => app(EmpresaSettings::class),
+            'qrTimbre' => base64_encode((string) QrCode::format('png')->size(120)->generate($venta->dgii_url)),
+        ])->render();
+
+        $this->assertStringContainsString('data:image/png;base64,', $html);
+        $this->assertStringContainsString($venta->codigo_seguridad, $html);
+        $this->assertStringContainsString($venta->dgii_url, $html);
+    }
+
+    public function test_el_comprobante_no_muestra_el_timbre_si_no_hay_dgii_url(): void
+    {
+        $venta = $this->crearVenta()->refresh()->load('detalles.producto', 'cliente');
+
+        $html = view('ventas.comprobante', [
+            'venta' => $venta,
+            'empresa' => app(EmpresaSettings::class),
+            'qrTimbre' => null,
+        ])->render();
+
+        $this->assertStringNotContainsString('data:image/png;base64,', $html);
     }
 }

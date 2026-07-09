@@ -54,6 +54,11 @@
             font-size: 13px;
         }
         .clear { clear: both; }
+        .timbre { margin-top: 20px; border-top: 1px solid #d1d5db; padding-top: 10px; }
+        .timbre td { vertical-align: top; }
+        .timbre .qr { width: 90px; height: 90px; }
+        .timbre .datos { font-size: 10px; color: #374151; padding-left: 12px; }
+        .timbre .datos p { margin: 0 0 3px; }
         .footer { margin-top: 40px; font-size: 10px; color: #6b7280; text-align: center; }
     </style>
 </head>
@@ -161,6 +166,23 @@
     </table>
 
     <div class="clear"></div>
+
+    @if ($qrTimbre)
+        <table class="timbre">
+            <tr>
+                <td style="width: 90px;">
+                    <img src="data:image/png;base64,{{ $qrTimbre }}" class="qr" alt="QR del timbre DGII">
+                </td>
+                <td class="datos">
+                    <p><strong>Comprobante fiscal electrónico válido.</strong></p>
+                    @if ($venta->codigo_seguridad)
+                        <p>Código de seguridad: {{ $venta->codigo_seguridad }}</p>
+                    @endif
+                    <p>Consulta este e-CF en: {{ $venta->dgii_url }}</p>
+                </td>
+            </tr>
+        </table>
+    @endif
 
     @if ($venta->estaAnulada())
         <div class="footer">

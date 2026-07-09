@@ -9,7 +9,9 @@ use App\Enums\EventoEcf;
 use App\Enums\TipoComprobante;
 use App\Exceptions\VentaYaAnuladaException;
 use App\Filament\Resources\VentaResource\Pages;
+use App\Jobs\EnviarEcfJob;
 use App\Models\Venta;
+use App\Services\Dgii\EnvioEcfService;
 use App\Services\VentaService;
 use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
@@ -281,8 +283,52 @@ class VentaResource extends Resource
 
                         Notification::make()->title('Venta anulada correctamente')->success()->send();
                     }),
+
+                self::refrescarEstadoAction(),
+                self::reintentarEnvioAction(),
             ])
             ->defaultSort('fecha', 'desc');
+    }
+
+    public static function refrescarEstadoAction(): Action
+    {
+        return Action::make('refrescarEstado')
+            ->label('Refrescar estado')
+            ->icon('heroicon-o-arrow-path')
+            ->color('gray')
+            ->visible(fn (Venta $record) => $record->pac_id !== null
+                && (auth()->user()?->can('gestionar_ecf') ?? false))
+            ->action(function (Venta $record): void {
+                $respuesta = app(EnvioEcfService::class)->refrescarEstado($record);
+                $record->refresh();
+
+                if (! $respuesta->exito) {
+                    Notification::make()->title($respuesta->errorMessage)->danger()->send();
+
+                    return;
+                }
+
+                Notification::make()
+                    ->title('Estado fiscal actualizado: '.self::etiquetaEstadoFiscal($record->estado_fiscal))
+                    ->success()
+                    ->send();
+            });
+    }
+
+    public static function reintentarEnvioAction(): Action
+    {
+        return Action::make('reintentarEnvio')
+            ->label('Reintentar envío')
+            ->icon('heroicon-o-paper-airplane')
+            ->color('warning')
+            ->visible(fn (Venta $record) => (auth()->user()?->can('gestionar_ecf') ?? false)
+                && ($record->estado_fiscal === EstadoFiscal::PENDIENTE || isset($record->ecf_respuesta['error'])))
+            ->requiresConfirmation()
+            ->action(function (Venta $record): void {
+                EnviarEcfJob::dispatch($record);
+
+                Notification::make()->title('Reintento de envío encolado')->success()->send();
+            });
     }
 
     public static function getPages(): array

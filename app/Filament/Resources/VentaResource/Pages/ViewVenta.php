@@ -11,6 +11,9 @@ class ViewVenta extends ViewRecord
 
     protected function getHeaderActions(): array
     {
-        return [];
+        return [
+            VentaResource::refrescarEstadoAction(),
+            VentaResource::reintentarEnvioAction(),
+        ];
     }
 }
