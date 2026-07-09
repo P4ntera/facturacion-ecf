@@ -98,6 +98,16 @@ class EnvioEcfServiceTest extends TestCase
             {
                 return null;
             }
+
+            public function reenviarRecepcion(string $xml): RespuestaEcf
+            {
+                return $this->respuesta;
+            }
+
+            public function reenviarAprobacionComercial(string $xml): RespuestaEcf
+            {
+                return $this->respuesta;
+            }
         });
     }
 
@@ -191,6 +201,16 @@ class EnvioEcfServiceTest extends TestCase
             }
 
             public function buscarContribuyente(string $valor): ?array
+            {
+                throw new \RuntimeException('no usado');
+            }
+
+            public function reenviarRecepcion(string $xml): RespuestaEcf
+            {
+                throw new \RuntimeException('no usado');
+            }
+
+            public function reenviarAprobacionComercial(string $xml): RespuestaEcf
             {
                 throw new \RuntimeException('no usado');
             }

@@ -90,6 +90,16 @@ class EnviarEcfJobTest extends TestCase
             {
                 throw new \RuntimeException('no usado');
             }
+
+            public function reenviarRecepcion(string $xml): RespuestaEcf
+            {
+                throw new \RuntimeException('no usado');
+            }
+
+            public function reenviarAprobacionComercial(string $xml): RespuestaEcf
+            {
+                throw new \RuntimeException('no usado');
+            }
         });
 
         (new EnviarEcfJob($venta))->handle(app(EnvioEcfService::class));
@@ -126,6 +136,16 @@ class EnviarEcfJobTest extends TestCase
             public function buscarContribuyente(string $valor): ?array
             {
                 return null;
+            }
+
+            public function reenviarRecepcion(string $xml): RespuestaEcf
+            {
+                return new RespuestaEcf(exito: false);
+            }
+
+            public function reenviarAprobacionComercial(string $xml): RespuestaEcf
+            {
+                return new RespuestaEcf(exito: false);
             }
         });
 

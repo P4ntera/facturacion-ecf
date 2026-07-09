@@ -3,6 +3,7 @@
 namespace App\Services\Dgii;
 
 use App\Enums\AmbienteEcf;
+use App\Enums\CanalRecepcionEcf;
 use App\Exceptions\DgiiGatewayException;
 use App\Settings\EmpresaSettings;
 use Illuminate\Http\Client\PendingRequest;
@@ -65,6 +66,24 @@ final class EcfPlatformGateway implements DgiiGatewayInterface
         }
 
         return $response->successful() ? $response->json() : null;
+    }
+
+    public function reenviarRecepcion(string $xml): RespuestaEcf
+    {
+        return $this->reenviarXml(CanalRecepcionEcf::RECEPCION, $xml);
+    }
+
+    public function reenviarAprobacionComercial(string $xml): RespuestaEcf
+    {
+        return $this->reenviarXml(CanalRecepcionEcf::APROBACION_COMERCIAL, $xml);
+    }
+
+    /** El XML se reenvía tal cual, sin transformarlo: el cuerpo del POST es el XML recibido. */
+    private function reenviarXml(CanalRecepcionEcf $canal, string $xml): RespuestaEcf
+    {
+        return $this->peticion(fn (PendingRequest $cliente) => $cliente
+            ->withBody($xml, 'application/xml')
+            ->post("/{$this->settings->rnc}/fe/{$canal->segmentoPac()}/api/ecf"));
     }
 
     private function peticion(\Closure $llamada): RespuestaEcf

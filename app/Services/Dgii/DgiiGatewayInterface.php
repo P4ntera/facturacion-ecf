@@ -23,4 +23,17 @@ interface DgiiGatewayInterface
 
     /** GET /dgii/rnc */
     public function buscarContribuyente(string $valor): ?array;
+
+    /**
+     * POST {base}/{rnc}/fe/recepcion/api/ecf — reenvía tal cual (sin transformar) un e-CF que
+     * otra empresa nos envió, recibido en nuestro endpoint público de recepción.
+     */
+    public function reenviarRecepcion(string $xml): RespuestaEcf;
+
+    /**
+     * POST {base}/{rnc}/fe/aprobacioncomercial/api/ecf — reenvía tal cual una aprobación
+     * comercial recibida en nuestro endpoint público, o la que nosotros emitimos sobre un e-CF
+     * de un proveedor.
+     */
+    public function reenviarAprobacionComercial(string $xml): RespuestaEcf;
 }
