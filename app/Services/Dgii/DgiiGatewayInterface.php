@@ -24,6 +24,9 @@ interface DgiiGatewayInterface
     /** GET /dgii/rnc */
     public function buscarContribuyente(string $valor): ?array;
 
+    /** GET /dgii/jce — datos de una persona física por cédula (Junta Central Electoral). */
+    public function buscarCedulaJce(string $cedula): ?array;
+
     /**
      * POST {base}/{rnc}/fe/recepcion/api/ecf — reenvía tal cual (sin transformar) un e-CF que
      * otra empresa nos envió, recibido en nuestro endpoint público de recepción.

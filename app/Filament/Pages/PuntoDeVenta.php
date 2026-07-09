@@ -11,6 +11,7 @@ use App\Exceptions\StockInsuficienteException;
 use App\Exceptions\VentaInvalidaException;
 use App\Models\Cliente;
 use App\Models\Producto;
+use App\Services\Dgii\ConsultaContribuyenteService;
 use App\Services\SecuenciaNcfService;
 use App\Services\VentaService;
 use App\Settings\FacturacionSettings;
@@ -107,6 +108,46 @@ class PuntoDeVenta extends Page
     public function quitarCliente(): void
     {
         $this->clienteId = null;
+    }
+
+    /**
+     * Busca el documento tecleado en busquedaCliente contra la DGII/JCE (vía el PAC); si lo
+     * encuentra, crea (o reutiliza, si ya existe con ese documento) el Cliente y lo selecciona.
+     */
+    public function buscarClienteEnDgii(): void
+    {
+        $resultado = app(ConsultaContribuyenteService::class)->buscar($this->busquedaCliente);
+
+        if ($resultado === null) {
+            Notification::make()
+                ->title('No encontrado')
+                ->body('Ingresa un RNC (9 dígitos) o Cédula (11 dígitos) válido y registrado en la DGII/JCE.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $cliente = Cliente::query()->firstOrCreate(
+            ['documento' => $resultado['documento']],
+            ['nombre' => $resultado['nombre'], 'tipo_documento' => $resultado['tipo'], 'activo' => true],
+        );
+
+        $this->clienteId = $cliente->id;
+        $this->busquedaCliente = '';
+
+        Notification::make()->title("Cliente cargado desde la DGII/JCE: {$cliente->nombre}")->success()->send();
+    }
+
+    /** La Factura de Crédito Fiscal (e-CF 31) exige el RNC del comprador. */
+    public function requiereRncComprador(): bool
+    {
+        return $this->tipoComprobante === TipoComprobante::FACTURA_CREDITO_FISCAL->value;
+    }
+
+    public function faltaRncComprador(): bool
+    {
+        return $this->requiereRncComprador() && blank($this->clienteSeleccionado()?->documento);
     }
 
     /** @return Collection<int, Producto> */
@@ -219,16 +260,18 @@ class PuntoDeVenta extends Page
         return $this->clienteId !== null
             && ! empty($this->carrito)
             && ! $this->hayLineasConStockInsuficiente()
+            && ! $this->faltaRncComprador()
             && collect($this->carrito)->every(fn (array $linea) => (float) $linea['cantidad'] > 0);
     }
 
     public function cobrar(): void
     {
         if (! $this->puedeCobrar()) {
-            Notification::make()
-                ->title('Revisa el carrito antes de cobrar: cliente, líneas y stock.')
-                ->danger()
-                ->send();
+            $mensaje = $this->faltaRncComprador()
+                ? 'La Factura de Crédito Fiscal (e-CF 31) requiere el RNC del comprador: busca el cliente o cárgalo desde la DGII.'
+                : 'Revisa el carrito antes de cobrar: cliente, líneas y stock.';
+
+            Notification::make()->title($mensaje)->danger()->send();
 
             return;
         }

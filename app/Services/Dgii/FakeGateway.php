@@ -36,8 +36,17 @@ final class FakeGateway implements DgiiGatewayInterface
     {
         return [
             'rnc' => $valor,
-            'nombre' => 'Contribuyente de prueba',
+            'nombre' => 'Contribuyente de Prueba SRL',
             'estado' => 'ACTIVO',
+        ];
+    }
+
+    public function buscarCedulaJce(string $cedula): ?array
+    {
+        return [
+            'cedula' => $cedula,
+            'nombre' => 'Persona de Prueba',
+            'estado' => 'ACTIVA',
         ];
     }
 

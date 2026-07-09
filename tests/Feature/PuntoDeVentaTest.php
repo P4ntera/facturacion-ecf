@@ -3,14 +3,20 @@
 namespace Tests\Feature;
 
 use App\Enums\TasaItbis;
+use App\Enums\TipoComprobante;
+use App\Enums\TipoDocumentoCliente;
 use App\Enums\TipoProducto;
 use App\Filament\Pages\PuntoDeVenta;
+use App\Models\Cliente;
 use App\Models\Producto;
+use App\Models\SecuenciaNcf;
 use App\Models\User;
+use App\Services\Dgii\DgiiGatewayInterface;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
+use Tests\Support\GatewayStub;
 use Tests\TestCase;
 
 class PuntoDeVentaTest extends TestCase
@@ -101,6 +107,91 @@ class PuntoDeVentaTest extends TestCase
 
         $this->assertTrue($componente->instance()->hayLineasConStockInsuficiente());
         $this->assertFalse($componente->instance()->puedeCobrar());
+    }
+
+    public function test_tipo_31_sin_rnc_del_cliente_deshabilita_cobrar(): void
+    {
+        $producto = $this->producto();
+
+        $componente = Livewire::actingAs($this->vendedor())
+            ->test(PuntoDeVenta::class)
+            ->call('agregarProducto', $producto->id)
+            ->set('tipoComprobante', TipoComprobante::FACTURA_CREDITO_FISCAL->value);
+
+        $this->assertTrue($componente->instance()->faltaRncComprador());
+        $this->assertFalse($componente->instance()->puedeCobrar());
+    }
+
+    public function test_tipo_31_con_rnc_del_cliente_permite_cobrar(): void
+    {
+        SecuenciaNcf::create([
+            'tipo_comprobante' => TipoComprobante::FACTURA_CREDITO_FISCAL,
+            'prefijo' => 'E31',
+            'secuencia_desde' => 1,
+            'secuencia_actual' => 1,
+            'secuencia_hasta' => 100,
+            'vencimiento' => now()->addYear(),
+            'activa' => true,
+        ]);
+
+        $producto = $this->producto();
+        $cliente = Cliente::create([
+            'nombre' => 'Comercial Con RNC SRL',
+            'documento' => '130123456',
+            'tipo_documento' => TipoDocumentoCliente::RNC,
+            'activo' => true,
+        ]);
+
+        $componente = Livewire::actingAs($this->vendedor())
+            ->test(PuntoDeVenta::class)
+            ->call('agregarProducto', $producto->id)
+            ->call('seleccionarCliente', $cliente->id)
+            ->set('tipoComprobante', TipoComprobante::FACTURA_CREDITO_FISCAL->value);
+
+        $this->assertFalse($componente->instance()->faltaRncComprador());
+        $this->assertTrue($componente->instance()->puedeCobrar());
+    }
+
+    public function test_buscar_cliente_en_dgii_crea_y_selecciona_el_cliente(): void
+    {
+        $this->app->bind(DgiiGatewayInterface::class, fn () => new class extends GatewayStub
+        {
+            public function buscarContribuyente(string $valor): ?array
+            {
+                return ['rnc' => $valor, 'nombre' => 'Comercial Desde DGII SRL'];
+            }
+        });
+
+        $componente = Livewire::actingAs($this->vendedor())
+            ->test(PuntoDeVenta::class)
+            ->set('busquedaCliente', '130123456')
+            ->call('buscarClienteEnDgii');
+
+        $cliente = Cliente::where('documento', '130123456')->first();
+
+        $this->assertNotNull($cliente);
+        $this->assertSame('Comercial Desde DGII SRL', $cliente->nombre);
+        $componente->assertSet('clienteId', $cliente->id);
+        $componente->assertSet('busquedaCliente', '');
+    }
+
+    public function test_buscar_cliente_en_dgii_notifica_cuando_no_se_encuentra(): void
+    {
+        $this->app->bind(DgiiGatewayInterface::class, fn () => new class extends GatewayStub
+        {
+            public function buscarContribuyente(string $valor): ?array
+            {
+                return null;
+            }
+        });
+
+        Livewire::actingAs($this->vendedor())
+            ->test(PuntoDeVenta::class)
+            ->set('busquedaCliente', '130123456')
+            ->call('buscarClienteEnDgii')
+            ->assertNotified();
+
+        $this->assertDatabaseMissing('clientes', ['documento' => '130123456']);
     }
 
     public function test_un_usuario_sin_permiso_no_puede_acceder(): void

@@ -68,6 +68,19 @@ final class EcfPlatformGateway implements DgiiGatewayInterface
         return $response->successful() ? $response->json() : null;
     }
 
+    public function buscarCedulaJce(string $cedula): ?array
+    {
+        try {
+            $response = $this->cliente()->get('/dgii/jce', ['cedula' => $cedula]);
+        } catch (Throwable $e) {
+            $this->registrarFallo('buscarCedulaJce', $e);
+
+            return null;
+        }
+
+        return $response->successful() ? $response->json() : null;
+    }
+
     public function reenviarRecepcion(string $xml): RespuestaEcf
     {
         return $this->reenviarXml(CanalRecepcionEcf::RECEPCION, $xml);

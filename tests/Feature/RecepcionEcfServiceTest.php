@@ -84,6 +84,11 @@ class RecepcionEcfServiceTest extends TestCase
                 return null;
             }
 
+            public function buscarCedulaJce(string $cedula): ?array
+            {
+                return null;
+            }
+
             public function reenviarRecepcion(string $xml): RespuestaEcf
             {
                 return $this->respuesta;
@@ -144,6 +149,11 @@ class RecepcionEcfServiceTest extends TestCase
             }
 
             public function buscarContribuyente(string $valor): ?array
+            {
+                throw new \RuntimeException('no usado');
+            }
+
+            public function buscarCedulaJce(string $cedula): ?array
             {
                 throw new \RuntimeException('no usado');
             }

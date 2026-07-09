@@ -91,6 +91,11 @@ class EnviarEcfJobTest extends TestCase
                 throw new \RuntimeException('no usado');
             }
 
+            public function buscarCedulaJce(string $cedula): ?array
+            {
+                throw new \RuntimeException('no usado');
+            }
+
             public function reenviarRecepcion(string $xml): RespuestaEcf
             {
                 throw new \RuntimeException('no usado');
@@ -139,6 +144,11 @@ class EnviarEcfJobTest extends TestCase
             }
 
             public function buscarContribuyente(string $valor): ?array
+            {
+                return null;
+            }
+
+            public function buscarCedulaJce(string $cedula): ?array
             {
                 return null;
             }
