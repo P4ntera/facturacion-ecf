@@ -3,6 +3,7 @@
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RncController;
 use App\Http\Controllers\VentaComprobanteController;
+use App\Http\Controllers\VentaEcfXmlController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -25,5 +26,9 @@ Route::get('/rnc/{rnc}', [RncController::class, 'consultar'])
 Route::get('/ventas/{venta}/pdf', VentaComprobanteController::class)
     ->middleware(['auth', 'can:registrar_ventas'])
     ->name('ventas.pdf');
+
+Route::get('/ventas/{venta}/xml', VentaEcfXmlController::class)
+    ->middleware(['auth', 'can:registrar_ventas'])
+    ->name('ventas.ecf.xml');
 
 require __DIR__.'/auth.php';

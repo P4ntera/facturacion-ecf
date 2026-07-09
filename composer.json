@@ -12,6 +12,7 @@
         "filament/spatie-laravel-settings-plugin": "^4.11",
         "laravel/framework": "^12.0",
         "laravel/tinker": "^2.10.1",
+        "simplesoftwareio/simple-qrcode": "^4.2",
         "spatie/laravel-activitylog": "^4.12",
         "spatie/laravel-permission": "^8.0",
         "spatie/laravel-settings": "^3.9"

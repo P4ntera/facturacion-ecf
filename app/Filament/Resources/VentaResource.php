@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Enums\AmbienteEcf;
 use App\Enums\EstadoFiscal;
 use App\Enums\EstadoVenta;
+use App\Enums\EventoEcf;
 use App\Enums\TipoComprobante;
 use App\Exceptions\VentaYaAnuladaException;
 use App\Filament\Resources\VentaResource\Pages;
@@ -17,6 +18,7 @@ use Filament\Forms\Components\Textarea;
 use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Infolists\Components\RepeatableEntry\TableColumn;
 use Filament\Infolists\Components\TextEntry;
+use Filament\Infolists\Components\ViewEntry;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
@@ -72,6 +74,62 @@ class VentaResource extends Resource
                         ->label('Motivo de anulación')
                         ->visible(fn (Venta $record) => $record->estaAnulada())
                         ->columnSpan(3),
+                ]),
+
+            Section::make('Estado fiscal DGII')
+                ->columns(4)
+                ->visible(fn (Venta $record) => $record->esElectronica())
+                ->schema([
+                    TextEntry::make('estado_fiscal')
+                        ->label('Estado')
+                        ->badge()
+                        ->formatStateUsing(fn (EstadoFiscal $state) => self::etiquetaEstadoFiscal($state))
+                        ->color(fn (EstadoFiscal $state) => self::colorEstadoFiscal($state)),
+                    TextEntry::make('ecf_track_id')
+                        ->label('Track ID')
+                        ->placeholder('—'),
+                    TextEntry::make('codigo_seguridad')
+                        ->label('Código de seguridad')
+                        ->placeholder('—'),
+                    TextEntry::make('ambiente')
+                        ->label('Ambiente')
+                        ->placeholder('—')
+                        ->formatStateUsing(fn (?AmbienteEcf $state) => $state?->etiqueta()),
+
+                    TextEntry::make('descargar_xml')
+                        ->label('XML firmado')
+                        ->getStateUsing(fn () => 'Descargar XML')
+                        ->url(fn (Venta $record) => route('ventas.ecf.xml', $record))
+                        ->openUrlInNewTab()
+                        ->icon('heroicon-o-arrow-down-tray')
+                        ->visible(fn (Venta $record) => $record->pac_id !== null || $record->xml_url !== null)
+                        ->columnSpan(4),
+
+                    ViewEntry::make('dgii_url')
+                        ->label('Timbre / QR')
+                        ->view('filament.infolists.venta-qr-timbre')
+                        ->visible(fn (Venta $record) => $record->dgii_url !== null)
+                        ->columnSpan(4),
+
+                    RepeatableEntry::make('eventos')
+                        ->label('Historial DGII')
+                        ->getStateUsing(fn (Venta $record) => collect(data_get($record->ecf_respuesta, 'eventos', []))
+                            ->sortBy('timestamp')
+                            ->values()
+                            ->all())
+                        ->schema([
+                            TextEntry::make('timestamp')
+                                ->label('Fecha/hora')
+                                ->dateTime('d/m/Y H:i:s'),
+                            TextEntry::make('status')
+                                ->label('Evento')
+                                ->formatStateUsing(fn (?string $state) => $state !== null
+                                    ? (EventoEcf::tryFrom($state)?->etiqueta() ?? $state)
+                                    : null),
+                        ])
+                        ->columns(2)
+                        ->visible(fn (Venta $record) => filled(data_get($record->ecf_respuesta, 'eventos')))
+                        ->columnSpan(4),
                 ]),
 
             Section::make('Líneas')

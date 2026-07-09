@@ -18,12 +18,12 @@ final class FakeGateway implements DgiiGatewayInterface
 
     public function consultarEstado(string $pacId): RespuestaEcf
     {
-        return $this->respuestaAceptada(pacId: $pacId);
+        return $this->respuestaAceptada(pacId: $pacId, incluirTrack: true);
     }
 
     public function consultarTrack(string $pacId): RespuestaEcf
     {
-        return $this->respuestaAceptada(pacId: $pacId);
+        return $this->respuestaAceptada(pacId: $pacId, incluirTrack: true);
     }
 
     public function descargarXml(string $pacId): string
@@ -41,9 +41,24 @@ final class FakeGateway implements DgiiGatewayInterface
         ];
     }
 
-    private function respuestaAceptada(?string $encf = null, ?string $pacId = null): RespuestaEcf
+    /**
+     * @param  bool  $incluirTrack  El "track" del PAC devuelve el historial completo hasta el
+     *                              momento de la consulta, así que agrega un evento más al final.
+     */
+    private function respuestaAceptada(?string $encf = null, ?string $pacId = null, bool $incluirTrack = false): RespuestaEcf
     {
         $pacId ??= 'FAKE-'.Str::random(10);
+        $ahora = now();
+
+        $eventos = [
+            ['status' => 'AUTENTICACION_EXITOSA', 'timestamp' => $ahora->copy()->subSeconds(3)->toIso8601String()],
+            ['status' => 'DOCUMENTO_FIRMADO', 'timestamp' => $ahora->copy()->subSeconds(2)->toIso8601String()],
+            ['status' => 'RESPUESTA_DGII', 'timestamp' => $ahora->copy()->subSecond()->toIso8601String()],
+        ];
+
+        if ($incluirTrack) {
+            $eventos[] = ['status' => 'TRACK_STATUS', 'timestamp' => $ahora->toIso8601String()];
+        }
 
         return new RespuestaEcf(
             exito: true,
@@ -55,7 +70,7 @@ final class FakeGateway implements DgiiGatewayInterface
             dgiiUrl: "https://ecf.dgii.gov.do/fake/{$pacId}",
             xmlUrl: "https://ecf.dgii.gov.do/fake/{$pacId}/xml",
             ambiente: AmbienteEcf::TESTECF,
-            responseJson: ['estado' => 'Aceptado', 'pacId' => $pacId],
+            responseJson: ['estado' => 'Aceptado', 'pacId' => $pacId, 'eventos' => $eventos],
         );
     }
 }
