@@ -19,6 +19,7 @@ use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Repeater\TableColumn;
 use Filament\Forms\Components\Select;
@@ -328,6 +329,12 @@ class CompraResource extends Resource
                     TableColumn::make('ITBIS'),
                 ])
                 ->schema([
+                    // Hidden porque los TextEntry de abajo son solo de vista (Entry::isDehydrated()
+                    // siempre es false): sin estos campos el valor real no viaja al $data del submit.
+                    Hidden::make('producto_id'),
+                    Hidden::make('cantidad'),
+                    Hidden::make('costo_unitario'),
+
                     TextEntry::make('producto_id')
                         ->hiddenLabel()
                         ->formatStateUsing(fn ($state) => Producto::find($state)?->nombre ?? '—'),

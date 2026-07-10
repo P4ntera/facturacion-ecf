@@ -13,6 +13,7 @@ use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Repeater\TableColumn;
 use Filament\Forms\Components\Select;
@@ -148,6 +149,11 @@ class DevolucionCompraResource extends Resource
                     TableColumn::make('Cantidad a devolver')->markAsRequired(),
                 ])
                 ->schema([
+                    // Hidden porque los TextEntry de abajo son solo de vista (Entry::isDehydrated()
+                    // siempre es false): sin estos campos el valor real no viaja al $data del submit.
+                    Hidden::make('detalle_compra_id'),
+                    Hidden::make('cantidad'),
+
                     TextEntry::make('detalle_compra_id')
                         ->hiddenLabel()
                         ->formatStateUsing(fn ($state) => DetalleCompra::find($state)?->producto?->nombre ?? '—'),
