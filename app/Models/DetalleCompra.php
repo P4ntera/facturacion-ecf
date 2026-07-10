@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use App\Enums\EstadoDevolucion;
 use App\Enums\TasaItbis;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class DetalleCompra extends Model
 {
@@ -32,5 +34,24 @@ class DetalleCompra extends Model
     public function producto(): BelongsTo
     {
         return $this->belongsTo(Producto::class);
+    }
+
+    public function devoluciones(): HasMany
+    {
+        return $this->hasMany(DetalleDevolucionCompra::class);
+    }
+
+    /** Suma de lo devuelto en devoluciones NO anuladas de esta línea. */
+    public function cantidadDevuelta(): float
+    {
+        return (float) $this->devoluciones()
+            ->whereHas('devolucion', fn ($q) => $q->where('estado', '!=', EstadoDevolucion::ANULADA))
+            ->sum('cantidad');
+    }
+
+    /** Cuánto de lo comprado en esta línea aún puede devolverse. */
+    public function cantidadDisponibleParaDevolver(): float
+    {
+        return max(0, (float) $this->cantidad - $this->cantidadDevuelta());
     }
 }

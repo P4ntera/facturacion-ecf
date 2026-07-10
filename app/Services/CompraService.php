@@ -62,13 +62,14 @@ class CompraService
             }
 
             $compra = Compra::create([
-                'proveedor_id'     => $proveedor->id,
-                'user_id'          => $userId,
-                'tipo_comprobante' => $tipoComprobante,
-                'ncf'              => $ncf,
-                'fecha'            => $datos['fecha'],
-                'itbis_incluido'   => $itbisIncluido,
-                'estado'           => EstadoCompra::REGISTRADA,
+                'proveedor_id'         => $proveedor->id,
+                'user_id'              => $userId,
+                'tipo_comprobante'     => $tipoComprobante,
+                'ncf'                  => $ncf,
+                'fecha'                => $datos['fecha'],
+                'itbis_incluido'       => $itbisIncluido,
+                'monto_total_factura'  => $datos['monto_total_factura'] ?? null,
+                'estado'               => EstadoCompra::REGISTRADA,
                 ...$totales,
             ]);
 

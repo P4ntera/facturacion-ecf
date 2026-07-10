@@ -6,9 +6,11 @@ use App\Enums\TipoComprobante;
 use App\Exceptions\StockInsuficienteException;
 use App\Filament\Resources\CompraResource;
 use App\Services\CompraService;
+use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Support\Exceptions\Halt;
+use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -20,6 +22,26 @@ class CreateCompra extends CreateRecord
     protected function getRedirectUrl(): string
     {
         return $this->getResource()::getUrl('index');
+    }
+
+    protected function getHeaderActions(): array
+    {
+        return [
+            Action::make('verListado')
+                ->label('Ver todas las compras')
+                ->icon('heroicon-o-list-bullet')
+                ->color('gray')
+                ->modalHeading('Compras registradas')
+                ->modalWidth('7xl')
+                ->modalSubmitAction(false)
+                ->modalCancelAction(false)
+                ->modalContent(fn () => view('filament.compras.listado-modal-content')),
+        ];
+    }
+
+    public function getFooter(): ?View
+    {
+        return view('filament.compras.create-footer-script');
     }
 
     protected function getCreatedNotificationTitle(): ?string
@@ -65,12 +87,13 @@ class CreateCompra extends CreateRecord
     {
         try {
             return app(CompraService::class)->crear([
-                'proveedor_id'     => $data['proveedor_id'],
-                'tipo_comprobante' => filled($data['tipo_comprobante'] ?? null) ? TipoComprobante::from($data['tipo_comprobante']) : null,
-                'ncf'              => $data['ncf'] ?? null,
-                'fecha'            => $data['fecha'],
-                'itbis_incluido'   => $data['itbis_incluido'] ?? false,
-                'lineas'           => $data['lineas'],
+                'proveedor_id'         => $data['proveedor_id'],
+                'tipo_comprobante'     => filled($data['tipo_comprobante'] ?? null) ? TipoComprobante::from($data['tipo_comprobante']) : null,
+                'ncf'                  => $data['ncf'] ?? null,
+                'fecha'                => $data['fecha'],
+                'itbis_incluido'       => $data['itbis_incluido'] ?? false,
+                'monto_total_factura'  => $data['monto_total_factura'] ?? null,
+                'lineas'               => $data['lineas'],
             ], auth()->id());
         } catch (RuntimeException|StockInsuficienteException $e) {
             Notification::make()->title($e->getMessage())->danger()->send();

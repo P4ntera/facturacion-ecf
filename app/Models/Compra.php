@@ -15,27 +15,28 @@ class Compra extends Model
 
     protected $fillable = [
         'proveedor_id', 'user_id', 'tipo_comprobante', 'ncf', 'fecha',
-        'itbis_incluido',
+        'itbis_incluido', 'monto_total_factura',
         'subtotal', 'monto_gravado_18', 'monto_gravado_16', 'monto_gravado_0', 'monto_exento',
         'itbis_18', 'itbis_16', 'itbis', 'total',
         'estado', 'motivo_anulacion', 'anulada_en',
     ];
 
     protected $casts = [
-        'tipo_comprobante' => TipoComprobante::class,
-        'estado'           => EstadoCompra::class,
-        'itbis_incluido'   => 'boolean',
-        'fecha'            => 'datetime',
-        'anulada_en'       => 'datetime',
-        'subtotal'         => 'decimal:2',
-        'monto_gravado_18' => 'decimal:2',
-        'monto_gravado_16' => 'decimal:2',
-        'monto_gravado_0'  => 'decimal:2',
-        'monto_exento'     => 'decimal:2',
-        'itbis_18'         => 'decimal:2',
-        'itbis_16'         => 'decimal:2',
-        'itbis'            => 'decimal:2',
-        'total'            => 'decimal:2',
+        'tipo_comprobante'     => TipoComprobante::class,
+        'estado'               => EstadoCompra::class,
+        'itbis_incluido'       => 'boolean',
+        'fecha'                => 'datetime',
+        'anulada_en'           => 'datetime',
+        'monto_total_factura'  => 'decimal:2',
+        'subtotal'             => 'decimal:2',
+        'monto_gravado_18'     => 'decimal:2',
+        'monto_gravado_16'     => 'decimal:2',
+        'monto_gravado_0'      => 'decimal:2',
+        'monto_exento'         => 'decimal:2',
+        'itbis_18'             => 'decimal:2',
+        'itbis_16'             => 'decimal:2',
+        'itbis'                => 'decimal:2',
+        'total'                => 'decimal:2',
     ];
 
     public function proveedor(): BelongsTo
@@ -51,6 +52,11 @@ class Compra extends Model
     public function detalles(): HasMany
     {
         return $this->hasMany(DetalleCompra::class);
+    }
+
+    public function devoluciones(): HasMany
+    {
+        return $this->hasMany(DevolucionCompra::class);
     }
 
     public function estaAnulada(): bool

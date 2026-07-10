@@ -1,0 +1,1 @@
+<livewire:compras-listado-modal />

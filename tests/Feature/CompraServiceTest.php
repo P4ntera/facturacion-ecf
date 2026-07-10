@@ -250,6 +250,30 @@ class CompraServiceTest extends TestCase
         $this->assertEquals('B0100000001', $compra->ncf);
     }
 
+    public function test_guarda_monto_total_factura_aunque_no_coincida_con_el_calculado(): void
+    {
+        $proveedor = Proveedor::factory()->create();
+        $producto  = $this->crearProducto();
+        $user      = User::factory()->create();
+
+        // Total calculado real: 5 * 60 = 300 + 18% = 354. Se digita un monto distinto
+        // (ej. la factura trae flete aparte) y debe guardarse sin bloquear ni corregirse.
+        $compra = app(CompraService::class)->crear([
+            'proveedor_id'         => $proveedor->id,
+            'tipo_comprobante'     => TipoComprobante::COMPRAS,
+            'ncf'                  => null,
+            'fecha'                => now(),
+            'itbis_incluido'       => false,
+            'monto_total_factura'  => 400.00,
+            'lineas' => [
+                ['producto_id' => $producto->id, 'cantidad' => 5, 'costo_unitario' => 60],
+            ],
+        ], $user->id);
+
+        $this->assertEqualsWithDelta(354.00, (float) $compra->total, 0.01);
+        $this->assertEqualsWithDelta(400.00, (float) $compra->monto_total_factura, 0.01);
+    }
+
     public function test_anular_compras_solo_lo_tiene_administrador(): void
     {
         $this->seed(RolePermissionSeeder::class);

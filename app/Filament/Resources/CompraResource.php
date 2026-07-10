@@ -3,12 +3,14 @@
 namespace App\Filament\Resources;
 
 use App\Enums\EstadoCompra;
+use App\Enums\EstadoDevolucion;
 use App\Enums\TasaItbis;
 use App\Enums\TipoComprobante;
 use App\Enums\TipoProducto;
 use App\Enums\TipoProveedor;
 use App\Filament\Resources\CompraResource\Pages;
 use App\Models\Compra;
+use App\Models\DetalleCompra;
 use App\Models\Producto;
 use App\Models\Proveedor;
 use App\Services\CompraService;
@@ -181,6 +183,49 @@ class CompraResource extends Resource
                         ->live()
                         ->default(false)
                         ->columnSpanFull(),
+
+                    TextInput::make('monto_total_factura')
+                        ->label('Monto total de la factura')
+                        ->helperText('Total impreso en la factura física del proveedor, para cuadrar contra el detalle digitado abajo.')
+                        ->numeric()
+                        ->prefix('RD$')
+                        ->minValue(0)
+                        ->required()
+                        ->live(onBlur: true)
+                        ->hintColor('warning')
+                        ->hint(function (Get $get) {
+                            $montoFactura = $get('monto_total_factura');
+
+                            if (! filled($montoFactura)) {
+                                return null;
+                            }
+
+                            $lineas = collect($get('lineas') ?? [])
+                                ->filter(fn ($l) => filled($l['producto_id'] ?? null) && filled($l['cantidad'] ?? null) && filled($l['costo_unitario'] ?? null))
+                                ->values()
+                                ->all();
+
+                            if (empty($lineas)) {
+                                return null;
+                            }
+
+                            $service = app(CompraService::class);
+                            $calc    = $service->calcularLineas($lineas, (bool) $get('itbis_incluido'));
+                            $totales = $service->calcularTotales($calc);
+
+                            $diferencia = round((float) $montoFactura - $totales['total'], 2);
+
+                            if (abs($diferencia) < 0.01) {
+                                return null;
+                            }
+
+                            return sprintf(
+                                'No coincide con el total calculado (RD$%s). Diferencia: RD$%s',
+                                number_format($totales['total'], 2),
+                                number_format($diferencia, 2),
+                            );
+                        })
+                        ->columnSpanFull(),
                 ]),
 
             Section::make('Agregar producto')
@@ -238,7 +283,6 @@ class CompraResource extends Resource
                                     TasaItbis::DIECIOCHO->value => '18 %',
                                     TasaItbis::DIECISEIS->value => '16 %',
                                     TasaItbis::CERO->value      => '0 %',
-                                    TasaItbis::EXENTO->value    => 'Exento',
                                 ])
                                 ->default(TasaItbis::DIECIOCHO->value)
                                 ->required(),
@@ -359,6 +403,18 @@ class CompraResource extends Resource
                     TextEntry::make('subtotal')->label('Subtotal')->money('DOP'),
                     TextEntry::make('itbis')->label('ITBIS')->money('DOP'),
                     TextEntry::make('total')->label('Total')->money('DOP'),
+                    TextEntry::make('monto_total_factura')
+                        ->label('Monto total de la factura')
+                        ->money('DOP')
+                        ->placeholder('—')
+                        ->color(fn (Compra $record) => $record->monto_total_factura !== null
+                            && abs((float) $record->monto_total_factura - (float) $record->total) >= 0.01
+                                ? 'warning'
+                                : null)
+                        ->helperText(fn (Compra $record) => $record->monto_total_factura !== null
+                            && abs((float) $record->monto_total_factura - (float) $record->total) >= 0.01
+                                ? 'No coincide con el total calculado del sistema.'
+                                : null),
                     TextEntry::make('motivo_anulacion')->label('Motivo de anulación')->placeholder('—')
                         ->visible(fn (Compra $record) => $record->estaAnulada()),
                 ]),
@@ -371,6 +427,7 @@ class CompraResource extends Resource
                     InfolistTableColumn::make('Costo unitario'),
                     InfolistTableColumn::make('ITBIS'),
                     InfolistTableColumn::make('Subtotal'),
+                    InfolistTableColumn::make('Devuelto'),
                 ])
                 ->schema([
                     TextEntry::make('producto.nombre')->hiddenLabel(),
@@ -378,8 +435,38 @@ class CompraResource extends Resource
                     TextEntry::make('costo_unitario')->hiddenLabel()->money('DOP'),
                     TextEntry::make('itbis_monto')->hiddenLabel()->money('DOP'),
                     TextEntry::make('subtotal')->hiddenLabel()->money('DOP'),
+                    TextEntry::make('devuelto_preview')
+                        ->hiddenLabel()
+                        ->state(fn (DetalleCompra $record) => $record->cantidadDevuelta() > 0
+                            ? number_format($record->cantidadDevuelta(), 2)
+                            : '—'),
                 ])
                 ->columnSpanFull(),
+
+            Section::make('Devoluciones registradas')
+                ->columnSpanFull()
+                ->visible(fn (Compra $record) => $record->devoluciones()->exists())
+                ->schema([
+                    RepeatableEntry::make('devoluciones')
+                        ->hiddenLabel()
+                        ->table([
+                            InfolistTableColumn::make('Fecha'),
+                            InfolistTableColumn::make('Motivo'),
+                            InfolistTableColumn::make('Total'),
+                            InfolistTableColumn::make('Estado'),
+                        ])
+                        ->schema([
+                            TextEntry::make('fecha')->hiddenLabel()->dateTime('d/m/Y H:i'),
+                            TextEntry::make('motivo')->hiddenLabel(),
+                            TextEntry::make('total')->hiddenLabel()->money('DOP'),
+                            TextEntry::make('estado')->hiddenLabel()->badge()
+                                ->formatStateUsing(fn (EstadoDevolucion $state) => match ($state) {
+                                    EstadoDevolucion::REGISTRADA => 'Registrada',
+                                    EstadoDevolucion::ANULADA    => 'Anulada',
+                                })
+                                ->color(fn (EstadoDevolucion $state) => $state === EstadoDevolucion::ANULADA ? 'danger' : 'success'),
+                        ]),
+                ]),
         ]);
     }
 
@@ -478,6 +565,7 @@ class CompraResource extends Resource
                         Notification::make()->title('Compra anulada')->success()->send();
                     }),
             ])
+            ->searchable(false)
             ->defaultSort('fecha', 'desc');
     }
 
@@ -491,7 +579,7 @@ class CompraResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index'  => Pages\ListCompras::route('/'),
+            'index'  => Pages\CreateCompra::route('/'),
             'create' => Pages\CreateCompra::route('/create'),
             'view'   => Pages\ViewCompra::route('/{record}'),
         ];
