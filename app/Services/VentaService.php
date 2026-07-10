@@ -74,11 +74,16 @@ class VentaService
 
             [$detalles, $productosLineas, $acumulado] = $this->procesarLineas($lineas, $settings, $estrategia);
 
-            // Se asigna DESPUÉS de validar las líneas: si algo más falla y la transacción hace
-            // rollback, el e-NCF no se "quema" (el contador también se revierte).
-            $ncf = $this->ncfService->siguiente($tipoComprobante);
-
             $total = $this->calcularTotalFinal($acumulado, $descuentoGlobal);
+
+            // Antes de consumir el e-NCF: si el comprobante exige RNC del comprador (Crédito
+            // Fiscal siempre; Consumo desde Venta::UMBRAL_CONSUMO) y el cliente no lo tiene, no
+            // tiene sentido "quemar" un número que el PAC rechazaría de todas formas.
+            $this->validarComprador($tipoComprobante, $cliente, $total);
+
+            // Se asigna DESPUÉS de validar: si algo más falla y la transacción hace rollback, el
+            // e-NCF no se "quema" (el contador también se revierte).
+            $ncf = $this->ncfService->siguiente($tipoComprobante);
 
             $venta = Venta::create([
                 'cliente_id' => $cliente->id,
@@ -199,6 +204,26 @@ class VentaService
     }
 
     // -------------------------------------------------------------------------
+
+    /**
+     * Crédito Fiscal (31) siempre exige RNC del comprador; Consumo (32) lo exige desde
+     * Venta::UMBRAL_CONSUMO. Se evalúa sobre una Venta "en memoria" (sin persistir) porque acá
+     * solo se conocen tipo_comprobante y total todavía.
+     */
+    private function validarComprador(TipoComprobante $tipoComprobante, Cliente $cliente, string $total): void
+    {
+        $requiereComprador = (new Venta(['tipo_comprobante' => $tipoComprobante, 'total' => $total]))->requiereComprador();
+
+        if (! $requiereComprador || ! blank($cliente->documento)) {
+            return;
+        }
+
+        $mensaje = $tipoComprobante === TipoComprobante::FACTURA_CONSUMO
+            ? 'Para facturas de consumo de RD$250,000 o más, el cliente con RNC/Cédula es obligatorio.'
+            : 'La Factura de Crédito Fiscal (e-CF 31) requiere un cliente con RNC/Cédula.';
+
+        throw new VentaInvalidaException($mensaje);
+    }
 
     private function resolverTipoComprobante(TipoComprobante|string|null $valor, FacturacionSettings $settings): TipoComprobante
     {

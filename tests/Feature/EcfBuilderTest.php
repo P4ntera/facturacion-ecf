@@ -176,13 +176,17 @@ class EcfBuilderTest extends TestCase
         $this->secuencia(TipoComprobante::FACTURA_CREDITO_FISCAL, 'E31');
 
         $producto = $this->producto('PFC', TasaItbis::DIECIOCHO);
-        $cliente = Cliente::create(['nombre' => 'Consumidor Final', 'activo' => true]);
+        // VentaService::registrar() ya exige RNC para el 31 al cobrar; se crea con uno válido y
+        // se le quita después, para probar la defensa "en profundidad" del builder.
+        $cliente = Cliente::create(['nombre' => 'Con RNC luego retirado', 'documento' => '130123456', 'activo' => true]);
 
         $venta = app(VentaService::class)->registrar([
             'cliente_id' => $cliente->id,
             'tipo_comprobante' => TipoComprobante::FACTURA_CREDITO_FISCAL->value,
             'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
         ])->refresh();
+
+        $venta->cliente->update(['documento' => null]);
 
         $this->expectException(EcfInvalidoException::class);
 
@@ -249,7 +253,9 @@ class EcfBuilderTest extends TestCase
         $this->secuencia(TipoComprobante::FACTURA_CONSUMO, 'E32');
 
         $producto = $this->producto('PCF-250K', TasaItbis::DIECIOCHO, overrides: ['precio' => 300000]);
-        $cliente = Cliente::create(['nombre' => 'Consumidor Final', 'activo' => true]);
+        // VentaService::registrar() ya exige RNC en consumo >= 250k al cobrar; se crea con uno
+        // válido y se le quita después, para probar la defensa "en profundidad" del builder.
+        $cliente = Cliente::create(['nombre' => 'Con RNC luego retirado', 'documento' => '130555555', 'activo' => true]);
 
         $venta = app(VentaService::class)->registrar([
             'cliente_id' => $cliente->id,
@@ -257,6 +263,8 @@ class EcfBuilderTest extends TestCase
         ])->refresh();
 
         $this->assertTrue(bccomp((string) $venta->total, Venta::UMBRAL_CONSUMO, 2) >= 0);
+
+        $venta->cliente->update(['documento' => null]);
 
         $this->expectException(EcfInvalidoException::class);
 

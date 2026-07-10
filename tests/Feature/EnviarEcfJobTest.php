@@ -201,13 +201,18 @@ class EnviarEcfJobTest extends TestCase
             'activo' => true,
         ]);
 
-        $cliente = Cliente::create(['nombre' => 'Sin RNC', 'activo' => true]);
+        // VentaService::registrar() ya exige RNC para el 31 al cobrar; se crea con uno válido y
+        // se le quita después, para probar la defensa "en profundidad" del builder ante una
+        // venta que de algún modo (edición posterior del cliente, dato legado) llega sin RNC.
+        $cliente = Cliente::create(['nombre' => 'Con RNC luego retirado', 'documento' => '130000000', 'activo' => true]);
 
         $venta = app(VentaService::class)->registrar([
             'cliente_id' => $cliente->id,
             'tipo_comprobante' => TipoComprobante::FACTURA_CREDITO_FISCAL->value,
             'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
         ])->refresh();
+
+        $cliente->update(['documento' => null]);
 
         (new EnviarEcfJob($venta))->handle(app(EnvioEcfService::class));
 

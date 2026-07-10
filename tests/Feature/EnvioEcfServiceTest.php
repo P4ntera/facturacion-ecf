@@ -186,7 +186,11 @@ class EnvioEcfServiceTest extends TestCase
 
     public function test_falta_de_rnc_en_credito_fiscal_rechaza_sin_llamar_al_gateway(): void
     {
-        $venta = $this->crearVenta(TipoComprobante::FACTURA_CREDITO_FISCAL, documentoCliente: null);
+        // VentaService::registrar() ya exige RNC para el 31 al cobrar; se crea con uno válido y
+        // se le quita después, para probar la defensa "en profundidad" del builder ante una
+        // venta que de algún modo (edición posterior del cliente, dato legado) llega sin RNC.
+        $venta = $this->crearVenta(TipoComprobante::FACTURA_CREDITO_FISCAL, documentoCliente: '130000000');
+        $venta->cliente->update(['documento' => null]);
 
         $this->app->bind(DgiiGatewayInterface::class, fn () => new class implements DgiiGatewayInterface
         {
