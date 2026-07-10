@@ -84,16 +84,25 @@ class EcfBuilder
         return $idDoc;
     }
 
-    /** @return array<string, mixed> */
+    /**
+     * Reglas del PAC: Crédito Fiscal (31) siempre exige Comprador; Consumo (32) solo lo exige
+     * desde Venta::UMBRAL_CONSUMO — por debajo, se omite el bloque aunque el cliente tenga RNC
+     * (el PAC convierte el documento a RFCE). Los demás tipos (fuera del alcance de esta regla)
+     * mantienen el comportamiento previo: se incluye si el cliente tiene documento.
+     *
+     * @return array<string, mixed>
+     */
     private function comprador(Venta $venta): array
     {
         $cliente = $venta->cliente;
         $tieneRnc = ! blank($cliente->documento);
 
-        if ($venta->tipo_comprobante === TipoComprobante::FACTURA_CREDITO_FISCAL && ! $tieneRnc) {
-            throw new EcfInvalidoException(
-                "La venta #{$venta->id} es una Factura de Crédito Fiscal (e-CF 31) y el comprador no tiene RNC."
-            );
+        if ($venta->requiereComprador() && ! $tieneRnc) {
+            throw new EcfInvalidoException($this->mensajeRncFaltante($venta));
+        }
+
+        if ($venta->tipo_comprobante === TipoComprobante::FACTURA_CONSUMO && ! $venta->requiereComprador()) {
+            return [];
         }
 
         if (! $tieneRnc) {
@@ -104,6 +113,16 @@ class EcfBuilder
             'RNCComprador' => $cliente->documento,
             'RazonSocialComprador' => $cliente->nombre,
         ];
+    }
+
+    private function mensajeRncFaltante(Venta $venta): string
+    {
+        return match ($venta->tipo_comprobante) {
+            TipoComprobante::FACTURA_CREDITO_FISCAL => "La venta #{$venta->id} es una Factura de Crédito Fiscal (e-CF 31) y el comprador no tiene RNC.",
+            TipoComprobante::FACTURA_CONSUMO => "La venta #{$venta->id} es una Factura de Consumo (e-CF 32) de RD$".number_format((float) $venta->total, 2)
+                .' y el comprador no tiene RNC (obligatorio desde RD$250,000.00).',
+            default => "La venta #{$venta->id} requiere el RNC del comprador.",
+        };
     }
 
     /** @return array<string, mixed> */
