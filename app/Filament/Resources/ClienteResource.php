@@ -5,11 +5,16 @@ namespace App\Filament\Resources;
 use App\Enums\TipoDocumentoCliente;
 use App\Filament\Resources\ClienteResource\Pages;
 use App\Models\Cliente;
+use App\Services\Dgii\ConsultaContribuyenteService;
+use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\ToggleColumn;
@@ -47,7 +52,32 @@ class ClienteResource extends Resource
 
                 TextInput::make('documento')
                     ->label('Documento')
-                    ->maxLength(20),
+                    ->maxLength(20)
+                    ->helperText('RNC (9 dígitos) o Cédula (11 dígitos).')
+                    ->suffixAction(
+                        Action::make('buscarDgii')
+                            ->label('Buscar en DGII')
+                            ->icon('heroicon-o-magnifying-glass')
+                            ->action(function (Get $get, Set $set): void {
+                                $resultado = app(ConsultaContribuyenteService::class)->buscar((string) ($get('documento') ?? ''));
+
+                                if ($resultado === null) {
+                                    Notification::make()
+                                        ->title('No encontrado')
+                                        ->body('Ingresa un RNC (9 dígitos) o Cédula (11 dígitos) válido y registrado en la DGII/JCE.')
+                                        ->warning()
+                                        ->send();
+
+                                    return;
+                                }
+
+                                $set('documento', $resultado['documento']);
+                                $set('nombre', $resultado['nombre']);
+                                $set('tipo_documento', $resultado['tipo']->value);
+
+                                Notification::make()->title('Datos cargados desde la DGII/JCE')->success()->send();
+                            })
+                    ),
 
                 TextInput::make('nombre')
                     ->label('Nombre completo / Razón social')
