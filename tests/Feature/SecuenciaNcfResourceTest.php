@@ -51,7 +51,7 @@ class SecuenciaNcfResourceTest extends TestCase
         ]);
     }
 
-    public function test_rechaza_una_segunda_secuencia_activa_para_el_mismo_comprobante(): void
+    public function test_un_segundo_rango_del_mismo_comprobante_queda_encolado_sin_error(): void
     {
         SecuenciaNcf::create([
             'tipo_comprobante' => TipoComprobante::FACTURA_CONSUMO,
@@ -73,6 +73,39 @@ class SecuenciaNcfResourceTest extends TestCase
                 'activa' => true,
             ])
             ->call('create')
-            ->assertHasFormErrors(['activa']);
+            ->assertHasNoFormErrors();
+
+        $this->assertDatabaseHas('secuencias_ncf', [
+            'prefijo' => 'E32',
+            'secuencia_desde' => 101,
+            'secuencia_hasta' => 200,
+            'activa' => false,
+        ]);
+    }
+
+    public function test_rechaza_un_rango_que_se_solapa_con_uno_existente(): void
+    {
+        SecuenciaNcf::create([
+            'tipo_comprobante' => TipoComprobante::FACTURA_CONSUMO,
+            'prefijo' => 'E32',
+            'secuencia_desde' => 1,
+            'secuencia_actual' => 1,
+            'secuencia_hasta' => 100,
+            'activa' => true,
+        ]);
+
+        Livewire::actingAs($this->usuarioAutorizado())
+            ->test(CreateSecuenciaNcf::class)
+            ->fillForm([
+                'tipo_comprobante' => TipoComprobante::FACTURA_CONSUMO->value,
+                'prefijo' => 'E32',
+                'secuencia_desde' => 50,
+                'secuencia_hasta' => 120,
+                'activa' => false,
+            ])
+            ->call('create')
+            ->assertHasFormErrors(['secuencia_hasta']);
+
+        $this->assertDatabaseMissing('secuencias_ncf', ['secuencia_desde' => 50]);
     }
 }
