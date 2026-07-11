@@ -2,12 +2,14 @@
 
 namespace Tests\Feature;
 
+use App\Enums\AmbienteEcf;
 use App\Filament\Pages\ManageEmpresa;
 use App\Filament\Pages\ManageFacturacion;
 use App\Models\User;
 use App\Settings\EmpresaSettings;
 use App\Settings\FacturacionSettings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
@@ -60,6 +62,33 @@ class ConfiguracionSettingsTest extends TestCase
             ])
             ->call('save')
             ->assertHasFormErrors(['rnc']);
+    }
+
+    public function test_guarda_la_api_key_del_pac_cifrada_y_no_en_texto_plano(): void
+    {
+        Livewire::actingAs($this->usuarioAutorizado())
+            ->test(ManageEmpresa::class)
+            ->fillForm([
+                'razon_social' => 'Comercial Prueba SRL',
+                'nombre_comercial' => 'Prueba',
+                'rnc' => '130123456',
+                'dgii_api_key' => 'clave-secreta-del-pac',
+                'dgii_ambiente' => AmbienteEcf::CERTECF->value,
+                'dgii_base_url' => 'https://pac.ejemplo.test/api',
+            ])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $settings = app(EmpresaSettings::class);
+        $this->assertSame('clave-secreta-del-pac', $settings->dgii_api_key);
+        $this->assertSame(AmbienteEcf::CERTECF->value, $settings->dgii_ambiente);
+
+        $payload = DB::table('settings')
+            ->where('group', 'empresa')
+            ->where('name', 'dgii_api_key')
+            ->value('payload');
+
+        $this->assertStringNotContainsString('clave-secreta-del-pac', $payload);
     }
 
     public function test_guarda_la_configuracion_de_facturacion(): void

@@ -98,7 +98,9 @@ class VentaService
                 'total_itbis' => $acumulado['total_itbis'],
                 'total' => $total,
                 'estado' => EstadoVenta::EMITIDA,
-                'estado_fiscal' => EstadoFiscal::NO_APLICA,
+                // Toda venta con e-NCF asignado debe transmitirse como e-CF: queda PENDIENTE y
+                // VentaObserver dispara EnviarEcfJob (a cola, sin bloquear el cobro).
+                'estado_fiscal' => EstadoFiscal::PENDIENTE,
             ]);
 
             $venta->detalles()->createMany($detalles);
