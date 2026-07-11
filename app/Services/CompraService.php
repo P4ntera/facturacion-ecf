@@ -39,6 +39,13 @@ class CompraService
      */
     public function crear(array $datos, int $userId): Compra
     {
+        // Descarta líneas incompletas (p. ej. una fila del repeater sin producto seleccionado)
+        // en vez de dejar que revienten más abajo con un ModelNotFoundException.
+        $datos['lineas'] = array_values(array_filter(
+            $datos['lineas'] ?? [],
+            fn (array $l) => filled($l['producto_id'] ?? null) && filled($l['cantidad'] ?? null) && filled($l['costo_unitario'] ?? null),
+        ));
+
         if (empty($datos['lineas'])) {
             throw new RuntimeException('La compra debe tener al menos una línea.');
         }

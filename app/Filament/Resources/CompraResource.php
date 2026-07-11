@@ -203,6 +203,7 @@ class CompraResource extends Resource
 
                             $lineas = collect($get('lineas') ?? [])
                                 ->filter(fn ($l) => filled($l['producto_id'] ?? null) && filled($l['cantidad'] ?? null) && filled($l['costo_unitario'] ?? null))
+                                ->filter(fn ($l) => Producto::whereKey($l['producto_id'])->exists())
                                 ->values()
                                 ->all();
 
@@ -369,6 +370,7 @@ class CompraResource extends Resource
                         ->state(function (Get $get) {
                             $lineas = collect($get('lineas') ?? [])
                                 ->filter(fn ($l) => filled($l['producto_id'] ?? null) && filled($l['cantidad'] ?? null) && filled($l['costo_unitario'] ?? null))
+                                ->filter(fn ($l) => Producto::whereKey($l['producto_id'])->exists())
                                 ->values()
                                 ->all();
 

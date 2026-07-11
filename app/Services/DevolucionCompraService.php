@@ -37,6 +37,13 @@ class DevolucionCompraService
      */
     public function crear(array $datos, int $userId): DevolucionCompra
     {
+        // Descarta líneas incompletas (p. ej. una fila del repeater sin producto seleccionado)
+        // en vez de dejar que revienten más abajo con un ModelNotFoundException.
+        $datos['lineas'] = array_values(array_filter(
+            $datos['lineas'] ?? [],
+            fn (array $l) => filled($l['detalle_compra_id'] ?? null) && filled($l['cantidad'] ?? null),
+        ));
+
         if (empty($datos['lineas'])) {
             throw new RuntimeException('La devolución debe tener al menos una línea.');
         }
