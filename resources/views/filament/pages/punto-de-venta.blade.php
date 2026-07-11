@@ -41,11 +41,8 @@
               <button type="button" class="btn btn-secondary" wire:click="quitarCliente">Cambiar</button>
             </div>
 
-            @if ($this->faltaRncComprador())
-              <p class="mt-2 pos-alerta">
-                La Factura de Crédito Fiscal (e-CF 31) requiere el RNC del comprador. Cambia el
-                cliente o búscalo por RNC en la DGII abajo.
-              </p>
+            @if ($this->mensajeFaltaRncComprador())
+              <p class="mt-2 pos-alerta">{{ $this->mensajeFaltaRncComprador() }}</p>
             @endif
           @else
             <div class="space-y-2">

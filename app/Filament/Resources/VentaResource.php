@@ -348,13 +348,15 @@ class VentaResource extends Resource
             EstadoFiscal::ACEPTADO => 'Aceptado',
             EstadoFiscal::ACEPTADO_CONDICIONAL => 'Aceptado condicional',
             EstadoFiscal::RECHAZADO => 'Rechazado',
+            // Consumo (32) por debajo del umbral: el PAC lo convirtió a RFCE (aceptado).
+            EstadoFiscal::RFCE => 'Aceptado (RFCE)',
         };
     }
 
     private static function colorEstadoFiscal(EstadoFiscal $estado): string
     {
         return match ($estado) {
-            EstadoFiscal::ACEPTADO => 'success',
+            EstadoFiscal::ACEPTADO, EstadoFiscal::RFCE => 'success',
             EstadoFiscal::ACEPTADO_CONDICIONAL => 'warning',
             EstadoFiscal::RECHAZADO => 'danger',
             EstadoFiscal::EN_PROCESO => 'info',

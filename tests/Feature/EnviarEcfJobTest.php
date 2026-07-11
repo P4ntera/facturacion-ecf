@@ -18,6 +18,7 @@ use App\Services\Dgii\RespuestaEcf;
 use App\Services\VentaService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
+use Tests\Support\GatewayStub;
 use Tests\TestCase;
 
 class EnviarEcfJobTest extends TestCase
@@ -109,6 +110,25 @@ class EnviarEcfJobTest extends TestCase
             public function registrarAprobacionComercial(array $datos): RespuestaEcf
             {
                 throw new \RuntimeException('no usado');
+            }
+        });
+
+        (new EnviarEcfJob($venta))->handle(app(EnvioEcfService::class));
+
+        $this->assertTrue(true); // si el gateway se hubiera llamado, la excepción arriba habría fallado el test.
+    }
+
+    /** RFCE (consumo < 250k convertido por el PAC) es un estado final: tampoco se debe reenviar. */
+    public function test_no_reenvia_si_la_venta_quedo_en_rfce(): void
+    {
+        $venta = $this->crearVentaPendiente();
+        $venta->update(['estado_fiscal' => EstadoFiscal::RFCE]);
+
+        $this->app->bind(DgiiGatewayInterface::class, fn () => new class extends GatewayStub
+        {
+            public function enviar(array $ecf): RespuestaEcf
+            {
+                throw new \RuntimeException('No debía reenviarse una venta ya en RFCE.');
             }
         });
 

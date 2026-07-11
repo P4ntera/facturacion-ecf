@@ -170,6 +170,20 @@ class EnvioEcfServiceTest extends TestCase
         $this->assertSame(EstadoFiscal::EN_PROCESO, $venta->refresh()->estado_fiscal);
     }
 
+    /** Consumo (32) por debajo del umbral: el PAC lo convierte a RFCE — es una aceptación, no un error. */
+    public function test_respuesta_rfce_del_pac_se_mapea_como_estado_final_de_aceptacion(): void
+    {
+        $venta = $this->crearVenta(documentoCliente: null);
+
+        $this->conGateway(new RespuestaEcf(exito: true, estado: 'RFCE'));
+
+        $respuesta = app(EnvioEcfService::class)->enviar($venta);
+        $venta->refresh();
+
+        $this->assertTrue($respuesta->exito);
+        $this->assertSame(EstadoFiscal::RFCE, $venta->estado_fiscal);
+    }
+
     public function test_error_de_red_deja_la_venta_pendiente_con_el_motivo_guardado(): void
     {
         $venta = $this->crearVenta(documentoCliente: null);

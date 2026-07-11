@@ -101,6 +101,9 @@ class EnvioEcfService
             'Aceptado Condicional' => EstadoFiscal::ACEPTADO_CONDICIONAL,
             'Rechazado' => EstadoFiscal::RECHAZADO,
             'En Proceso', 'EN_PROCESO' => EstadoFiscal::EN_PROCESO,
+            // Consumo (32) por debajo de Venta::UMBRAL_CONSUMO: el PAC lo convirtió a RFCE — es
+            // una aceptación final, no un error ni algo que reintentar.
+            'RFCE' => EstadoFiscal::RFCE,
             // Estado desconocido o "ERROR_AL_ENVIAR": se deja pendiente para que se reintente.
             default => EstadoFiscal::PENDIENTE,
         };

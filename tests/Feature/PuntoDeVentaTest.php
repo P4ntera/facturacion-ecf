@@ -152,6 +152,68 @@ class PuntoDeVentaTest extends TestCase
         $this->assertTrue($componente->instance()->puedeCobrar());
     }
 
+    public function test_tipo_32_por_debajo_del_umbral_permite_consumidor_final(): void
+    {
+        $producto = $this->producto();
+
+        $componente = Livewire::actingAs($this->vendedor())
+            ->test(PuntoDeVenta::class)
+            ->call('agregarProducto', $producto->id)
+            ->set('tipoComprobante', TipoComprobante::FACTURA_CONSUMO->value);
+
+        $this->assertFalse($componente->instance()->requiereRncComprador());
+        $this->assertFalse($componente->instance()->faltaRncComprador());
+        $this->assertTrue($componente->instance()->puedeCobrar());
+    }
+
+    public function test_tipo_32_al_cruzar_250k_en_vivo_exige_rnc_con_consumidor_final(): void
+    {
+        $producto = $this->producto(['codigo' => 'POS-250K', 'precio' => 300000]);
+
+        $componente = Livewire::actingAs($this->vendedor())
+            ->test(PuntoDeVenta::class)
+            ->set('tipoComprobante', TipoComprobante::FACTURA_CONSUMO->value)
+            ->call('agregarProducto', $producto->id);
+
+        $this->assertTrue($componente->instance()->requiereRncComprador());
+        $this->assertTrue($componente->instance()->faltaRncComprador());
+        $this->assertFalse($componente->instance()->puedeCobrar());
+        $this->assertStringContainsString(
+            'RD$250,000',
+            $componente->instance()->mensajeFaltaRncComprador(),
+        );
+    }
+
+    public function test_tipo_32_igual_o_por_encima_de_250k_con_rnc_permite_cobrar(): void
+    {
+        SecuenciaNcf::create([
+            'tipo_comprobante' => TipoComprobante::FACTURA_CONSUMO,
+            'prefijo' => 'E32',
+            'secuencia_desde' => 1,
+            'secuencia_actual' => 1,
+            'secuencia_hasta' => 100,
+            'vencimiento' => now()->addYear(),
+            'activa' => true,
+        ]);
+
+        $producto = $this->producto(['codigo' => 'POS-250K-OK', 'precio' => 300000]);
+        $cliente = Cliente::create([
+            'nombre' => 'Comercial Con RNC SRL',
+            'documento' => '130123456',
+            'tipo_documento' => TipoDocumentoCliente::RNC,
+            'activo' => true,
+        ]);
+
+        $componente = Livewire::actingAs($this->vendedor())
+            ->test(PuntoDeVenta::class)
+            ->set('tipoComprobante', TipoComprobante::FACTURA_CONSUMO->value)
+            ->call('agregarProducto', $producto->id)
+            ->call('seleccionarCliente', $cliente->id);
+
+        $this->assertFalse($componente->instance()->faltaRncComprador());
+        $this->assertTrue($componente->instance()->puedeCobrar());
+    }
+
     public function test_buscar_cliente_en_dgii_crea_y_selecciona_el_cliente(): void
     {
         $this->app->bind(DgiiGatewayInterface::class, fn () => new class extends GatewayStub
