@@ -20,6 +20,7 @@ class RolePermissionSeeder extends Seeder
             'registrar_ventas',
             'anular_ventas',
             'gestionar_compras',
+            'anular_compras',
             'ver_reportes',
             'administrar_secuencias',
             'ver_auditoria',

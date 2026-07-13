@@ -49,10 +49,11 @@ class MovimientoInventarioResource extends Resource
                 TipoMovimiento::AJUSTE  => 'Ajuste',
             }),
             TextEntry::make('origen')->label('Origen')->formatStateUsing(fn (OrigenMovimiento $state) => match ($state) {
-                OrigenMovimiento::VENTA     => 'Venta',
-                OrigenMovimiento::COMPRA    => 'Compra',
-                OrigenMovimiento::AJUSTE    => 'Ajuste',
-                OrigenMovimiento::ANULACION => 'Anulación',
+                OrigenMovimiento::VENTA             => 'Venta',
+                OrigenMovimiento::COMPRA            => 'Compra',
+                OrigenMovimiento::AJUSTE            => 'Ajuste',
+                OrigenMovimiento::ANULACION         => 'Anulación',
+                OrigenMovimiento::DEVOLUCION_COMPRA => 'Devolución a proveedor',
             }),
             TextEntry::make('cantidad')->label('Cantidad')->numeric(decimalPlaces: 2),
             TextEntry::make('stock_anterior')->label('Stock anterior')->numeric(decimalPlaces: 2),
@@ -92,11 +93,12 @@ class MovimientoInventarioResource extends Resource
                     ->label('Origen')
                     ->badge()
                     ->formatStateUsing(fn ($state) => match ($state) {
-                        OrigenMovimiento::VENTA     => 'Venta',
-                        OrigenMovimiento::COMPRA    => 'Compra',
-                        OrigenMovimiento::AJUSTE    => 'Ajuste',
-                        OrigenMovimiento::ANULACION => 'Anulación',
-                        default                     => $state,
+                        OrigenMovimiento::VENTA             => 'Venta',
+                        OrigenMovimiento::COMPRA            => 'Compra',
+                        OrigenMovimiento::AJUSTE            => 'Ajuste',
+                        OrigenMovimiento::ANULACION         => 'Anulación',
+                        OrigenMovimiento::DEVOLUCION_COMPRA => 'Devolución a proveedor',
+                        default                              => $state,
                     }),
 
                 TextColumn::make('cantidad')
