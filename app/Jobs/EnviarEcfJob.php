@@ -40,7 +40,9 @@ class EnviarEcfJob implements ShouldQueue
     {
         $venta = $this->venta->fresh();
 
-        if ($venta === null || $venta->estado_fiscal === EstadoFiscal::ACEPTADO) {
+        // ACEPTADO o RFCE (consumo < 250k convertido por el PAC) ya son estados finales de
+        // aceptación: no hay nada que reenviar.
+        if ($venta === null || in_array($venta->estado_fiscal, [EstadoFiscal::ACEPTADO, EstadoFiscal::RFCE], true)) {
             return;
         }
 

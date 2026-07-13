@@ -18,6 +18,7 @@ use App\Services\Dgii\RespuestaEcf;
 use App\Services\VentaService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
+use Tests\Support\GatewayStub;
 use Tests\TestCase;
 
 class EnviarEcfJobTest extends TestCase
@@ -117,6 +118,25 @@ class EnviarEcfJobTest extends TestCase
         $this->assertTrue(true); // si el gateway se hubiera llamado, la excepción arriba habría fallado el test.
     }
 
+    /** RFCE (consumo < 250k convertido por el PAC) es un estado final: tampoco se debe reenviar. */
+    public function test_no_reenvia_si_la_venta_quedo_en_rfce(): void
+    {
+        $venta = $this->crearVentaPendiente();
+        $venta->update(['estado_fiscal' => EstadoFiscal::RFCE]);
+
+        $this->app->bind(DgiiGatewayInterface::class, fn () => new class extends GatewayStub
+        {
+            public function enviar(array $ecf): RespuestaEcf
+            {
+                throw new \RuntimeException('No debía reenviarse una venta ya en RFCE.');
+            }
+        });
+
+        (new EnviarEcfJob($venta))->handle(app(EnvioEcfService::class));
+
+        $this->assertTrue(true); // si el gateway se hubiera llamado, la excepción arriba habría fallado el test.
+    }
+
     public function test_relanza_la_excepcion_ante_un_error_de_red_para_que_el_job_reintente(): void
     {
         $venta = $this->crearVentaPendiente();
@@ -201,13 +221,18 @@ class EnviarEcfJobTest extends TestCase
             'activo' => true,
         ]);
 
-        $cliente = Cliente::create(['nombre' => 'Sin RNC', 'activo' => true]);
+        // VentaService::registrar() ya exige RNC para el 31 al cobrar; se crea con uno válido y
+        // se le quita después, para probar la defensa "en profundidad" del builder ante una
+        // venta que de algún modo (edición posterior del cliente, dato legado) llega sin RNC.
+        $cliente = Cliente::create(['nombre' => 'Con RNC luego retirado', 'documento' => '130000000', 'activo' => true]);
 
         $venta = app(VentaService::class)->registrar([
             'cliente_id' => $cliente->id,
             'tipo_comprobante' => TipoComprobante::FACTURA_CREDITO_FISCAL->value,
             'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
         ])->refresh();
+
+        $cliente->update(['documento' => null]);
 
         (new EnviarEcfJob($venta))->handle(app(EnvioEcfService::class));
 

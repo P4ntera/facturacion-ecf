@@ -10,6 +10,7 @@ use App\Exceptions\EcfInvalidoException;
 use App\Models\Cliente;
 use App\Models\Producto;
 use App\Models\SecuenciaNcf;
+use App\Models\Venta;
 use App\Services\Dgii\EcfBuilder;
 use App\Services\VentaService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -32,9 +33,10 @@ class EcfBuilderTest extends TestCase
         ]);
     }
 
-    private function producto(string $codigo, TasaItbis $tasa, TipoProducto $tipo = TipoProducto::PRODUCTO): Producto
+    /** @param  array<string, mixed>  $overrides */
+    private function producto(string $codigo, TasaItbis $tasa, TipoProducto $tipo = TipoProducto::PRODUCTO, array $overrides = []): Producto
     {
-        return Producto::create([
+        return Producto::create(array_merge([
             'codigo' => $codigo,
             'nombre' => "Producto {$codigo}",
             'tipo' => $tipo,
@@ -45,7 +47,7 @@ class EcfBuilderTest extends TestCase
             'stock' => 100,
             'stock_minimo' => 1,
             'activo' => true,
-        ]);
+        ], $overrides));
     }
 
     public function test_incluye_solo_los_brackets_de_itbis_con_montos(): void
@@ -174,13 +176,17 @@ class EcfBuilderTest extends TestCase
         $this->secuencia(TipoComprobante::FACTURA_CREDITO_FISCAL, 'E31');
 
         $producto = $this->producto('PFC', TasaItbis::DIECIOCHO);
-        $cliente = Cliente::create(['nombre' => 'Consumidor Final', 'activo' => true]);
+        // VentaService::registrar() ya exige RNC para el 31 al cobrar; se crea con uno válido y
+        // se le quita después, para probar la defensa "en profundidad" del builder.
+        $cliente = Cliente::create(['nombre' => 'Con RNC luego retirado', 'documento' => '130123456', 'activo' => true]);
 
         $venta = app(VentaService::class)->registrar([
             'cliente_id' => $cliente->id,
             'tipo_comprobante' => TipoComprobante::FACTURA_CREDITO_FISCAL->value,
             'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
         ])->refresh();
+
+        $venta->cliente->update(['documento' => null]);
 
         $this->expectException(EcfInvalidoException::class);
 
@@ -221,5 +227,67 @@ class EcfBuilderTest extends TestCase
         $encabezado = app(EcfBuilder::class)->construir($venta)['ECF']['Encabezado'];
 
         $this->assertArrayNotHasKey('Comprador', $encabezado);
+    }
+
+    public function test_consumo_por_debajo_del_umbral_omite_comprador_aunque_el_cliente_tenga_rnc(): void
+    {
+        $this->secuencia(TipoComprobante::FACTURA_CONSUMO, 'E32');
+
+        $producto = $this->producto('PCF-RNC', TasaItbis::DIECIOCHO);
+        $cliente = Cliente::create(['nombre' => 'Comercial Con RNC SRL', 'documento' => '130123456', 'activo' => true]);
+
+        $venta = app(VentaService::class)->registrar([
+            'cliente_id' => $cliente->id,
+            'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
+        ])->refresh();
+
+        $this->assertTrue(bccomp((string) $venta->total, Venta::UMBRAL_CONSUMO, 2) < 0);
+
+        $encabezado = app(EcfBuilder::class)->construir($venta)['ECF']['Encabezado'];
+
+        $this->assertArrayNotHasKey('Comprador', $encabezado);
+    }
+
+    public function test_consumo_en_o_por_encima_del_umbral_exige_rnc_del_comprador(): void
+    {
+        $this->secuencia(TipoComprobante::FACTURA_CONSUMO, 'E32');
+
+        $producto = $this->producto('PCF-250K', TasaItbis::DIECIOCHO, overrides: ['precio' => 300000]);
+        // VentaService::registrar() ya exige RNC en consumo >= 250k al cobrar; se crea con uno
+        // válido y se le quita después, para probar la defensa "en profundidad" del builder.
+        $cliente = Cliente::create(['nombre' => 'Con RNC luego retirado', 'documento' => '130555555', 'activo' => true]);
+
+        $venta = app(VentaService::class)->registrar([
+            'cliente_id' => $cliente->id,
+            'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
+        ])->refresh();
+
+        $this->assertTrue(bccomp((string) $venta->total, Venta::UMBRAL_CONSUMO, 2) >= 0);
+
+        $venta->cliente->update(['documento' => null]);
+
+        $this->expectException(EcfInvalidoException::class);
+
+        app(EcfBuilder::class)->construir($venta);
+    }
+
+    public function test_consumo_en_o_por_encima_del_umbral_incluye_comprador_con_rnc(): void
+    {
+        $this->secuencia(TipoComprobante::FACTURA_CONSUMO, 'E32');
+
+        $producto = $this->producto('PCF-250K-OK', TasaItbis::DIECIOCHO, overrides: ['precio' => 300000]);
+        $cliente = Cliente::create(['nombre' => 'Comercial Grande SRL', 'documento' => '130987654', 'activo' => true]);
+
+        $venta = app(VentaService::class)->registrar([
+            'cliente_id' => $cliente->id,
+            'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
+        ])->refresh();
+
+        $this->assertTrue(bccomp((string) $venta->total, Venta::UMBRAL_CONSUMO, 2) >= 0);
+
+        $comprador = app(EcfBuilder::class)->construir($venta)['ECF']['Encabezado']['Comprador'];
+
+        $this->assertSame('130987654', $comprador['RNCComprador']);
+        $this->assertSame('Comercial Grande SRL', $comprador['RazonSocialComprador']);
     }
 }

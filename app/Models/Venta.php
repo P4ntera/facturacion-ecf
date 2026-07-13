@@ -74,6 +74,12 @@ class Venta extends Model
         return $this->hasMany(DetalleVenta::class);
     }
 
+    /**
+     * Umbral de la DGII para Factura de Consumo (e-CF 32): por debajo, el comprador es opcional
+     * y el PAC convierte el documento a RFCE automáticamente; en/por encima, es obligatorio.
+     */
+    public const UMBRAL_CONSUMO = '250000.00';
+
     public function estaAnulada(): bool
     {
         return $this->estado === EstadoVenta::ANULADA;
@@ -82,6 +88,20 @@ class Venta extends Model
     public function esElectronica(): bool
     {
         return $this->ncf !== null;
+    }
+
+    /**
+     * true si este comprobante exige RNC/razón social del comprador: siempre para Crédito Fiscal
+     * (31); para Consumo (32) solo si el total alcanza UMBRAL_CONSUMO. Los demás tipos no forman
+     * parte de esta regla.
+     */
+    public function requiereComprador(): bool
+    {
+        return match ($this->tipo_comprobante) {
+            TipoComprobante::FACTURA_CREDITO_FISCAL => true,
+            TipoComprobante::FACTURA_CONSUMO => bccomp((string) $this->total, self::UMBRAL_CONSUMO, 2) >= 0,
+            default => false,
+        };
     }
 
     public function getActivitylogOptions(): LogOptions

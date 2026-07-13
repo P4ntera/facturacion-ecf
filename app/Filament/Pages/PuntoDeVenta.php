@@ -11,6 +11,7 @@ use App\Exceptions\StockInsuficienteException;
 use App\Exceptions\VentaInvalidaException;
 use App\Models\Cliente;
 use App\Models\Producto;
+use App\Models\Venta;
 use App\Services\Dgii\ConsultaContribuyenteService;
 use App\Services\SecuenciaNcfService;
 use App\Services\VentaService;
@@ -139,15 +140,39 @@ class PuntoDeVenta extends Page
         Notification::make()->title("Cliente cargado desde la DGII/JCE: {$cliente->nombre}")->success()->send();
     }
 
-    /** La Factura de Crédito Fiscal (e-CF 31) exige el RNC del comprador. */
+    /**
+     * Crédito Fiscal (31) siempre exige RNC del comprador; Consumo (32) lo exige en vivo en
+     * cuanto el total del carrito cruza Venta::UMBRAL_CONSUMO. Misma regla que
+     * VentaService::registrar()/EcfBuilder (Venta::requiereComprador), evaluada aquí sobre una
+     * Venta "en memoria" con el tipo y el total actuales del carrito.
+     */
     public function requiereRncComprador(): bool
     {
-        return $this->tipoComprobante === TipoComprobante::FACTURA_CREDITO_FISCAL->value;
+        if (blank($this->tipoComprobante)) {
+            return false;
+        }
+
+        return (new Venta([
+            'tipo_comprobante' => $this->tipoComprobante,
+            'total' => $this->totales['total'] ?? '0.00',
+        ]))->requiereComprador();
     }
 
     public function faltaRncComprador(): bool
     {
         return $this->requiereRncComprador() && blank($this->clienteSeleccionado()?->documento);
+    }
+
+    /** Mismo mensaje (y motivo) que bloquearía VentaService::registrar() al intentar cobrar. */
+    public function mensajeFaltaRncComprador(): ?string
+    {
+        if (! $this->faltaRncComprador()) {
+            return null;
+        }
+
+        return $this->tipoComprobante === TipoComprobante::FACTURA_CREDITO_FISCAL->value
+            ? 'La Factura de Crédito Fiscal (e-CF 31) requiere el RNC del comprador. Cambia el cliente o búscalo por RNC en la DGII abajo.'
+            : 'Para facturas de consumo de RD$250,000 o más, el cliente con RNC/Cédula es obligatorio. Cambia el cliente o búscalo por RNC en la DGII abajo.';
     }
 
     /** @return Collection<int, Producto> */
@@ -267,9 +292,7 @@ class PuntoDeVenta extends Page
     public function cobrar(): void
     {
         if (! $this->puedeCobrar()) {
-            $mensaje = $this->faltaRncComprador()
-                ? 'La Factura de Crédito Fiscal (e-CF 31) requiere el RNC del comprador: busca el cliente o cárgalo desde la DGII.'
-                : 'Revisa el carrito antes de cobrar: cliente, líneas y stock.';
+            $mensaje = $this->mensajeFaltaRncComprador() ?? 'Revisa el carrito antes de cobrar: cliente, líneas y stock.';
 
             Notification::make()->title($mensaje)->danger()->send();
 

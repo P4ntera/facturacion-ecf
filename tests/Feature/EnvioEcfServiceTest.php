@@ -170,6 +170,20 @@ class EnvioEcfServiceTest extends TestCase
         $this->assertSame(EstadoFiscal::EN_PROCESO, $venta->refresh()->estado_fiscal);
     }
 
+    /** Consumo (32) por debajo del umbral: el PAC lo convierte a RFCE — es una aceptación, no un error. */
+    public function test_respuesta_rfce_del_pac_se_mapea_como_estado_final_de_aceptacion(): void
+    {
+        $venta = $this->crearVenta(documentoCliente: null);
+
+        $this->conGateway(new RespuestaEcf(exito: true, estado: 'RFCE'));
+
+        $respuesta = app(EnvioEcfService::class)->enviar($venta);
+        $venta->refresh();
+
+        $this->assertTrue($respuesta->exito);
+        $this->assertSame(EstadoFiscal::RFCE, $venta->estado_fiscal);
+    }
+
     public function test_error_de_red_deja_la_venta_pendiente_con_el_motivo_guardado(): void
     {
         $venta = $this->crearVenta(documentoCliente: null);
@@ -186,7 +200,11 @@ class EnvioEcfServiceTest extends TestCase
 
     public function test_falta_de_rnc_en_credito_fiscal_rechaza_sin_llamar_al_gateway(): void
     {
-        $venta = $this->crearVenta(TipoComprobante::FACTURA_CREDITO_FISCAL, documentoCliente: null);
+        // VentaService::registrar() ya exige RNC para el 31 al cobrar; se crea con uno válido y
+        // se le quita después, para probar la defensa "en profundidad" del builder ante una
+        // venta que de algún modo (edición posterior del cliente, dato legado) llega sin RNC.
+        $venta = $this->crearVenta(TipoComprobante::FACTURA_CREDITO_FISCAL, documentoCliente: '130000000');
+        $venta->cliente->update(['documento' => null]);
 
         $this->app->bind(DgiiGatewayInterface::class, fn () => new class implements DgiiGatewayInterface
         {
