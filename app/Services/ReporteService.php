@@ -94,15 +94,8 @@ class ReporteService
             ->orderBy('fecha')
             ->get()
             ->map(fn (Venta $venta) => [
-                'rnc_cedula' => match ($venta->cliente->tipo_documento) {
-                    TipoDocumentoCliente::RNC, TipoDocumentoCliente::CEDULA => $venta->cliente->documento,
-                    TipoDocumentoCliente::SIN_DOCUMENTO => null,
-                },
-                'tipo_identificacion' => match ($venta->cliente->tipo_documento) {
-                    TipoDocumentoCliente::RNC => 1,
-                    TipoDocumentoCliente::CEDULA => 2,
-                    TipoDocumentoCliente::SIN_DOCUMENTO => null,
-                },
+                'rnc_cedula' => $this->rncCedula607($venta->cliente->tipo_documento, $venta->cliente->documento),
+                'tipo_identificacion' => $this->tipoIdentificacion607($venta->cliente->tipo_documento),
                 'numero_comprobante' => $venta->ncf,
                 'numero_comprobante_modificado' => $venta->ncf_modifica,
                 'tipo_ingreso' => self::TIPO_INGRESO_DEFECTO,
@@ -111,6 +104,44 @@ class ReporteService
                 'itbis_facturado' => (string) $venta->total_itbis,
                 'monto_total' => (string) $venta->total,
             ]);
+    }
+
+    /**
+     * RNC/Cédula del comprador para el 607, según el tipo de documento del cliente. Único
+     * punto donde vive esta regla —usado tanto por reporte607() como por la página y los
+     * exportadores del 607— para que el mapeo no se desalinee entre pantalla y archivo.
+     */
+    public function rncCedula607(TipoDocumentoCliente $tipoDocumento, ?string $documento): ?string
+    {
+        return match ($tipoDocumento) {
+            TipoDocumentoCliente::RNC, TipoDocumentoCliente::CEDULA => $documento,
+            TipoDocumentoCliente::SIN_DOCUMENTO => null,
+        };
+    }
+
+    /**
+     * Código DGII de "Tipo de Identificación" para el 607: 1=RNC, 2=Cédula. Ver la nota en
+     * reporte607() sobre por qué "sin documento" es null y no un código 3 inventado.
+     */
+    public function tipoIdentificacion607(TipoDocumentoCliente $tipoDocumento): ?int
+    {
+        return match ($tipoDocumento) {
+            TipoDocumentoCliente::RNC => 1,
+            TipoDocumentoCliente::CEDULA => 2,
+            TipoDocumentoCliente::SIN_DOCUMENTO => null,
+        };
+    }
+
+    /**
+     * Etiqueta legible del código de tipo_identificacion607(), para pantalla/PDF/exportables.
+     */
+    public function etiquetaTipoIdentificacion607(?int $codigo): string
+    {
+        return match ($codigo) {
+            1 => 'RNC',
+            2 => 'Cédula',
+            default => '—',
+        };
     }
 
     /**
