@@ -26,6 +26,16 @@ class ReporteService
     }
 
     /**
+     * Todas las ventas del rango (incluye ANULADAs) para el listado del reporte de ventas:
+     * a diferencia de los agregados de ingresos, aquí interesa la trazabilidad completa.
+     */
+    public function ventasEnRangoQuery(Carbon $desde, Carbon $hasta): Builder
+    {
+        return Venta::query()
+            ->whereBetween('fecha', [$desde->copy()->startOfDay(), $hasta->copy()->endOfDay()]);
+    }
+
+    /**
      * @return array{total_vendido: string, total_itbis: string, cantidad_ventas: int, ticket_promedio: string}
      */
     public function ventasPorRango(Carbon $desde, Carbon $hasta): array
@@ -65,12 +75,9 @@ class ReporteService
             ->mapWithKeys(fn ($fila) => [(string) $fila->dia => (string) $fila->total]);
     }
 
-    /**
-     * @return array{por_cantidad: Collection, por_ingresos: Collection}
-     */
-    public function topProductos(Carbon $desde, Carbon $hasta, int $limite = 10): array
+    public function productosVendidosQuery(Carbon $desde, Carbon $hasta): Builder
     {
-        $base = Producto::query()
+        return Producto::query()
             ->join('detalle_ventas', 'detalle_ventas.producto_id', '=', 'productos.id')
             ->join('ventas', 'ventas.id', '=', 'detalle_ventas.venta_id')
             ->whereBetween('ventas.fecha', [$desde->copy()->startOfDay(), $hasta->copy()->endOfDay()])
@@ -79,6 +86,14 @@ class ReporteService
             ->selectRaw('productos.id, productos.codigo, productos.nombre')
             ->selectRaw('COALESCE(SUM(detalle_ventas.cantidad), 0) as cantidad_vendida')
             ->selectRaw('COALESCE(SUM(detalle_ventas.subtotal), 0) as ingresos');
+    }
+
+    /**
+     * @return array{por_cantidad: Collection, por_ingresos: Collection}
+     */
+    public function topProductos(Carbon $desde, Carbon $hasta, int $limite = 10): array
+    {
+        $base = $this->productosVendidosQuery($desde, $hasta);
 
         return [
             'por_cantidad' => (clone $base)->orderByDesc('cantidad_vendida')->limit($limite)->get(),
@@ -86,28 +101,36 @@ class ReporteService
         ];
     }
 
-    public function ventasPorCliente(Carbon $desde, Carbon $hasta): Collection
+    public function ventasPorClienteQuery(Carbon $desde, Carbon $hasta): Builder
     {
         return $this->ventasEmitidasEnRango($desde, $hasta)
             ->join('clientes', 'clientes.id', '=', 'ventas.cliente_id')
             ->groupBy('clientes.id', 'clientes.nombre')
-            ->selectRaw('clientes.id as cliente_id, clientes.nombre as cliente_nombre')
+            // "id" además de "cliente_id": el modelo base de la consulta sigue siendo Venta,
+            // y Filament identifica cada fila de tabla con getKey() (columna "id").
+            ->selectRaw('clientes.id as id, clientes.id as cliente_id, clientes.nombre as cliente_nombre')
             ->selectRaw('COALESCE(SUM(ventas.total), 0) as total_vendido')
-            ->selectRaw('COUNT(*) as cantidad_ventas')
-            ->orderByDesc('total_vendido')
-            ->get();
+            ->selectRaw('COUNT(*) as cantidad_ventas');
     }
 
-    public function ventasPorUsuario(Carbon $desde, Carbon $hasta): Collection
+    public function ventasPorCliente(Carbon $desde, Carbon $hasta): Collection
+    {
+        return $this->ventasPorClienteQuery($desde, $hasta)->orderByDesc('total_vendido')->get();
+    }
+
+    public function ventasPorUsuarioQuery(Carbon $desde, Carbon $hasta): Builder
     {
         return $this->ventasEmitidasEnRango($desde, $hasta)
             ->join('users', 'users.id', '=', 'ventas.user_id')
             ->groupBy('users.id', 'users.name')
-            ->selectRaw('users.id as user_id, users.name as user_nombre')
+            ->selectRaw('users.id as id, users.id as user_id, users.name as user_nombre')
             ->selectRaw('COALESCE(SUM(ventas.total), 0) as total_vendido')
-            ->selectRaw('COUNT(*) as cantidad_ventas')
-            ->orderByDesc('total_vendido')
-            ->get();
+            ->selectRaw('COUNT(*) as cantidad_ventas');
+    }
+
+    public function ventasPorUsuario(Carbon $desde, Carbon $hasta): Collection
+    {
+        return $this->ventasPorUsuarioQuery($desde, $hasta)->orderByDesc('total_vendido')->get();
     }
 
     /**
@@ -137,15 +160,16 @@ class ReporteService
             ->value('valor');
     }
 
+    public function productosBajoMinimoQuery(): Builder
+    {
+        return Producto::query()->activos()->bajoMinimo();
+    }
+
     /**
      * @return Collection<int, Producto>
      */
     public function productosBajoMinimo(): Collection
     {
-        return Producto::query()
-            ->activos()
-            ->bajoMinimo()
-            ->orderBy('nombre')
-            ->get();
+        return $this->productosBajoMinimoQuery()->orderBy('nombre')->get();
     }
 }

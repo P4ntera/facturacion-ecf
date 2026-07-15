@@ -339,7 +339,7 @@ class VentaResource extends Resource
         ];
     }
 
-    private static function etiquetaEstadoFiscal(EstadoFiscal $estado): string
+    public static function etiquetaEstadoFiscal(EstadoFiscal $estado): string
     {
         return match ($estado) {
             EstadoFiscal::NO_APLICA => 'No aplica',
@@ -353,7 +353,7 @@ class VentaResource extends Resource
         };
     }
 
-    private static function colorEstadoFiscal(EstadoFiscal $estado): string
+    public static function colorEstadoFiscal(EstadoFiscal $estado): string
     {
         return match ($estado) {
             EstadoFiscal::ACEPTADO, EstadoFiscal::RFCE => 'success',
