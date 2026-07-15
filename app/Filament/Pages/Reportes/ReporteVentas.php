@@ -104,4 +104,14 @@ class ReporteVentas extends ReportePage
             ])
             ->defaultSort('fecha', 'desc');
     }
+
+    protected function pdfRouteName(): string
+    {
+        return 'reportes.ventas.pdf';
+    }
+
+    protected function pdfRouteParams(): array
+    {
+        return ['desde' => $this->rangoDesde()->toDateString(), 'hasta' => $this->rangoHasta()->toDateString()];
+    }
 }

@@ -57,4 +57,14 @@ class ReporteTopProductos extends ReportePage
             ])
             ->defaultSort('ingresos', 'desc');
     }
+
+    protected function pdfRouteName(): string
+    {
+        return 'reportes.top-productos.pdf';
+    }
+
+    protected function pdfRouteParams(): array
+    {
+        return ['desde' => $this->rangoDesde()->toDateString(), 'hasta' => $this->rangoHasta()->toDateString()];
+    }
 }

@@ -77,4 +77,9 @@ class ReporteInventario extends ReportePage
             ])
             ->defaultSort('nombre');
     }
+
+    protected function pdfRouteName(): string
+    {
+        return 'reportes.inventario.pdf';
+    }
 }

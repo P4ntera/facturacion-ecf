@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Filament\Pages\Reportes;
 
+use Filament\Actions\Action;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\EmbeddedTable;
 use Filament\Schemas\Schema;
+use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 use Illuminate\Support\Carbon;
@@ -28,6 +30,30 @@ abstract class ReportePage extends Page implements HasTable
         return $schema->components([
             EmbeddedTable::make(),
         ]);
+    }
+
+    /**
+     * Nombre de la ruta que genera el PDF de este reporte (definida en routes/web.php).
+     */
+    abstract protected function pdfRouteName(): string;
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function pdfRouteParams(): array
+    {
+        return [];
+    }
+
+    protected function getHeaderActions(): array
+    {
+        return [
+            Action::make('exportarPdf')
+                ->label('Exportar PDF')
+                ->icon(Heroicon::OutlinedDocumentArrowDown)
+                ->color('gray')
+                ->url(fn (): string => route($this->pdfRouteName(), $this->pdfRouteParams()), shouldOpenInNewTab: true),
+        ];
     }
 
     /**

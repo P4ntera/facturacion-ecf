@@ -60,4 +60,14 @@ class ReporteVentasPorCliente extends ReportePage
             // primaria que Filament añade por defecto rompería el GROUP BY de Postgres.
             ->defaultKeySort(false);
     }
+
+    protected function pdfRouteName(): string
+    {
+        return 'reportes.ventas-por-cliente.pdf';
+    }
+
+    protected function pdfRouteParams(): array
+    {
+        return ['desde' => $this->rangoDesde()->toDateString(), 'hasta' => $this->rangoHasta()->toDateString()];
+    }
 }

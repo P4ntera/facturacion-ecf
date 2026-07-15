@@ -8,11 +8,6 @@ use App\Enums\TasaItbis;
 use App\Enums\TipoComprobante;
 use App\Enums\TipoDocumentoCliente;
 use App\Enums\TipoProducto;
-use App\Filament\Pages\Reportes\ReporteInventario;
-use App\Filament\Pages\Reportes\ReporteTopProductos;
-use App\Filament\Pages\Reportes\ReporteVentas;
-use App\Filament\Pages\Reportes\ReporteVentasPorCliente;
-use App\Filament\Pages\Reportes\ReporteVentasPorVendedor;
 use App\Models\Cliente;
 use App\Models\DetalleVenta;
 use App\Models\Producto;
@@ -22,7 +17,7 @@ use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
-class ReportesPagesTest extends TestCase
+class ReportesPdfTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -82,26 +77,36 @@ class ReportesPagesTest extends TestCase
         ]);
     }
 
-    public function test_las_paginas_de_reportes_cargan_para_quien_tiene_ver_reportes(): void
+    public function test_los_pdf_de_los_reportes_se_generan_para_quien_tiene_ver_reportes(): void
     {
         $usuario = $this->usuarioConPermiso();
         $this->crearVentaDeEjemplo($usuario);
 
-        $this->actingAs($usuario)->get(ReporteVentas::getUrl())->assertOk()->assertSee('Cliente de prueba')->assertSee('Exportar PDF');
-        $this->actingAs($usuario)->get(ReporteTopProductos::getUrl())->assertOk()->assertSee('Producto de prueba');
-        $this->actingAs($usuario)->get(ReporteVentasPorCliente::getUrl())->assertOk()->assertSee('Cliente de prueba');
-        $this->actingAs($usuario)->get(ReporteVentasPorVendedor::getUrl())->assertOk();
-        $this->actingAs($usuario)->get(ReporteInventario::getUrl())->assertOk()->assertSee('Producto de prueba');
+        $desde = now()->startOfMonth()->toDateString();
+        $hasta = now()->endOfMonth()->toDateString();
+
+        foreach ([
+            route('reportes.ventas.pdf', ['desde' => $desde, 'hasta' => $hasta]),
+            route('reportes.top-productos.pdf', ['desde' => $desde, 'hasta' => $hasta]),
+            route('reportes.ventas-por-cliente.pdf', ['desde' => $desde, 'hasta' => $hasta]),
+            route('reportes.ventas-por-vendedor.pdf', ['desde' => $desde, 'hasta' => $hasta]),
+            route('reportes.inventario.pdf'),
+        ] as $url) {
+            $response = $this->actingAs($usuario)->get($url);
+            $response->assertOk();
+            $this->assertSame('application/pdf', $response->headers->get('Content-Type'));
+            $this->assertStringStartsWith('%PDF', $response->getContent());
+        }
     }
 
-    public function test_usuario_sin_ver_reportes_no_puede_entrar_a_los_reportes(): void
+    public function test_usuario_sin_ver_reportes_no_puede_descargar_los_pdf(): void
     {
         $this->seed(RolePermissionSeeder::class);
 
         $usuario = User::factory()->create();
         $usuario->assignRole('Almacenista');
 
-        $this->actingAs($usuario)->get(ReporteVentas::getUrl())->assertForbidden();
-        $this->actingAs($usuario)->get(ReporteInventario::getUrl())->assertForbidden();
+        $this->actingAs($usuario)->get(route('reportes.ventas.pdf'))->assertForbidden();
+        $this->actingAs($usuario)->get(route('reportes.inventario.pdf'))->assertForbidden();
     }
 }
