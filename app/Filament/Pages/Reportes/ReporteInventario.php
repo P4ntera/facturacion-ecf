@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Pages\Reportes;
 
+use App\Filament\Exports\ProductoExporter;
 use App\Services\ReporteService;
 use BackedEnum;
 use Filament\Schemas\Components\EmbeddedTable;
@@ -81,5 +82,10 @@ class ReporteInventario extends ReportePage
     protected function pdfRouteName(): string
     {
         return 'reportes.inventario.pdf';
+    }
+
+    protected function exporterClass(): string
+    {
+        return ProductoExporter::class;
     }
 }

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Filament\Pages\Reportes;
 
 use Filament\Actions\Action;
+use Filament\Actions\ExportAction;
+use Filament\Actions\Exports\Exporter;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\EmbeddedTable;
 use Filament\Schemas\Schema;
@@ -45,9 +47,20 @@ abstract class ReportePage extends Page implements HasTable
         return [];
     }
 
+    /**
+     * Clase del exportador nativo de Filament (columnas y notificación de este reporte).
+     *
+     * @return class-string<Exporter>
+     */
+    abstract protected function exporterClass(): string;
+
     protected function getHeaderActions(): array
     {
         return [
+            ExportAction::make()
+                ->label('Exportar Excel/CSV')
+                ->exporter($this->exporterClass()),
+
             Action::make('exportarPdf')
                 ->label('Exportar PDF')
                 ->icon(Heroicon::OutlinedDocumentArrowDown)

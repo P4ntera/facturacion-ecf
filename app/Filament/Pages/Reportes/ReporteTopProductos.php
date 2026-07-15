@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Pages\Reportes;
 
+use App\Filament\Exports\TopProductoExporter;
 use App\Services\ReporteService;
 use BackedEnum;
 use Filament\Forms\Components\DatePicker;
@@ -66,5 +67,10 @@ class ReporteTopProductos extends ReportePage
     protected function pdfRouteParams(): array
     {
         return ['desde' => $this->rangoDesde()->toDateString(), 'hasta' => $this->rangoHasta()->toDateString()];
+    }
+
+    protected function exporterClass(): string
+    {
+        return TopProductoExporter::class;
     }
 }

@@ -7,6 +7,7 @@ namespace App\Filament\Pages\Reportes;
 use App\Enums\EstadoFiscal;
 use App\Enums\EstadoVenta;
 use App\Enums\TipoComprobante;
+use App\Filament\Exports\VentaExporter;
 use App\Filament\Resources\VentaResource;
 use App\Services\ReporteService;
 use BackedEnum;
@@ -113,5 +114,10 @@ class ReporteVentas extends ReportePage
     protected function pdfRouteParams(): array
     {
         return ['desde' => $this->rangoDesde()->toDateString(), 'hasta' => $this->rangoHasta()->toDateString()];
+    }
+
+    protected function exporterClass(): string
+    {
+        return VentaExporter::class;
     }
 }
