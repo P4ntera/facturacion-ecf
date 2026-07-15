@@ -7,6 +7,7 @@ use Database\Factories\UserFactory;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -25,6 +26,7 @@ class User extends Authenticatable implements FilamentUser
         'name',
         'email',
         'password',
+        'impresora_facturacion_id',
     ];
 
     protected $hidden = [
@@ -55,10 +57,15 @@ class User extends Authenticatable implements FilamentUser
         return $this->hasMany(Compra::class);
     }
 
+    public function impresoraFacturacion(): BelongsTo
+    {
+        return $this->belongsTo(Impresora::class, 'impresora_facturacion_id');
+    }
+
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
-            ->logOnly(['name', 'email'])
+            ->logOnly(['name', 'email', 'impresora_facturacion_id'])
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs()
             ->useLogName('Usuarios');
