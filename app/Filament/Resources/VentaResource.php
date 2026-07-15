@@ -3,15 +3,18 @@
 namespace App\Filament\Resources;
 
 use App\Enums\AmbienteEcf;
+use App\Enums\AnchoPapel;
 use App\Enums\EstadoFiscal;
 use App\Enums\EstadoVenta;
 use App\Enums\EventoEcf;
+use App\Enums\ModuloImpresion;
 use App\Enums\TipoComprobante;
 use App\Exceptions\VentaYaAnuladaException;
 use App\Filament\Resources\VentaResource\Pages;
 use App\Jobs\EnviarEcfJob;
 use App\Models\Venta;
 use App\Services\Dgii\EnvioEcfService;
+use App\Services\Impresion\ImpresionService;
 use App\Services\VentaService;
 use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
@@ -259,6 +262,8 @@ class VentaResource extends Resource
                     ->url(fn (Venta $record) => route('ventas.pdf', $record))
                     ->openUrlInNewTab(),
 
+                self::reimprimirTicketAction(),
+
                 Action::make('anular')
                     ->label('Anular')
                     ->icon('heroicon-o-x-circle')
@@ -288,6 +293,43 @@ class VentaResource extends Resource
                 self::reintentarEnvioAction(),
             ])
             ->defaultSort('fecha', 'desc');
+    }
+
+    /**
+     * Mismo criterio dual que ImpresoraResource::probarImpresion(): si la impresora resuelta
+     * (del usuario que reimprime, o la predeterminada del módulo) es de RED, ->url() resuelve a
+     * null y se ejecuta ->action() en el servidor sin diálogo; si es NAVEGADOR o no hay ninguna
+     * configurada, ->url() abre el ticket en una pestaña para que el usuario elija su impresora.
+     */
+    public static function reimprimirTicketAction(): Action
+    {
+        return Action::make('reimprimirTicket')
+            ->label('Reimprimir ticket')
+            ->icon('heroicon-o-printer')
+            ->color('gray')
+            ->action(function (Venta $record): void {
+                $impresora = app(ImpresionService::class)->resolverImpresora(ModuloImpresion::FACTURACION, auth()->user());
+                $resultado = app(ImpresionService::class)->imprimirTicket($record, $impresora);
+
+                if ($resultado['modo'] !== 'red') {
+                    return;
+                }
+
+                if ($resultado['exito']) {
+                    Notification::make()->title('Ticket impreso')->success()->send();
+
+                    return;
+                }
+
+                Notification::make()->title('No se pudo imprimir el ticket')->body($resultado['error'])->danger()->send();
+            })
+            ->url(function (Venta $record) {
+                $impresora = app(ImpresionService::class)->resolverImpresora(ModuloImpresion::FACTURACION, auth()->user());
+
+                return $impresora?->esDeRed()
+                    ? null
+                    : app(ImpresionService::class)->urlTicket($record, $impresora?->ancho_papel ?? AnchoPapel::MM80);
+            }, shouldOpenInNewTab: true);
     }
 
     public static function refrescarEstadoAction(): Action

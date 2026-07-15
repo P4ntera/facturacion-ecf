@@ -23,6 +23,7 @@
       };
       document.addEventListener('livewire:navigate', posRestaurarSidebar);
     "
+    x-on:abrir-ticket.window="window.open($event.detail.url, '_blank')"
   >
     <div class="pos-grid">
       <div class="pos-main">
