@@ -3,6 +3,7 @@
 use App\Http\Controllers\AprobacionComercialEcfController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RecepcionEcfController;
+use App\Http\Controllers\Reportes\ReporteFiscal607PdfController;
 use App\Http\Controllers\Reportes\ReporteInventarioPdfController;
 use App\Http\Controllers\Reportes\ReporteTopProductosPdfController;
 use App\Http\Controllers\Reportes\ReporteVentasPdfController;
@@ -44,6 +45,7 @@ Route::middleware(['auth', 'can:ver_reportes'])->prefix('reportes')->name('repor
     Route::get('/ventas-por-cliente/pdf', ReporteVentasPorClientePdfController::class)->name('ventas-por-cliente.pdf');
     Route::get('/ventas-por-vendedor/pdf', ReporteVentasPorVendedorPdfController::class)->name('ventas-por-vendedor.pdf');
     Route::get('/inventario/pdf', ReporteInventarioPdfController::class)->name('inventario.pdf');
+    Route::get('/fiscal-607/pdf', ReporteFiscal607PdfController::class)->name('fiscal-607.pdf');
 });
 
 // URLs públicas que se registran en el portal de la DGII (ella misma las llama, sin sesión ni

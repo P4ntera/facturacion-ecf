@@ -27,13 +27,14 @@ abstract class ReportePdfController extends Controller
 
     /**
      * Suma con bcmath para no arrastrar imprecisión de coma flotante en los totales del PDF.
+     * `data_get` soporta tanto modelos Eloquent (objetos) como filas ya mapeadas a array.
      *
-     * @param  Collection<int, object>  $items
+     * @param  Collection<int, object|array<string, mixed>>  $items
      */
     protected function sumarBc(Collection $items, string $atributo): string
     {
         return $items->reduce(
-            fn (string $acumulado, object $item): string => bcadd($acumulado, (string) $item->{$atributo}, 2),
+            fn (string $acumulado, object|array $item): string => bcadd($acumulado, (string) data_get($item, $atributo), 2),
             '0.00',
         );
     }

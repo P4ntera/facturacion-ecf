@@ -4,53 +4,31 @@ declare(strict_types=1);
 
 namespace App\Filament\Pages\Reportes;
 
+use App\Filament\Exports\Reporte607Exporter;
 use App\Models\Venta;
 use App\Services\ReporteService;
 use BackedEnum;
 use Filament\Forms\Components\DatePicker;
-use Filament\Pages\Page;
-use Filament\Schemas\Components\EmbeddedTable;
-use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\Summarizers\Sum;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Concerns\InteractsWithTable;
-use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Table;
-use Illuminate\Support\Carbon;
-use UnitEnum;
 
 /**
  * Formato 607 (Envío de Ventas de Bienes y Servicios) de la DGII. La regla fiscal de qué se
  * incluye/excluye (ANULADAs fuera, van al 608) vive en ReporteService::reporte607Query(); esta
  * página solo la muestra con filtro de período y exporta lo que está en pantalla.
  */
-class ReporteFiscal607 extends Page implements HasTable
+class ReporteFiscal607 extends ReportePage
 {
-    use InteractsWithTable;
-
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedDocumentText;
-
-    protected static string|UnitEnum|null $navigationGroup = 'Reportes';
 
     protected static ?string $navigationLabel = 'Fiscal 607';
 
     protected static ?string $title = 'Formato 607 — Envío de ventas';
 
     protected static ?string $slug = 'reportes/fiscal-607';
-
-    public static function canAccess(): bool
-    {
-        return auth()->user()?->can('ver_reportes') ?? false;
-    }
-
-    public function content(Schema $schema): Schema
-    {
-        return $schema->components([
-            EmbeddedTable::make(),
-        ]);
-    }
 
     public function table(Table $table): Table
     {
@@ -118,17 +96,18 @@ class ReporteFiscal607 extends Page implements HasTable
             ->defaultSort('fecha');
     }
 
-    /**
-     * Rango de fechas aplicado en el filtro "rango": por defecto, el mes en curso. Mismo
-     * criterio que el resto de los reportes, para que exportar refleje lo filtrado en pantalla.
-     */
-    protected function rangoDesde(): Carbon
+    protected function pdfRouteName(): string
     {
-        return Carbon::parse($this->tableFilters['rango']['desde'] ?? now()->startOfMonth()->toDateString())->startOfDay();
+        return 'reportes.fiscal-607.pdf';
     }
 
-    protected function rangoHasta(): Carbon
+    protected function pdfRouteParams(): array
     {
-        return Carbon::parse($this->tableFilters['rango']['hasta'] ?? now()->endOfMonth()->toDateString())->endOfDay();
+        return ['desde' => $this->rangoDesde()->toDateString(), 'hasta' => $this->rangoHasta()->toDateString()];
+    }
+
+    protected function exporterClass(): string
+    {
+        return Reporte607Exporter::class;
     }
 }
