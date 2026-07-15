@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AprobacionComercialEcfController;
+use App\Http\Controllers\ImpresoraPruebaController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RecepcionEcfController;
 use App\Http\Controllers\Reportes\ReporteFiscal607PdfController;
@@ -38,6 +39,10 @@ Route::get('/ventas/{venta}/pdf', VentaComprobanteController::class)
 Route::get('/ventas/{venta}/xml', VentaEcfXmlController::class)
     ->middleware(['auth', 'can:registrar_ventas'])
     ->name('ventas.ecf.xml');
+
+Route::get('/impresoras/{impresora}/prueba', ImpresoraPruebaController::class)
+    ->middleware(['auth', 'can:administrar_configuracion'])
+    ->name('impresoras.prueba');
 
 Route::middleware(['auth', 'can:ver_reportes'])->prefix('reportes')->name('reportes.')->group(function () {
     Route::get('/ventas/pdf', ReporteVentasPdfController::class)->name('ventas.pdf');
