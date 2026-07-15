@@ -24,6 +24,15 @@ class Impresora extends Model
         'ancho_papel', 'modulo', 'predeterminada', 'activa',
     ];
 
+    // Reflejan los defaults de la columna en la migración: sin esto, un Impresora::create() que
+    // omite estos campos deja el modelo en memoria con null hasta refrescarlo desde la BD.
+    protected $attributes = [
+        'puerto' => 9100,
+        'ancho_papel' => '80',
+        'predeterminada' => false,
+        'activa' => true,
+    ];
+
     protected $casts = [
         'tipo_conexion' => TipoConexionImpresora::class,
         'ancho_papel' => AnchoPapel::class,

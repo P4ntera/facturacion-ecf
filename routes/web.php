@@ -13,6 +13,7 @@ use App\Http\Controllers\Reportes\ReporteVentasPorVendedorPdfController;
 use App\Http\Controllers\RncController;
 use App\Http\Controllers\VentaComprobanteController;
 use App\Http\Controllers\VentaEcfXmlController;
+use App\Http\Controllers\VentaTicketController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -39,6 +40,10 @@ Route::get('/ventas/{venta}/pdf', VentaComprobanteController::class)
 Route::get('/ventas/{venta}/xml', VentaEcfXmlController::class)
     ->middleware(['auth', 'can:registrar_ventas'])
     ->name('ventas.ecf.xml');
+
+Route::get('/ventas/{venta}/ticket', VentaTicketController::class)
+    ->middleware(['auth', 'can:registrar_ventas'])
+    ->name('ventas.ticket');
 
 Route::get('/impresoras/{impresora}/prueba', ImpresoraPruebaController::class)
     ->middleware(['auth', 'can:administrar_configuracion'])
