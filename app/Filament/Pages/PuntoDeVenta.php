@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Pages;
 
+use App\Enums\ModuloImpresion;
 use App\Enums\TipoComprobante;
 use App\Enums\TipoDocumentoCliente;
 use App\Exceptions\SecuenciaNcfAgotadaException;
@@ -11,7 +12,9 @@ use App\Exceptions\StockInsuficienteException;
 use App\Exceptions\VentaInvalidaException;
 use App\Models\Cliente;
 use App\Models\Producto;
+use App\Models\Venta;
 use App\Services\Dgii\ConsultaContribuyenteService;
+use App\Services\Impresion\ImpresionService;
 use App\Services\SecuenciaNcfService;
 use App\Services\VentaService;
 use App\Settings\FacturacionSettings;
@@ -139,15 +142,39 @@ class PuntoDeVenta extends Page
         Notification::make()->title("Cliente cargado desde la DGII/JCE: {$cliente->nombre}")->success()->send();
     }
 
-    /** La Factura de Crédito Fiscal (e-CF 31) exige el RNC del comprador. */
+    /**
+     * Crédito Fiscal (31) siempre exige RNC del comprador; Consumo (32) lo exige en vivo en
+     * cuanto el total del carrito cruza Venta::UMBRAL_CONSUMO. Misma regla que
+     * VentaService::registrar()/EcfBuilder (Venta::requiereComprador), evaluada aquí sobre una
+     * Venta "en memoria" con el tipo y el total actuales del carrito.
+     */
     public function requiereRncComprador(): bool
     {
-        return $this->tipoComprobante === TipoComprobante::FACTURA_CREDITO_FISCAL->value;
+        if (blank($this->tipoComprobante)) {
+            return false;
+        }
+
+        return (new Venta([
+            'tipo_comprobante' => $this->tipoComprobante,
+            'total' => $this->totales['total'] ?? '0.00',
+        ]))->requiereComprador();
     }
 
     public function faltaRncComprador(): bool
     {
         return $this->requiereRncComprador() && blank($this->clienteSeleccionado()?->documento);
+    }
+
+    /** Mismo mensaje (y motivo) que bloquearía VentaService::registrar() al intentar cobrar. */
+    public function mensajeFaltaRncComprador(): ?string
+    {
+        if (! $this->faltaRncComprador()) {
+            return null;
+        }
+
+        return $this->tipoComprobante === TipoComprobante::FACTURA_CREDITO_FISCAL->value
+            ? 'La Factura de Crédito Fiscal (e-CF 31) requiere el RNC del comprador. Cambia el cliente o búscalo por RNC en la DGII abajo.'
+            : 'Para facturas de consumo de RD$250,000 o más, el cliente con RNC/Cédula es obligatorio. Cambia el cliente o búscalo por RNC en la DGII abajo.';
     }
 
     /** @return Collection<int, Producto> */
@@ -267,9 +294,7 @@ class PuntoDeVenta extends Page
     public function cobrar(): void
     {
         if (! $this->puedeCobrar()) {
-            $mensaje = $this->faltaRncComprador()
-                ? 'La Factura de Crédito Fiscal (e-CF 31) requiere el RNC del comprador: busca el cliente o cárgalo desde la DGII.'
-                : 'Revisa el carrito antes de cobrar: cliente, líneas y stock.';
+            $mensaje = $this->mensajeFaltaRncComprador() ?? 'Revisa el carrito antes de cobrar: cliente, líneas y stock.';
 
             Notification::make()->title($mensaje)->danger()->send();
 
@@ -295,14 +320,66 @@ class PuntoDeVenta extends Page
         $this->busquedaProducto = '';
         $this->recalcularTotales();
 
+        $this->notificarVentaRegistradaEImprimirTicket($venta);
+    }
+
+    /**
+     * La venta ya quedó registrada (atómica, vía VentaService) antes de llegar aquí: un fallo de
+     * impresión de aquí en adelante NUNCA la revierte ni la afecta, solo se notifica.
+     *
+     * RED -> el servidor manda los bytes ESC/POS directo al socket, sin diálogo. NAVEGADOR (o sin
+     * impresora configurada) -> el navegador decide la impresora física, así que solo podemos
+     * abrir la vista del ticket y dejar que window.print() (en la propia vista) dispare el diálogo.
+     */
+    private function notificarVentaRegistradaEImprimirTicket(Venta $venta): void
+    {
+        $impresora = app(ImpresionService::class)->resolverImpresora(ModuloImpresion::FACTURACION, auth()->user());
+        $resultado = app(ImpresionService::class)->imprimirTicket($venta, $impresora);
+
+        $accionComprobante = Action::make('comprobante')
+            ->label('Comprobante PDF')
+            ->url(route('ventas.pdf', $venta), shouldOpenInNewTab: true)
+            ->button();
+
+        if ($resultado['modo'] === 'navegador') {
+            $this->dispatch('abrir-ticket', url: $resultado['url']);
+
+            Notification::make()
+                ->title("Venta {$venta->ncf} registrada")
+                ->body($impresora === null
+                    ? 'No hay impresora configurada para Facturación: se abrió el ticket para imprimir desde el navegador.'
+                    : null)
+                ->success()
+                ->actions([
+                    Action::make('ticket')->label('Imprimir ticket de nuevo')->url($resultado['url'], shouldOpenInNewTab: true)->button(),
+                    $accionComprobante,
+                ])
+                ->send();
+
+            return;
+        }
+
+        if ($resultado['exito']) {
+            Notification::make()
+                ->title("Venta {$venta->ncf} registrada")
+                ->body('Ticket impreso.')
+                ->success()
+                ->actions([$accionComprobante])
+                ->send();
+
+            return;
+        }
+
         Notification::make()
-            ->title("Venta {$venta->ncf} registrada")
-            ->success()
+            ->title("Venta {$venta->ncf} registrada, pero el ticket no se pudo imprimir")
+            ->body($resultado['error'])
+            ->danger()
             ->actions([
-                Action::make('imprimir')
-                    ->label('Imprimir comprobante')
-                    ->url(route('ventas.pdf', $venta), shouldOpenInNewTab: true)
+                Action::make('ticketNavegador')
+                    ->label('Reintentar por navegador')
+                    ->url($resultado['url'], shouldOpenInNewTab: true)
                     ->button(),
+                $accionComprobante,
             ])
             ->send();
     }

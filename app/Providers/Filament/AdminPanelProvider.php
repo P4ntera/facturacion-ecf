@@ -2,6 +2,7 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Pages\Auth\EditProfile;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -10,6 +11,7 @@ use Filament\Pages\Dashboard;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
+use Filament\Support\Enums\Width;
 use Filament\Widgets\AccountWidget;
 use Filament\Widgets\FilamentInfoWidget;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
@@ -18,7 +20,6 @@ use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
-use Filament\Support\Enums\Width;
 
 class AdminPanelProvider extends PanelProvider
 {
@@ -30,13 +31,14 @@ class AdminPanelProvider extends PanelProvider
             ->path('admin')
             ->viteTheme('resources/css/filament/admin/theme.css')
             ->login()
+            ->profile(EditProfile::class)
             ->colors([
                 'primary' => Color::hex('#2563EB'), // --primary
                 'success' => Color::hex('#10B981'), // --secondary
-                'info'    => Color::hex('#06B6D4'), // --info
+                'info' => Color::hex('#06B6D4'), // --info
                 'warning' => Color::hex('#F59E0B'), // --warning
-                'danger'  => Color::hex('#EF4444'), // --danger
-                'gray'    => Color::Gray,
+                'danger' => Color::hex('#EF4444'), // --danger
+                'gray' => Color::Gray,
             ])
             // El fondo/superficies del panel salen del slot 'gray' + el modo de color,
             // no de 'primary'. El design-system del proyecto es claro (--background #F9FAFB),
@@ -44,7 +46,7 @@ class AdminPanelProvider extends PanelProvider
             ->darkMode(false)
             ->databaseNotifications()
             ->maxContentWidth(Width::Full)
-            ->sidebarCollapsibleOnDesktop() 
+            ->sidebarCollapsibleOnDesktop()
             ->font('Inter')
             ->brandName('Facturación e-CF')
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')

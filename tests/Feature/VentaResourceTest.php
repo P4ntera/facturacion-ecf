@@ -144,6 +144,19 @@ class VentaResourceTest extends TestCase
             ->assertCanNotSeeTableRecords([$venta]);
     }
 
+    public function test_estado_rfce_se_muestra_como_aceptado_sin_romper_el_listado(): void
+    {
+        // Consumo (32) por debajo del umbral: el PAC lo convierte a RFCE, no es un error.
+        $venta = $this->crearVenta()->refresh();
+        $venta->update(['estado_fiscal' => EstadoFiscal::RFCE]);
+
+        Livewire::actingAs($this->usuarioConPermisos(['registrar_ventas']))
+            ->test(ListVentas::class)
+            ->assertSuccessful()
+            ->assertCanSeeTableRecords([$venta->refresh()])
+            ->assertSee('Aceptado (RFCE)');
+    }
+
     public function test_la_pagina_de_ver_muestra_cabecera_y_lineas(): void
     {
         $venta = $this->crearVenta();
