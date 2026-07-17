@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AprobacionComercialEcfController;
+use App\Http\Controllers\PedidoCompraPdfController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RecepcionEcfController;
 use App\Http\Controllers\RncController;
@@ -32,6 +33,10 @@ Route::get('/ventas/{venta}/pdf', VentaComprobanteController::class)
 Route::get('/ventas/{venta}/xml', VentaEcfXmlController::class)
     ->middleware(['auth', 'can:registrar_ventas'])
     ->name('ventas.ecf.xml');
+
+Route::get('/pedidos-compra/{pedidoCompra}/pdf', PedidoCompraPdfController::class)
+    ->middleware(['auth', 'can:gestionar_compras'])
+    ->name('pedidos-compra.pdf');
 
 // URLs públicas que se registran en el portal de la DGII (ella misma las llama, sin sesión ni
 // CSRF — ver bootstrap/app.php). Seguridad: RNC/tamaño/rate limit/registro en RecepcionEcfService.

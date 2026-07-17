@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Enums\TipoProveedor;
 use App\Filament\Resources\ProveedorResource\Pages;
+use App\Filament\Resources\ProveedorResource\RelationManagers;
 use App\Models\Proveedor;
 use App\Services\DgiiRncService;
 use Filament\Actions\Action;
@@ -258,7 +259,9 @@ class ProveedorResource extends Resource
 
     public static function getRelations(): array
     {
-        return [];
+        return [
+            RelationManagers\ProductosRelationManager::class,
+        ];
     }
 
     public static function getPages(): array
