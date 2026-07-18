@@ -18,19 +18,9 @@ use App\Http\Controllers\VentaEcfXmlController;
 use App\Http\Controllers\VentaTicketController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', function () {
-    return view('welcome');
-});
+// La app es 100% panel de Filament: la raíz solo redirige a /admin (login incluido).
+Route::redirect('/', '/admin');
 
-Route::get('/dashboard', function () {
-    return view('dashboard');
-})->middleware(['auth', 'verified'])->name('dashboard');
-
-Route::middleware('auth')->group(function () {
-    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
-    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
-    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
-});
 Route::get('/rnc/{rnc}', [RncController::class, 'consultar'])
     ->where('rnc', '[0-9]{9,11}')
     ->name('rnc.consultar');
@@ -80,5 +70,3 @@ Route::post('/fe/recepcion/api/ecf', RecepcionEcfController::class)
 Route::post('/fe/aprobacioncomercial/api/ecf', AprobacionComercialEcfController::class)
     ->middleware('throttle:30,1')
     ->name('dgii.aprobacioncomercial');
-
-require __DIR__.'/auth.php';

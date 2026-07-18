@@ -7,13 +7,11 @@ use Tests\TestCase;
 
 class ExampleTest extends TestCase
 {
-    /**
-     * A basic test example.
-     */
-    public function test_the_application_returns_a_successful_response(): void
+    /** La app es 100% panel: la raíz redirige a /admin en vez de servir una vista propia. */
+    public function test_la_raiz_redirige_al_panel(): void
     {
         $response = $this->get('/');
 
-        $response->assertStatus(200);
+        $response->assertRedirect('/admin');
     }
 }
