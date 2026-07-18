@@ -24,6 +24,7 @@
       document.addEventListener('livewire:navigate', posRestaurarSidebar);
     "
     x-on:abrir-ticket.window="window.open($event.detail.url, '_blank')"
+    x-on:producto-escaneado.window="$nextTick(() => $refs.buscadorProducto?.focus())"
   >
     @if ($this->arqueoAbierto() === null)
       {{-- Sin caja abierta: se bloquea la pantalla de venta hasta abrirla --}}
@@ -162,8 +163,10 @@
           <input
             type="text"
             class="form-input"
-            placeholder="Buscar por código o nombre..."
+            x-ref="buscadorProducto"
+            placeholder="Buscar por código, nombre o escanear código de barras..."
             wire:model.live.debounce.300ms="busquedaProducto"
+            wire:keydown.enter="escanearOBuscar"
           />
 
           @if ($busquedaProducto !== '')

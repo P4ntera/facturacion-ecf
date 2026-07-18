@@ -200,6 +200,47 @@ class PuntoDeVenta extends Page
             ->get();
     }
 
+    /**
+     * Un lector de código de barras funciona como un teclado: "teclea" el código muy rápido y
+     * termina con Enter — no hace falta driver ni integración especial, basta con escuchar el
+     * mismo evento que dispararía un cajero al terminar de escribir a mano (wire:keydown.enter
+     * en el buscador). Si el texto coincide EXACTO con el código de barras o el código de un
+     * producto, se agrega directo al carrito y el campo queda listo para el siguiente escaneo.
+     * Si no hay coincidencia exacta, no se hace nada más: la búsqueda por nombre/código de abajo
+     * ya es reactiva sola (wire:model.live) y sigue mostrando resultados sin que esto interfiera.
+     */
+    public function escanearOBuscar(): void
+    {
+        $texto = trim($this->busquedaProducto);
+
+        if ($texto === '') {
+            return;
+        }
+
+        $producto = Producto::query()
+            ->where(fn (Builder $q) => $q->where('codigo_barra', 'ilike', $texto)->orWhere('codigo', 'ilike', $texto))
+            ->first();
+
+        if ($producto === null) {
+            return;
+        }
+
+        if (! $producto->activo) {
+            Notification::make()->title("«{$producto->nombre}» está inactivo y no se puede vender")->danger()->send();
+
+            return;
+        }
+
+        if ($producto->controla_stock && (float) $producto->stock <= 0) {
+            Notification::make()->title("«{$producto->nombre}» no tiene stock disponible")->danger()->send();
+
+            return;
+        }
+
+        $this->agregarProducto($producto->id);
+        $this->dispatch('producto-escaneado');
+    }
+
     public function agregarProducto(int $productoId): void
     {
         $producto = Producto::query()->where('activo', true)->find($productoId);
