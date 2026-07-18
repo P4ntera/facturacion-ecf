@@ -42,9 +42,15 @@ class User extends Authenticatable implements FilamentUser
         ];
     }
 
+    /**
+     * Cualquier permiso (de cualquier rol, incluidos los creados desde RoleResource) basta para
+     * entrar al panel: la lista fija de roles ('Administrador', 'Vendedor', 'Almacenista') dejaba
+     * fuera a cualquier rol nuevo creado desde la matriz de permisos, aunque tuviera acceso
+     * legítimo a alguna pantalla. Cada Resource/Page sigue gateando su propia pantalla.
+     */
     public function canAccessPanel(Panel $panel): bool
     {
-        return $this->hasAnyRole(['Administrador', 'Vendedor', 'Almacenista']);
+        return $this->getAllPermissions()->isNotEmpty();
     }
 
     public function ventas(): HasMany
