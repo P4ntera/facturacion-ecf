@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Database\Seeders;
 
 use App\Models\User;
+use App\Support\Permisos;
 use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
@@ -13,6 +14,13 @@ class RolePermissionSeeder extends Seeder
 {
     public function run(): void
     {
+        // Catálogo granular por pantalla (app/Support/Permisos.php): se crea aquí de forma
+        // idempotente. Los roles todavía se asignan con los permisos gruesos de abajo hasta que
+        // las Policies/páginas se migren a los granulares (ver siguiente commit).
+        foreach (Permisos::todos() as $permiso) {
+            Permission::firstOrCreate(['name' => $permiso, 'guard_name' => 'web']);
+        }
+
         $permisos = [
             'gestionar_usuarios',
             'gestionar_maestros',
