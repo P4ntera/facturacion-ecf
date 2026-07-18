@@ -11,17 +11,17 @@ class DevolucionCompraPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->can('gestionar_compras');
+        return $user->can('devoluciones.ver');
     }
 
     public function view(User $user, DevolucionCompra $devolucionCompra): bool
     {
-        return $user->can('gestionar_compras');
+        return $user->can('devoluciones.ver');
     }
 
     public function create(User $user): bool
     {
-        return $user->can('gestionar_compras');
+        return $user->can('devoluciones.crear');
     }
 
     public function delete(User $user, DevolucionCompra $devolucionCompra): bool

@@ -28,7 +28,7 @@ class ManageEmpresa extends SettingsPage
 
     public static function canAccess(): bool
     {
-        return auth()->user()?->can('administrar_configuracion') ?? false;
+        return auth()->user()?->can('empresa.administrar') ?? false;
     }
 
     public function form(Schema $schema): Schema

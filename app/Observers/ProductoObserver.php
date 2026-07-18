@@ -20,7 +20,7 @@ class ProductoObserver
             return;
         }
 
-        $destinatarios = User::permission('gestionar_inventario')->get();
+        $destinatarios = User::permission('inventario.ajustar')->get();
 
         if ($destinatarios->isEmpty()) {
             return;

@@ -184,7 +184,7 @@ class ProductoResource extends Resource
 
                 ToggleColumn::make('activo')
                     ->label('Activo')
-                    ->disabled(fn (): bool => ! auth()->user()?->can('gestionar_maestros'))
+                    ->disabled(fn (): bool => ! auth()->user()?->can('productos.desactivar'))
                     ->sortable(),
             ])
             ->filters([
@@ -203,7 +203,7 @@ class ProductoResource extends Resource
                 Action::make('ajustarStock')
                     ->label('Ajustar stock')
                     ->icon('heroicon-o-adjustments-horizontal')
-                    ->visible(fn (): bool => auth()->user()?->can('gestionar_inventario') ?? false)
+                    ->visible(fn (): bool => auth()->user()?->can('inventario.ajustar') ?? false)
                     ->schema([
                         Select::make('tipo')
                             ->label('Tipo')

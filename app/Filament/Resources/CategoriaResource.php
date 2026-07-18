@@ -70,7 +70,7 @@ class CategoriaResource extends Resource
 
                 ToggleColumn::make('activo')
                     ->label('Activo')
-                    ->disabled(fn (): bool => ! auth()->user()?->can('gestionar_maestros'))
+                    ->disabled(fn (): bool => ! auth()->user()?->can('categorias.desactivar'))
                     ->sortable(),
 
                 TextColumn::make('created_at')

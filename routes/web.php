@@ -36,11 +36,11 @@ Route::get('/rnc/{rnc}', [RncController::class, 'consultar'])
     ->name('rnc.consultar');
 
 Route::get('/ventas/{venta}/pdf', VentaComprobanteController::class)
-    ->middleware(['auth', 'can:registrar_ventas'])
+    ->middleware(['auth', 'can:ventas.imprimir'])
     ->name('ventas.pdf');
 
 Route::get('/ventas/{venta}/xml', VentaEcfXmlController::class)
-    ->middleware(['auth', 'can:registrar_ventas'])
+    ->middleware(['auth', 'can:ventas.ver'])
     ->name('ventas.ecf.xml');
 
 Route::get('/pedidos-compra/{pedidoCompra}/pdf', PedidoCompraPdfController::class)
@@ -52,14 +52,16 @@ Route::get('/arqueos-caja/{arqueoCaja}/pdf', ArqueoCajaPdfController::class)
     ->name('arqueos-caja.pdf');
 
 Route::get('/ventas/{venta}/ticket', VentaTicketController::class)
-    ->middleware(['auth', 'can:registrar_ventas'])
+    ->middleware(['auth', 'can:ventas.imprimir'])
     ->name('ventas.ticket');
 
 Route::get('/impresoras/{impresora}/prueba', ImpresoraPruebaController::class)
-    ->middleware(['auth', 'can:administrar_configuracion'])
+    ->middleware(['auth', 'can:impresoras.administrar'])
     ->name('impresoras.prueba');
 
-Route::middleware(['auth', 'can:ver_reportes'])->prefix('reportes')->name('reportes.')->group(function () {
+// Todas las rutas de este grupo generan PDFs para descargar: es la acción "exportar", distinta
+// de solo ver el reporte en pantalla (reportes.ver, gateado a nivel de página).
+Route::middleware(['auth', 'can:reportes.exportar'])->prefix('reportes')->name('reportes.')->group(function () {
     Route::get('/ventas/pdf', ReporteVentasPdfController::class)->name('ventas.pdf');
     Route::get('/top-productos/pdf', ReporteTopProductosPdfController::class)->name('top-productos.pdf');
     Route::get('/ventas-por-cliente/pdf', ReporteVentasPorClientePdfController::class)->name('ventas-por-cliente.pdf');

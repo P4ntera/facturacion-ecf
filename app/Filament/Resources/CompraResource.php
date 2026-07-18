@@ -122,7 +122,7 @@ class CompraResource extends Resource
                             Select::make('tipo')
                                 ->label('Tipo de proveedor')
                                 ->options([
-                                    TipoProveedor::FORMAL->value   => TipoProveedor::FORMAL->etiqueta(),
+                                    TipoProveedor::FORMAL->value => TipoProveedor::FORMAL->etiqueta(),
                                     TipoProveedor::INFORMAL->value => TipoProveedor::INFORMAL->etiqueta(),
                                 ])
                                 ->default(TipoProveedor::FORMAL->value)
@@ -150,7 +150,7 @@ class CompraResource extends Resource
                     Select::make('tipo_comprobante')
                         ->label('Tipo de comprobante')
                         ->options([
-                            TipoComprobante::COMPRAS->value        => TipoComprobante::COMPRAS->etiqueta(),
+                            TipoComprobante::COMPRAS->value => TipoComprobante::COMPRAS->etiqueta(),
                             TipoComprobante::GASTOS_MENORES->value => TipoComprobante::GASTOS_MENORES->etiqueta(),
                         ])
                         ->default(TipoComprobante::COMPRAS->value)
@@ -212,7 +212,7 @@ class CompraResource extends Resource
                             }
 
                             $service = app(CompraService::class);
-                            $calc    = $service->calcularLineas($lineas, (bool) $get('itbis_incluido'));
+                            $calc = $service->calcularLineas($lineas, (bool) $get('itbis_incluido'));
                             $totales = $service->calcularTotales($calc);
 
                             $diferencia = round((float) $montoFactura - $totales['total'], 2);
@@ -284,7 +284,7 @@ class CompraResource extends Resource
                                 ->options([
                                     TasaItbis::DIECIOCHO->value => '18 %',
                                     TasaItbis::DIECISEIS->value => '16 %',
-                                    TasaItbis::CERO->value      => '0 %',
+                                    TasaItbis::CERO->value => '0 %',
                                 ])
                                 ->default(TasaItbis::DIECIOCHO->value)
                                 ->required(),
@@ -353,7 +353,7 @@ class CompraResource extends Resource
                         ->state(function (Get $get) {
                             $producto = Producto::find($get('producto_id'));
 
-                            return $producto ? $producto->tasa_itbis->porcentaje() . ' %' : '—';
+                            return $producto ? $producto->tasa_itbis->porcentaje().' %' : '—';
                         }),
                 ])
                 ->addable(false)
@@ -378,9 +378,9 @@ class CompraResource extends Resource
                                 return 'Agrega al menos una línea con producto, cantidad y costo.';
                             }
 
-                            $service  = app(CompraService::class);
-                            $calc     = $service->calcularLineas($lineas, (bool) $get('itbis_incluido'));
-                            $totales  = $service->calcularTotales($calc);
+                            $service = app(CompraService::class);
+                            $calc = $service->calcularLineas($lineas, (bool) $get('itbis_incluido'));
+                            $totales = $service->calcularTotales($calc);
 
                             return sprintf(
                                 'Subtotal: RD$%s   |   ITBIS: RD$%s   |   Total: RD$%s',
@@ -406,7 +406,7 @@ class CompraResource extends Resource
                     TextEntry::make('estado')->label('Estado')->badge()
                         ->formatStateUsing(fn (EstadoCompra $state) => match ($state) {
                             EstadoCompra::REGISTRADA => 'Registrada',
-                            EstadoCompra::ANULADA    => 'Anulada',
+                            EstadoCompra::ANULADA => 'Anulada',
                         })
                         ->color(fn (EstadoCompra $state) => $state === EstadoCompra::ANULADA ? 'danger' : 'success'),
                     TextEntry::make('subtotal')->label('Subtotal')->money('DOP'),
@@ -471,7 +471,7 @@ class CompraResource extends Resource
                             TextEntry::make('estado')->hiddenLabel()->badge()
                                 ->formatStateUsing(fn (EstadoDevolucion $state) => match ($state) {
                                     EstadoDevolucion::REGISTRADA => 'Registrada',
-                                    EstadoDevolucion::ANULADA    => 'Anulada',
+                                    EstadoDevolucion::ANULADA => 'Anulada',
                                 })
                                 ->color(fn (EstadoDevolucion $state) => $state === EstadoDevolucion::ANULADA ? 'danger' : 'success'),
                         ]),
@@ -513,7 +513,7 @@ class CompraResource extends Resource
                     ->badge()
                     ->formatStateUsing(fn (EstadoCompra $state) => match ($state) {
                         EstadoCompra::REGISTRADA => 'Registrada',
-                        EstadoCompra::ANULADA    => 'Anulada',
+                        EstadoCompra::ANULADA => 'Anulada',
                     })
                     ->color(fn (EstadoCompra $state) => $state === EstadoCompra::ANULADA ? 'danger' : 'success'),
 
@@ -533,7 +533,7 @@ class CompraResource extends Resource
                     ->label('Estado')
                     ->options([
                         EstadoCompra::REGISTRADA->value => 'Registrada',
-                        EstadoCompra::ANULADA->value    => 'Anulada',
+                        EstadoCompra::ANULADA->value => 'Anulada',
                     ]),
 
                 Filter::make('fecha')
@@ -555,7 +555,7 @@ class CompraResource extends Resource
                     ->icon('heroicon-o-x-circle')
                     ->color('danger')
                     ->requiresConfirmation()
-                    ->visible(fn (Compra $record): bool => ! $record->estaAnulada() && (auth()->user()?->can('anular_compras') ?? false))
+                    ->visible(fn (Compra $record): bool => ! $record->estaAnulada() && (auth()->user()?->can('compras.anular') ?? false))
                     ->schema([
                         Textarea::make('motivo')
                             ->label('Motivo de anulación')
@@ -588,9 +588,9 @@ class CompraResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index'  => Pages\CreateCompra::route('/'),
+            'index' => Pages\CreateCompra::route('/'),
             'create' => Pages\CreateCompra::route('/create'),
-            'view'   => Pages\ViewCompra::route('/{record}'),
+            'view' => Pages\ViewCompra::route('/{record}'),
         ];
     }
 }

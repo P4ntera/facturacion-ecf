@@ -29,8 +29,8 @@ class VentaEcfActionsTest extends TestCase
     {
         parent::setUp();
 
-        Permission::firstOrCreate(['name' => 'registrar_ventas', 'guard_name' => 'web']);
-        Permission::firstOrCreate(['name' => 'gestionar_ecf', 'guard_name' => 'web']);
+        Permission::firstOrCreate(['name' => 'ventas.ver', 'guard_name' => 'web']);
+        Permission::firstOrCreate(['name' => 'ecf.gestionar', 'guard_name' => 'web']);
     }
 
     private function usuarioConPermisos(array $permisos): User
@@ -78,11 +78,11 @@ class VentaEcfActionsTest extends TestCase
         ])->refresh();
     }
 
-    public function test_refrescar_estado_no_es_visible_sin_el_permiso_gestionar_ecf(): void
+    public function test_refrescar_estado_no_es_visible_sin_el_permiso_ecf_gestionar(): void
     {
         $venta = $this->crearVentaAceptada();
 
-        Livewire::actingAs($this->usuarioConPermisos(['registrar_ventas']))
+        Livewire::actingAs($this->usuarioConPermisos(['ventas.ver']))
             ->test(ListVentas::class)
             ->assertTableActionHidden('refrescarEstado', $venta);
     }
@@ -91,7 +91,7 @@ class VentaEcfActionsTest extends TestCase
     {
         $venta = $this->crearVentaAceptada();
 
-        Livewire::actingAs($this->usuarioConPermisos(['registrar_ventas', 'gestionar_ecf']))
+        Livewire::actingAs($this->usuarioConPermisos(['ventas.ver', 'ecf.gestionar']))
             ->test(ListVentas::class)
             ->callTableAction('refrescarEstado', $venta)
             ->assertHasNoTableActionErrors();
@@ -107,7 +107,7 @@ class VentaEcfActionsTest extends TestCase
         $venta = $this->crearVentaAceptada();
         $venta->update(['pac_id' => null]);
 
-        Livewire::actingAs($this->usuarioConPermisos(['registrar_ventas', 'gestionar_ecf']))
+        Livewire::actingAs($this->usuarioConPermisos(['ventas.ver', 'ecf.gestionar']))
             ->test(ListVentas::class)
             ->assertTableActionHidden('refrescarEstado', $venta);
     }
@@ -116,13 +116,13 @@ class VentaEcfActionsTest extends TestCase
     {
         $venta = $this->crearVentaAceptada();
 
-        Livewire::actingAs($this->usuarioConPermisos(['registrar_ventas', 'gestionar_ecf']))
+        Livewire::actingAs($this->usuarioConPermisos(['ventas.ver', 'ecf.gestionar']))
             ->test(ListVentas::class)
             ->assertTableActionHidden('reintentarEnvio', $venta);
 
         $venta->update(['estado_fiscal' => EstadoFiscal::PENDIENTE]);
 
-        Livewire::actingAs($this->usuarioConPermisos(['registrar_ventas', 'gestionar_ecf']))
+        Livewire::actingAs($this->usuarioConPermisos(['ventas.ver', 'ecf.gestionar']))
             ->test(ListVentas::class)
             ->assertTableActionVisible('reintentarEnvio', $venta->refresh());
     }
@@ -134,7 +134,7 @@ class VentaEcfActionsTest extends TestCase
 
         Queue::fake();
 
-        Livewire::actingAs($this->usuarioConPermisos(['registrar_ventas', 'gestionar_ecf']))
+        Livewire::actingAs($this->usuarioConPermisos(['ventas.ver', 'ecf.gestionar']))
             ->test(ListVentas::class)
             ->callTableAction('reintentarEnvio', $venta->refresh())
             ->assertHasNoTableActionErrors();

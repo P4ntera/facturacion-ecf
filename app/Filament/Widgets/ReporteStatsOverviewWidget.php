@@ -16,7 +16,7 @@ class ReporteStatsOverviewWidget extends StatsOverviewWidget
 
     public static function canView(): bool
     {
-        return auth()->user()?->can('ver_reportes') ?? false;
+        return auth()->user()?->can('reportes.ver') ?? false;
     }
 
     protected function getStats(): array

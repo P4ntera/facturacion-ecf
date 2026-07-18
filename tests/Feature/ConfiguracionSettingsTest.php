@@ -21,9 +21,10 @@ class ConfiguracionSettingsTest extends TestCase
 
     private function usuarioAutorizado(): User
     {
-        Permission::firstOrCreate(['name' => 'administrar_configuracion', 'guard_name' => 'web']);
+        Permission::firstOrCreate(['name' => 'empresa.administrar', 'guard_name' => 'web']);
+        Permission::firstOrCreate(['name' => 'facturacion.administrar', 'guard_name' => 'web']);
         $rol = Role::firstOrCreate(['name' => 'Administrador', 'guard_name' => 'web']);
-        $rol->syncPermissions(['administrar_configuracion']);
+        $rol->syncPermissions(['empresa.administrar', 'facturacion.administrar']);
 
         $usuario = User::factory()->create();
         $usuario->assignRole('Administrador');

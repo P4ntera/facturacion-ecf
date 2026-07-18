@@ -27,7 +27,7 @@ class ManageFacturacion extends SettingsPage
 
     public static function canAccess(): bool
     {
-        return auth()->user()?->can('administrar_configuracion') ?? false;
+        return auth()->user()?->can('facturacion.administrar') ?? false;
     }
 
     public function form(Schema $schema): Schema

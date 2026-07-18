@@ -24,9 +24,9 @@ class MaestrosActivoTest extends TestCase
     {
         parent::setUp();
 
-        Permission::firstOrCreate(['name' => 'gestionar_maestros', 'guard_name' => 'web']);
+        Permission::firstOrCreate(['name' => 'productos.ver', 'guard_name' => 'web']);
         $rol = Role::firstOrCreate(['name' => 'Vendedor', 'guard_name' => 'web']);
-        $rol->syncPermissions(['gestionar_maestros']);
+        $rol->syncPermissions(['productos.ver']);
 
         $this->usuario = User::factory()->create();
         $this->usuario->assignRole('Vendedor');

@@ -24,9 +24,9 @@ class VentaComprobanteTest extends TestCase
 
     private function usuarioAutorizado(): User
     {
-        Permission::firstOrCreate(['name' => 'registrar_ventas', 'guard_name' => 'web']);
+        Permission::firstOrCreate(['name' => 'ventas.imprimir', 'guard_name' => 'web']);
         $rol = Role::firstOrCreate(['name' => 'Vendedor', 'guard_name' => 'web']);
-        $rol->syncPermissions(['registrar_ventas']);
+        $rol->syncPermissions(['ventas.imprimir']);
 
         $usuario = User::factory()->create();
         $usuario->assignRole('Vendedor');

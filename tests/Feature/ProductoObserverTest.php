@@ -21,9 +21,9 @@ class ProductoObserverTest extends TestCase
 
     public function test_notifica_a_usuarios_con_permiso_cuando_stock_baja_del_minimo(): void
     {
-        Permission::firstOrCreate(['name' => 'gestionar_inventario', 'guard_name' => 'web']);
+        Permission::firstOrCreate(['name' => 'inventario.ajustar', 'guard_name' => 'web']);
         $rol = Role::firstOrCreate(['name' => 'Almacenista', 'guard_name' => 'web']);
-        $rol->syncPermissions(['gestionar_inventario']);
+        $rol->syncPermissions(['inventario.ajustar']);
 
         $almacenista = User::factory()->create();
         $almacenista->assignRole('Almacenista');

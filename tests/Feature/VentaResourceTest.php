@@ -31,8 +31,8 @@ class VentaResourceTest extends TestCase
     {
         parent::setUp();
 
-        Permission::firstOrCreate(['name' => 'registrar_ventas', 'guard_name' => 'web']);
-        Permission::firstOrCreate(['name' => 'anular_ventas', 'guard_name' => 'web']);
+        Permission::firstOrCreate(['name' => 'ventas.ver', 'guard_name' => 'web']);
+        Permission::firstOrCreate(['name' => 'ventas.anular', 'guard_name' => 'web']);
 
         SecuenciaNcf::create([
             'tipo_comprobante' => TipoComprobante::FACTURA_CONSUMO,
@@ -84,7 +84,7 @@ class VentaResourceTest extends TestCase
     {
         $this->crearVenta();
 
-        Livewire::actingAs($this->usuarioConPermisos(['registrar_ventas']))
+        Livewire::actingAs($this->usuarioConPermisos(['ventas.ver']))
             ->test(ListVentas::class)
             ->assertSuccessful()
             ->assertCanSeeTableRecords(Venta::all());
@@ -95,7 +95,7 @@ class VentaResourceTest extends TestCase
         $venta = $this->crearVenta();
         $this->assertSame('8.000', $this->producto->refresh()->stock);
 
-        Livewire::actingAs($this->usuarioConPermisos(['registrar_ventas', 'anular_ventas']))
+        Livewire::actingAs($this->usuarioConPermisos(['ventas.ver', 'ventas.anular']))
             ->test(ListVentas::class)
             ->callTableAction('anular', $venta, data: ['motivo' => 'Prueba de anulación'])
             ->assertHasNoTableActionErrors();
@@ -109,7 +109,7 @@ class VentaResourceTest extends TestCase
     {
         $venta = $this->crearVenta();
 
-        Livewire::actingAs($this->usuarioConPermisos(['registrar_ventas']))
+        Livewire::actingAs($this->usuarioConPermisos(['ventas.ver']))
             ->test(ListVentas::class)
             ->assertTableActionHidden('anular', $venta);
     }
@@ -119,7 +119,7 @@ class VentaResourceTest extends TestCase
         $venta = $this->crearVenta();
         app(VentaService::class)->anular($venta, 'motivo previo', null);
 
-        Livewire::actingAs($this->usuarioConPermisos(['registrar_ventas', 'anular_ventas']))
+        Livewire::actingAs($this->usuarioConPermisos(['ventas.ver', 'ventas.anular']))
             ->test(ListVentas::class)
             ->assertTableActionHidden('anular', $venta->refresh());
     }
@@ -131,7 +131,7 @@ class VentaResourceTest extends TestCase
         $this->assertSame(EstadoFiscal::ACEPTADO, $venta->estado_fiscal);
         $this->assertSame(AmbienteEcf::TESTECF, $venta->ambiente);
 
-        Livewire::actingAs($this->usuarioConPermisos(['registrar_ventas']))
+        Livewire::actingAs($this->usuarioConPermisos(['ventas.ver']))
             ->test(ListVentas::class)
             ->filterTable('estado_fiscal', EstadoFiscal::ACEPTADO->value)
             ->assertCanSeeTableRecords([$venta])
@@ -150,7 +150,7 @@ class VentaResourceTest extends TestCase
         $venta = $this->crearVenta()->refresh();
         $venta->update(['estado_fiscal' => EstadoFiscal::RFCE]);
 
-        Livewire::actingAs($this->usuarioConPermisos(['registrar_ventas']))
+        Livewire::actingAs($this->usuarioConPermisos(['ventas.ver']))
             ->test(ListVentas::class)
             ->assertSuccessful()
             ->assertCanSeeTableRecords([$venta->refresh()])
@@ -161,7 +161,7 @@ class VentaResourceTest extends TestCase
     {
         $venta = $this->crearVenta();
 
-        Livewire::actingAs($this->usuarioConPermisos(['registrar_ventas']))
+        Livewire::actingAs($this->usuarioConPermisos(['ventas.ver']))
             ->test(ViewVenta::class, ['record' => $venta->id])
             ->assertSuccessful()
             ->assertSee($venta->ncf)

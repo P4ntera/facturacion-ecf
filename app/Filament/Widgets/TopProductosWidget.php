@@ -19,7 +19,7 @@ class TopProductosWidget extends TableWidget
 
     public static function canView(): bool
     {
-        return auth()->user()?->can('ver_reportes') ?? false;
+        return auth()->user()?->can('reportes.ver') ?? false;
     }
 
     public function table(Table $table): Table

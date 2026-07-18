@@ -58,7 +58,7 @@ class UserResource extends Resource
                 ->relationship('roles', 'name')
                 ->multiple()
                 ->preload()
-                ->visible(fn (): bool => auth()->user()?->can('gestionar_usuarios') ?? false),
+                ->visible(fn (): bool => auth()->user()?->can('usuarios.gestionar') ?? false),
 
             Select::make('impresora_facturacion_id')
                 ->label('Impresora de facturación')
@@ -66,7 +66,7 @@ class UserResource extends Resource
                 ->relationship('impresoraFacturacion', 'nombre', fn (Builder $query) => $query->activas()->porModulo(ModuloImpresion::FACTURACION))
                 ->preload()
                 ->native(false)
-                ->visible(fn (): bool => auth()->user()?->can('gestionar_usuarios') ?? false),
+                ->visible(fn (): bool => auth()->user()?->can('usuarios.gestionar') ?? false),
         ]);
     }
 

@@ -11,12 +11,12 @@ class MovimientoInventarioPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->can('gestionar_inventario');
+        return $user->can('kardex.ver');
     }
 
     public function view(User $user, MovimientoInventario $movimientoInventario): bool
     {
-        return $user->can('gestionar_inventario');
+        return $user->can('kardex.ver');
     }
 
     public function create(User $user): bool

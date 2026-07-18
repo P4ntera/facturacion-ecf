@@ -109,7 +109,7 @@ class ProveedorResource extends Resource
                     Select::make('tipo')
                         ->label('Tipo de proveedor')
                         ->options([
-                            TipoProveedor::FORMAL->value   => TipoProveedor::FORMAL->etiqueta(),
+                            TipoProveedor::FORMAL->value => TipoProveedor::FORMAL->etiqueta(),
                             TipoProveedor::INFORMAL->value => TipoProveedor::INFORMAL->etiqueta(),
                         ])
                         ->default(TipoProveedor::FORMAL->value)
@@ -204,7 +204,7 @@ class ProveedorResource extends Resource
                     ->label('Tipo')
                     ->badge()
                     ->formatStateUsing(fn (TipoProveedor $state) => match ($state) {
-                        TipoProveedor::FORMAL   => 'Formal',
+                        TipoProveedor::FORMAL => 'Formal',
                         TipoProveedor::INFORMAL => 'Informal',
                     })
                     ->color(fn (TipoProveedor $state) => $state === TipoProveedor::INFORMAL ? 'warning' : 'gray'),
@@ -221,7 +221,7 @@ class ProveedorResource extends Resource
 
                 ToggleColumn::make('activo')
                     ->label('Activo')
-                    ->disabled(fn (): bool => ! auth()->user()?->can('gestionar_maestros'))
+                    ->disabled(fn (): bool => ! auth()->user()?->can('proveedores.desactivar'))
                     ->sortable(),
 
                 TextColumn::make('created_at')
@@ -243,7 +243,7 @@ class ProveedorResource extends Resource
                 SelectFilter::make('tipo')
                     ->label('Tipo')
                     ->options([
-                        TipoProveedor::FORMAL->value   => 'Formal',
+                        TipoProveedor::FORMAL->value => 'Formal',
                         TipoProveedor::INFORMAL->value => 'Informal',
                     ]),
 

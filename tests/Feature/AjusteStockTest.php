@@ -19,10 +19,10 @@ class AjusteStockTest extends TestCase
 
     public function test_ajustar_stock_action_registra_movimiento_y_actualiza_stock(): void
     {
-        Permission::firstOrCreate(['name' => 'gestionar_inventario', 'guard_name' => 'web']);
-        Permission::firstOrCreate(['name' => 'gestionar_maestros', 'guard_name' => 'web']);
+        Permission::firstOrCreate(['name' => 'inventario.ajustar', 'guard_name' => 'web']);
+        Permission::firstOrCreate(['name' => 'productos.ver', 'guard_name' => 'web']);
         $rol = Role::firstOrCreate(['name' => 'Almacenista', 'guard_name' => 'web']);
-        $rol->syncPermissions(['gestionar_inventario', 'gestionar_maestros']);
+        $rol->syncPermissions(['inventario.ajustar', 'productos.ver']);
 
         $user = User::factory()->create();
         $user->assignRole('Almacenista');

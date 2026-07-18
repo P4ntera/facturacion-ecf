@@ -140,7 +140,7 @@ class ClienteResource extends Resource
 
                 ToggleColumn::make('activo')
                     ->label('Activo')
-                    ->disabled(fn (): bool => ! auth()->user()?->can('gestionar_maestros'))
+                    ->disabled(fn (): bool => ! auth()->user()?->can('clientes.desactivar'))
                     ->sortable(),
             ])
             ->filters([

@@ -63,7 +63,7 @@ class PuntoDeVenta extends Page
 
     public static function canAccess(): bool
     {
-        return auth()->user()?->can('registrar_ventas') ?? false;
+        return auth()->user()?->can('pos.acceder') ?? false;
     }
 
     public function mount(): void

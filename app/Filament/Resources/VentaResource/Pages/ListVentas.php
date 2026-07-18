@@ -18,7 +18,7 @@ class ListVentas extends ListRecords
                 ->label('Ir al Punto de Venta')
                 ->icon('heroicon-o-shopping-cart')
                 ->url(PuntoDeVenta::getUrl())
-                ->visible(fn (): bool => auth()->user()?->can('registrar_ventas') ?? false),
+                ->visible(fn (): bool => auth()->user()?->can('pos.acceder') ?? false),
         ];
     }
 }

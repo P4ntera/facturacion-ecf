@@ -11,12 +11,12 @@ class VentaPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->can('registrar_ventas');
+        return $user->can('ventas.ver');
     }
 
     public function view(User $user, Venta $venta): bool
     {
-        return $user->can('registrar_ventas');
+        return $user->can('ventas.ver');
     }
 
     // La creación de ventas es exclusiva del Punto de Venta (VentaService::registrar).

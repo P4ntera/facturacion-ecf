@@ -26,13 +26,13 @@ class VentaFiscalDetailTest extends TestCase
     {
         parent::setUp();
 
-        Permission::firstOrCreate(['name' => 'registrar_ventas', 'guard_name' => 'web']);
+        Permission::firstOrCreate(['name' => 'ventas.ver', 'guard_name' => 'web']);
     }
 
     private function usuarioAutorizado(): User
     {
         $rol = Role::firstOrCreate(['name' => 'Vendedor-fiscal', 'guard_name' => 'web']);
-        $rol->syncPermissions(['registrar_ventas']);
+        $rol->syncPermissions(['ventas.ver']);
 
         $usuario = User::factory()->create();
         $usuario->assignRole($rol);

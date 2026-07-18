@@ -259,6 +259,7 @@ class VentaResource extends Resource
                     ->label('Imprimir')
                     ->icon('heroicon-o-printer')
                     ->color('gray')
+                    ->visible(fn (): bool => auth()->user()?->can('ventas.imprimir') ?? false)
                     ->url(fn (Venta $record) => route('ventas.pdf', $record))
                     ->openUrlInNewTab(),
 
@@ -269,7 +270,7 @@ class VentaResource extends Resource
                     ->icon('heroicon-o-x-circle')
                     ->color('danger')
                     ->visible(fn (Venta $record) => $record->estado === EstadoVenta::EMITIDA
-                        && (auth()->user()?->can('anular_ventas') ?? false))
+                        && (auth()->user()?->can('ventas.anular') ?? false))
                     ->requiresConfirmation()
                     ->schema([
                         Textarea::make('motivo')
@@ -307,6 +308,7 @@ class VentaResource extends Resource
             ->label('Reimprimir ticket')
             ->icon('heroicon-o-printer')
             ->color('gray')
+            ->visible(fn (): bool => auth()->user()?->can('ventas.imprimir') ?? false)
             ->action(function (Venta $record): void {
                 $impresora = app(ImpresionService::class)->resolverImpresora(ModuloImpresion::FACTURACION, auth()->user());
                 $resultado = app(ImpresionService::class)->imprimirTicket($record, $impresora);
@@ -339,7 +341,7 @@ class VentaResource extends Resource
             ->icon('heroicon-o-arrow-path')
             ->color('gray')
             ->visible(fn (Venta $record) => $record->pac_id !== null
-                && (auth()->user()?->can('gestionar_ecf') ?? false))
+                && (auth()->user()?->can('ecf.gestionar') ?? false))
             ->action(function (Venta $record): void {
                 $respuesta = app(EnvioEcfService::class)->refrescarEstado($record);
                 $record->refresh();
@@ -363,7 +365,7 @@ class VentaResource extends Resource
             ->label('Reintentar envío')
             ->icon('heroicon-o-paper-airplane')
             ->color('warning')
-            ->visible(fn (Venta $record) => (auth()->user()?->can('gestionar_ecf') ?? false)
+            ->visible(fn (Venta $record) => (auth()->user()?->can('ecf.gestionar') ?? false)
                 && ($record->estado_fiscal === EstadoFiscal::PENDIENTE || isset($record->ecf_respuesta['error'])))
             ->requiresConfirmation()
             ->action(function (Venta $record): void {
