@@ -100,17 +100,54 @@ enteramente claro: `--white`, `--gray-100`, `--surface: var(--white)`...) asumen
 no devuelve nada). Es CSS muerto. Pero es una inconsistencia real entre el token, el comentario
 del código y la intención del design-system — se corrige en la sección 6.
 
-## 6. Estrategia de modo claro/oscuro
+## 6. Estrategia de modo claro/oscuro: (a) SOLO CLARO
 
-Pendiente de decisión — ver PASO 3. Dos opciones evaluadas:
+Decisión: **mantener el panel y el POS únicamente en modo claro.**
 
-- **(a) Solo claro**: formalizar `->darkMode(false)` (ya activo hoy) como decisión permanente,
-  y corregir el `--background` inconsistente de la sección 5 para que el design-system quede
-  100% coherente en claro.
-- **(b) Claro + oscuro**: reactivar el switch y escribir variantes `.dark` para los 10 archivos
-  del design-system (hoy ninguno tiene una sola línea de modo oscuro). Filament marca el modo
-  oscuro agregando la clase `.dark` al `<html>`
-  (`vendor/filament/filament/resources/js/dark-mode.js`, `document.documentElement.classList.add('dark')`) —
-  ese sería el selector a usar.
+Por qué:
 
-Esta sección se completa en el commit de PASO 3 una vez tomada la decisión.
+- `->darkMode(false)` ya estaba activo en `AdminPanelProvider.php` antes de este análisis.
+- Los 10 archivos del design-system (`variables.css` → `components.css`, incluyendo `pos.css`)
+  son 100% modo-claro: cero media queries, cero selector `.dark`, cero variante alternativa en
+  ningún archivo. Implementar modo oscuro real (opción b) implicaría escribir y mantener
+  variantes oscuras para cada uno de ellos sin que exista hoy ninguna necesidad de negocio que lo
+  pida.
+- Con el switch apagado, no hay forma de que el usuario entre a un estado donde Filament oscurece
+  sus propias superficies (`gray` slot) pero el design-system del proyecto (`--white`,
+  `--gray-100`, `.card`, `.table`...) se queda claro — que era el problema original que motivó
+  este análisis.
+
+Filament marca el modo oscuro agregando la clase `.dark` al `<html>`
+(`vendor/filament/filament/resources/js/dark-mode.js`, función que hace
+`document.documentElement.classList.add('dark')`). Si en el futuro se decide pasar a la
+estrategia (b), ese es el selector a usar (`.dark { --background: ...; }` o
+`html.dark & { ... }` dentro de cada archivo del design-system) — queda documentado aquí para no
+tener que volver a inspeccionarlo.
+
+Cambios aplicados como parte de esta decisión:
+
+- `--background` corregido de `#032e5a` a `#F9FAFB` en `variables.css`, para que coincida con el
+  resto del design-system (aunque hoy no tenga consumidores visibles, evita que alguien lo reuse
+  a futuro pensando que es un fondo claro y se encuentre con un azul oscuro).
+- Comentario de `AdminPanelProvider.php` actualizado para dejar de citar el valor obsoleto y en
+  su lugar apuntar a esta sección del documento.
+
+## 7. Cheat-sheet: "quiero cambiar X"
+
+- **Cambiar el color primario/de acento de todo el sistema** → `--primary` en
+  `resources/design-system/variables.css` **y** el hex correspondiente en
+  `->colors(['primary' => ...])` de `AdminPanelProvider.php` (no hay una sola fuente de verdad;
+  hay que tocar los dos).
+- **Cambiar el fondo/superficies del panel de Filament** (sidebar, topbar, tablas de Filament) →
+  el slot `gray` en `->colors([...])` de `AdminPanelProvider.php` (usa la escala `Color::Gray` de
+  Filament, no un token del proyecto).
+- **Cambiar los estilos del POS** (`.card`, `.btn`, `.table`, `.badge`, `.form-input` dentro de
+  `.pos-screen`) → `resources/design-system/pos.css`. Si el cambio es de un token (color,
+  espaciado, radio), tócalo en `variables.css`/`spacing.css`/etc. en vez de hardcodear un valor
+  nuevo en `pos.css`.
+- **Activar/desactivar el switch de modo claro/oscuro** → `->darkMode(bool)` en
+  `AdminPanelProvider.php`. Si se activa, hay que escribir antes las variantes `.dark` en todo
+  el design-system (ver sección 6) o el panel y el POS quedarán visualmente inconsistentes.
+- **Cualquier cambio a `theme.css` o a los archivos de `resources/design-system/`** no se ve en
+  el navegador hasta correr `./vendor/bin/sail npm run build` (o `npm run dev` para hot-reload
+  mientras se trabaja).
