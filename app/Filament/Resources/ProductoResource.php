@@ -50,6 +50,14 @@ class ProductoResource extends Resource
                     ->label('Código')
                     ->required()
                     ->unique(ignoreRecord: true)
+                    ->validationMessages(['unique' => 'Ya existe un producto con este código.'])
+                    ->maxLength(50),
+
+                TextInput::make('codigo_barra')
+                    ->label('Código de barras')
+                    ->helperText('Escanea o escribe el código de barras.')
+                    ->unique(ignoreRecord: true)
+                    ->validationMessages(['unique' => 'Ya existe un producto con este código de barras.'])
                     ->maxLength(50),
 
                 TextInput::make('nombre')
@@ -143,6 +151,12 @@ class ProductoResource extends Resource
                     ->label('Código')
                     ->searchable()
                     ->sortable(),
+
+                TextColumn::make('codigo_barra')
+                    ->label('Código de barras')
+                    ->searchable()
+                    ->toggleable()
+                    ->placeholder('—'),
 
                 TextColumn::make('nombre')
                     ->label('Nombre')
