@@ -3,6 +3,7 @@
 namespace App\Providers\Filament;
 
 use App\Filament\Pages\Auth\EditProfile;
+use App\Models\Empresa;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -32,6 +33,16 @@ class AdminPanelProvider extends PanelProvider
             ->viteTheme('resources/css/filament/admin/theme.css')
             ->login()
             ->profile(EditProfile::class)
+            // Multi-tenant nativo de Filament: cada empresa es un tenant, identificado en la URL
+            // por su slug (/admin/{empresa-slug}/...). ownershipRelationship es explícito aunque
+            // coincide con el default (camelCase del modelo) para que quede documentado aquí.
+            ->tenant(Empresa::class, slugAttribute: 'slug', ownershipRelationship: 'empresa')
+            // No hay auto-registro: las empresas las da de alta el super-admin (EmpresaResource).
+            ->tenantRegistration(null)
+            // Solo tiene efecto visual real para el super-admin (varias empresas); un usuario
+            // normal con una sola empresa entra directo (getDefaultTenant) y no lo necesita, pero
+            // no le estorba dejarlo visible.
+            ->tenantMenu()
             ->colors([
                 'primary' => Color::hex('#2563EB'), // --primary
                 'success' => Color::hex('#10B981'), // --secondary
