@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\TipoComprobante;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 
@@ -16,7 +17,7 @@ class SecuenciaNcf extends Model
     protected $table = 'secuencias_ncf';
 
     protected $fillable = [
-        'tipo_comprobante', 'prefijo', 'secuencia_desde', 'secuencia_actual',
+        'empresa_id', 'tipo_comprobante', 'prefijo', 'secuencia_desde', 'secuencia_actual',
         'secuencia_hasta', 'vencimiento', 'activa',
     ];
 
@@ -25,6 +26,11 @@ class SecuenciaNcf extends Model
         'vencimiento' => 'date',
         'activa' => 'boolean',
     ];
+
+    public function empresa(): BelongsTo
+    {
+        return $this->belongsTo(Empresa::class);
+    }
 
     public function getActivitylogOptions(): LogOptions
     {

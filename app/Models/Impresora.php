@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 
@@ -20,7 +21,7 @@ class Impresora extends Model
     use LogsActivity;
 
     protected $fillable = [
-        'nombre', 'descripcion', 'tipo_conexion', 'ip', 'puerto',
+        'empresa_id', 'nombre', 'descripcion', 'tipo_conexion', 'ip', 'puerto',
         'ancho_papel', 'modulo', 'predeterminada', 'activa',
     ];
 
@@ -41,6 +42,11 @@ class Impresora extends Model
         'predeterminada' => 'boolean',
         'activa' => 'boolean',
     ];
+
+    public function empresa(): BelongsTo
+    {
+        return $this->belongsTo(Empresa::class);
+    }
 
     public function scopeActivas(Builder $query): Builder
     {

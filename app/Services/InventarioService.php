@@ -40,28 +40,29 @@ class InventarioService
 
         $stockNuevo = match ($tipo) {
             TipoMovimiento::ENTRADA => $stockAnterior + $cantidad,
-            TipoMovimiento::SALIDA  => $stockAnterior - $cantidad,
-            TipoMovimiento::AJUSTE  => $stockAnterior + $cantidad, // $cantidad ya trae el signo
+            TipoMovimiento::SALIDA => $stockAnterior - $cantidad,
+            TipoMovimiento::AJUSTE => $stockAnterior + $cantidad, // $cantidad ya trae el signo
         };
 
         if ($stockNuevo < 0) {
             throw new StockInsuficienteException(
-                "Stock insuficiente para «{$producto->nombre}»: disponible {$stockAnterior}, solicitado " . abs($cantidad) . '.'
+                "Stock insuficiente para «{$producto->nombre}»: disponible {$stockAnterior}, solicitado ".abs($cantidad).'.'
             );
         }
 
         $producto->update(['stock' => $stockNuevo]);
 
         return MovimientoInventario::create([
-            'producto_id'    => $producto->id,
-            'tipo'           => $tipo,
-            'origen'         => $origen,
-            'referencia_id'  => $referenciaId,
-            'cantidad'       => $cantidad,
+            'empresa_id' => $producto->empresa_id,
+            'producto_id' => $producto->id,
+            'tipo' => $tipo,
+            'origen' => $origen,
+            'referencia_id' => $referenciaId,
+            'cantidad' => $cantidad,
             'stock_anterior' => $stockAnterior,
-            'stock_nuevo'    => $stockNuevo,
-            'user_id'        => $userId,
-            'observacion'    => $observacion,
+            'stock_nuevo' => $stockNuevo,
+            'user_id' => $userId,
+            'observacion' => $observacion,
         ]);
     }
 }

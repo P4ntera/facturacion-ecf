@@ -15,18 +15,23 @@ class MovimientoInventario extends Model
     protected $table = 'movimientos_inventario';
 
     protected $fillable = [
-        'producto_id', 'tipo', 'origen', 'referencia_id',
+        'empresa_id', 'producto_id', 'tipo', 'origen', 'referencia_id',
         'cantidad', 'stock_anterior', 'stock_nuevo',
         'user_id', 'observacion',
     ];
 
     protected $casts = [
-        'tipo'           => TipoMovimiento::class,
-        'origen'         => OrigenMovimiento::class,
-        'cantidad'       => 'decimal:3',
+        'tipo' => TipoMovimiento::class,
+        'origen' => OrigenMovimiento::class,
+        'cantidad' => 'decimal:3',
         'stock_anterior' => 'decimal:3',
-        'stock_nuevo'    => 'decimal:3',
+        'stock_nuevo' => 'decimal:3',
     ];
+
+    public function empresa(): BelongsTo
+    {
+        return $this->belongsTo(Empresa::class);
+    }
 
     public function producto(): BelongsTo
     {

@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\TipoDocumentoCliente;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
@@ -15,7 +16,7 @@ class Cliente extends Model
     use LogsActivity;
 
     protected $fillable = [
-        'tipo_documento', 'documento', 'nombre',
+        'empresa_id', 'tipo_documento', 'documento', 'nombre',
         'telefono', 'email', 'direccion', 'activo',
     ];
 
@@ -23,6 +24,11 @@ class Cliente extends Model
         'tipo_documento' => TipoDocumentoCliente::class,
         'activo' => 'boolean',
     ];
+
+    public function empresa(): BelongsTo
+    {
+        return $this->belongsTo(Empresa::class);
+    }
 
     public function ventas(): HasMany
     {

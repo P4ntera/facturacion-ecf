@@ -22,7 +22,7 @@ class Producto extends Model
     use LogsActivity;
 
     protected $fillable = [
-        'codigo', 'codigo_barra', 'nombre', 'descripcion', 'tipo', 'categoria_id',
+        'empresa_id', 'codigo', 'codigo_barra', 'nombre', 'descripcion', 'tipo', 'categoria_id',
         'costo', 'precio', 'tasa_itbis', 'controla_stock',
         'stock', 'stock_minimo', 'activo',
     ];
@@ -37,6 +37,11 @@ class Producto extends Model
         'stock' => 'decimal:3',
         'stock_minimo' => 'decimal:3',
     ];
+
+    public function empresa(): BelongsTo
+    {
+        return $this->belongsTo(Empresa::class);
+    }
 
     public function categoria(): BelongsTo
     {

@@ -5,7 +5,11 @@ namespace App\Models;
 use App\Enums\TipoProveedor;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+<<<<<<< HEAD
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+=======
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+>>>>>>> 23c0da1 (feat(tenant): empresa_id en las tablas de negocio + relación empresa en modelos)
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Activitylog\LogOptions;
@@ -19,6 +23,7 @@ class Proveedor extends Model
     protected $table = 'proveedores';
 
     protected $fillable = [
+        'empresa_id',
         'rnc',
         'tipo',
         'nombre',
@@ -32,7 +37,7 @@ class Proveedor extends Model
     ];
 
     protected $casts = [
-        'tipo'   => TipoProveedor::class,
+        'tipo' => TipoProveedor::class,
         'activo' => 'boolean',
     ];
 
@@ -43,6 +48,11 @@ class Proveedor extends Model
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs()
             ->useLogName('Proveedores');
+    }
+
+    public function empresa(): BelongsTo
+    {
+        return $this->belongsTo(Empresa::class);
     }
 
     public function esInformal(): bool

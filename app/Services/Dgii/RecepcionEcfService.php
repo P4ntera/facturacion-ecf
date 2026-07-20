@@ -5,6 +5,7 @@ namespace App\Services\Dgii;
 use App\Enums\CanalRecepcionEcf;
 use App\Enums\EstadoReenvioPac;
 use App\Models\DocumentoRecibido;
+use App\Models\Empresa;
 use App\Settings\EmpresaSettings;
 
 /**
@@ -122,7 +123,11 @@ class RecepcionEcfService
         ?string $error = null,
         array $respuestaPac = [],
     ): DocumentoRecibido {
+        // Best-effort: EmpresaSettings sigue siendo config global (T3 la migra a por-tenant), así
+        // que solo podemos ubicar el tenant dueño de este documento buscando su RNC entre las
+        // empresas activas. Si no hay match, empresa_id queda null (columna nullable).
         return DocumentoRecibido::create([
+            'empresa_id' => Empresa::where('rnc', $this->settings->rnc)->value('id'),
             'canal' => $canal,
             'rnc_destino' => $this->settings->rnc,
             'rnc_emisor' => $metadatos['rnc_emisor'],

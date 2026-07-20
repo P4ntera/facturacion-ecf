@@ -26,6 +26,8 @@ class Venta extends Model
     protected $fillable = [
         'cliente_id', 'user_id', 'tipo_comprobante', 'ncf', 'ncf_modifica',
         'tipo_pago', 'fecha_limite_pago', 'forma_pago', 'arqueo_caja_id',
+        'empresa_id', 'cliente_id', 'user_id', 'tipo_comprobante', 'ncf', 'ncf_modifica',
+        'tipo_pago', 'fecha_limite_pago',
         'fecha', 'moneda', 'tasa_cambio',
         'subtotal', 'descuento',
         'monto_gravado_18', 'monto_gravado_16', 'monto_gravado_0', 'monto_exento',
@@ -60,6 +62,11 @@ class Venta extends Model
         'total_itbis' => 'decimal:2',
         'total' => 'decimal:2',
     ];
+
+    public function empresa(): BelongsTo
+    {
+        return $this->belongsTo(Empresa::class);
+    }
 
     public function cliente(): BelongsTo
     {
