@@ -2,13 +2,14 @@
 
 namespace Database\Factories;
 
+use App\Models\Empresa;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
-use AddressInfo; 
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\User>
+ * @extends Factory<User>
  */
 class UserFactory extends Factory
 {
@@ -25,12 +26,22 @@ class UserFactory extends Factory
     public function definition(): array
     {
         return [
+            'empresa_id' => Empresa::factory(),
             'name' => fake()->name(),
             'email' => fake()->unique()->safeEmail(),
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
         ];
+    }
+
+    /** Super-admin: sin empresa, ve el selector y accede a cualquier tenant activo. */
+    public function superAdmin(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'empresa_id' => null,
+            'es_super_admin' => true,
+        ]);
     }
 
     /**
