@@ -7,10 +7,13 @@ use App\Enums\TipoComprobante;
 use App\Enums\TipoDocumentoCliente;
 use App\Enums\TipoProducto;
 use App\Filament\Pages\PuntoDeVenta;
+use App\Models\ArqueoCaja;
 use App\Models\Cliente;
 use App\Models\Producto;
 use App\Models\SecuenciaNcf;
 use App\Models\User;
+use App\Models\Venta;
+use App\Services\ArqueoCajaService;
 use App\Services\Dgii\DgiiGatewayInterface;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -55,6 +58,7 @@ class PuntoDeVentaTest extends TestCase
     {
         Livewire::actingAs($this->vendedor())
             ->test(PuntoDeVenta::class)
+            ->call('abrirCaja', '500.00')
             ->assertSet('totales.total', '0.00')
             ->assertSee('Consumidor Final');
     }
@@ -144,6 +148,7 @@ class PuntoDeVentaTest extends TestCase
 
         $componente = Livewire::actingAs($this->vendedor())
             ->test(PuntoDeVenta::class)
+            ->call('abrirCaja', '500.00')
             ->call('agregarProducto', $producto->id)
             ->call('seleccionarCliente', $cliente->id)
             ->set('tipoComprobante', TipoComprobante::FACTURA_CREDITO_FISCAL->value);
@@ -158,6 +163,7 @@ class PuntoDeVentaTest extends TestCase
 
         $componente = Livewire::actingAs($this->vendedor())
             ->test(PuntoDeVenta::class)
+            ->call('abrirCaja', '500.00')
             ->call('agregarProducto', $producto->id)
             ->set('tipoComprobante', TipoComprobante::FACTURA_CONSUMO->value);
 
@@ -206,6 +212,7 @@ class PuntoDeVentaTest extends TestCase
 
         $componente = Livewire::actingAs($this->vendedor())
             ->test(PuntoDeVenta::class)
+            ->call('abrirCaja', '500.00')
             ->set('tipoComprobante', TipoComprobante::FACTURA_CONSUMO->value)
             ->call('agregarProducto', $producto->id)
             ->call('seleccionarCliente', $cliente->id);
@@ -267,7 +274,10 @@ class PuntoDeVentaTest extends TestCase
 
     public function test_la_pagina_trae_el_wrapper_del_design_system_y_el_script_de_sidebar(): void
     {
-        $response = $this->actingAs($this->vendedor())->get(PuntoDeVenta::getUrl());
+        $usuario = $this->vendedor();
+        app(ArqueoCajaService::class)->abrir('500.00', $usuario->id);
+
+        $response = $this->actingAs($usuario)->get(PuntoDeVenta::getUrl());
 
         $response->assertOk();
         $response->assertSee('class="pos-screen"', false);
@@ -278,5 +288,85 @@ class PuntoDeVentaTest extends TestCase
         $response->assertSee('class="pos-side"', false);
         $response->assertSee('<thead>', false);
         $response->assertSee('btn-cobrar', false);
+    }
+
+    public function test_no_puede_cobrar_sin_caja_abierta(): void
+    {
+        $producto = $this->producto();
+
+        $componente = Livewire::actingAs($this->vendedor())
+            ->test(PuntoDeVenta::class)
+            ->call('agregarProducto', $producto->id);
+
+        $this->assertNull($componente->instance()->arqueoAbierto());
+        $this->assertFalse($componente->instance()->puedeCobrar());
+
+        $componente->call('cobrar');
+
+        $this->assertDatabaseCount('ventas', 0);
+    }
+
+    public function test_abrir_caja_bloquea_abrir_una_segunda(): void
+    {
+        $usuario = $this->vendedor();
+
+        Livewire::actingAs($usuario)
+            ->test(PuntoDeVenta::class)
+            ->call('abrirCaja', '500.00')
+            ->call('abrirCaja', '300.00')
+            ->assertNotified();
+
+        $this->assertSame(1, ArqueoCaja::where('user_id', $usuario->id)->count());
+    }
+
+    public function test_cerrar_caja_calcula_la_diferencia_visible_en_la_pagina(): void
+    {
+        $this->habilitarSecuenciaNcfDeConsumo();
+        $producto = $this->producto();
+
+        $componente = Livewire::actingAs($this->vendedor())
+            ->test(PuntoDeVenta::class)
+            ->call('abrirCaja', '500.00')
+            ->call('agregarProducto', $producto->id)
+            ->set('tipoComprobante', TipoComprobante::FACTURA_CONSUMO->value)
+            ->call('cobrar');
+
+        $arqueo = $componente->instance()->arqueoAbierto();
+        $componente->call('cerrarCaja', '600.00', 'sobrante de prueba');
+
+        $arqueo->refresh();
+        $this->assertTrue($arqueo->estaCerrado());
+        $this->assertSame('118.00', (string) $arqueo->total_ventas_efectivo);
+        $this->assertSame('618.00', (string) $arqueo->efectivo_esperado);
+        $this->assertSame('-18.00', (string) $arqueo->diferencia);
+    }
+
+    public function test_cobrar_persiste_la_forma_de_pago_elegida(): void
+    {
+        $this->habilitarSecuenciaNcfDeConsumo();
+        $producto = $this->producto();
+
+        Livewire::actingAs($this->vendedor())
+            ->test(PuntoDeVenta::class)
+            ->call('abrirCaja', '500.00')
+            ->call('agregarProducto', $producto->id)
+            ->set('tipoComprobante', TipoComprobante::FACTURA_CONSUMO->value)
+            ->set('formaPago', 'tarjeta')
+            ->call('cobrar');
+
+        $this->assertSame('tarjeta', Venta::first()->forma_pago->value);
+    }
+
+    private function habilitarSecuenciaNcfDeConsumo(): void
+    {
+        SecuenciaNcf::create([
+            'tipo_comprobante' => TipoComprobante::FACTURA_CONSUMO,
+            'prefijo' => 'E32',
+            'secuencia_desde' => 1,
+            'secuencia_actual' => 1,
+            'secuencia_hasta' => 100,
+            'vencimiento' => now()->addYear(),
+            'activa' => true,
+        ]);
     }
 }

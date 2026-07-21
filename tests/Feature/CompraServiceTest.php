@@ -74,6 +74,65 @@ class CompraServiceTest extends TestCase
         ]);
     }
 
+    public function test_crear_compra_vincula_producto_y_proveedor_en_el_catalogo(): void
+    {
+        $proveedor = Proveedor::factory()->create();
+        $producto  = $this->crearProducto();
+        $user      = User::factory()->create();
+
+        app(CompraService::class)->crear([
+            'proveedor_id'     => $proveedor->id,
+            'tipo_comprobante' => TipoComprobante::COMPRAS,
+            'ncf'              => null,
+            'fecha'            => now(),
+            'itbis_incluido'   => false,
+            'lineas' => [
+                ['producto_id' => $producto->id, 'cantidad' => 5, 'costo_unitario' => 60],
+            ],
+        ], $user->id);
+
+        $this->assertDatabaseHas('producto_proveedor', [
+            'producto_id'      => $producto->id,
+            'proveedor_id'     => $proveedor->id,
+            'costo_referencia' => 60.00,
+            'es_principal'     => true, // primer proveedor del producto
+        ]);
+    }
+
+    public function test_comprar_de_nuevo_al_mismo_proveedor_solo_refresca_el_costo_referencia(): void
+    {
+        $proveedor = Proveedor::factory()->create();
+        $producto  = $this->crearProducto();
+        $user      = User::factory()->create();
+        $service   = app(CompraService::class);
+
+        $datosCompra = [
+            'proveedor_id'     => $proveedor->id,
+            'tipo_comprobante' => TipoComprobante::COMPRAS,
+            'ncf'              => null,
+            'fecha'            => now(),
+            'itbis_incluido'   => false,
+        ];
+
+        $service->crear($datosCompra + ['lineas' => [
+            ['producto_id' => $producto->id, 'cantidad' => 1, 'costo_unitario' => 60],
+        ]], $user->id);
+
+        // El usuario marca a mano este vínculo como no-principal antes de la segunda compra.
+        $producto->proveedores()->updateExistingPivot($proveedor->id, ['es_principal' => false]);
+
+        $service->crear($datosCompra + ['lineas' => [
+            ['producto_id' => $producto->id, 'cantidad' => 1, 'costo_unitario' => 75],
+        ]], $user->id);
+
+        $this->assertDatabaseHas('producto_proveedor', [
+            'producto_id'      => $producto->id,
+            'proveedor_id'     => $proveedor->id,
+            'costo_referencia' => 75.00,
+            'es_principal'     => false, // no se toca en compras subsecuentes
+        ]);
+    }
+
     public function test_crear_compra_con_itbis_incluido_extrae_base_correctamente(): void
     {
         $proveedor = Proveedor::factory()->create();

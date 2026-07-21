@@ -19,6 +19,7 @@ class RolePermissionSeeder extends Seeder
             'gestionar_inventario',
             'registrar_ventas',
             'anular_ventas',
+            'gestionar_arqueo_caja',
             'gestionar_compras',
             'anular_compras',
             'ver_reportes',
@@ -38,6 +39,7 @@ class RolePermissionSeeder extends Seeder
         $vendedor = Role::firstOrCreate(['name' => 'Vendedor', 'guard_name' => 'web']);
         $vendedor->syncPermissions([
             'registrar_ventas',
+            'gestionar_arqueo_caja',
             'gestionar_maestros',
             'ver_reportes',
         ]);

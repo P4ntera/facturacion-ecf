@@ -4,15 +4,18 @@ declare(strict_types=1);
 
 namespace App\Filament\Pages;
 
+use App\Enums\FormaPago;
 use App\Enums\ModuloImpresion;
 use App\Enums\TipoComprobante;
 use App\Enums\TipoDocumentoCliente;
 use App\Exceptions\SecuenciaNcfAgotadaException;
 use App\Exceptions\StockInsuficienteException;
 use App\Exceptions\VentaInvalidaException;
+use App\Models\ArqueoCaja;
 use App\Models\Cliente;
 use App\Models\Producto;
 use App\Models\Venta;
+use App\Services\ArqueoCajaService;
 use App\Services\Dgii\ConsultaContribuyenteService;
 use App\Services\Impresion\ImpresionService;
 use App\Services\SecuenciaNcfService;
@@ -25,6 +28,7 @@ use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use RuntimeException;
 use UnitEnum;
 
 class PuntoDeVenta extends Page
@@ -51,6 +55,8 @@ class PuntoDeVenta extends Page
     public array $carrito = [];
 
     public string $descuentoGlobal = '0.00';
+
+    public string $formaPago = 'efectivo';
 
     /** @var array<string, string> */
     public array $totales = [];
@@ -282,17 +288,70 @@ class PuntoDeVenta extends Page
             ->all();
     }
 
+    /** @return array<string, string> */
+    public function formasPago(): array
+    {
+        return collect(FormaPago::cases())
+            ->mapWithKeys(fn (FormaPago $forma) => [$forma->value => $forma->etiqueta()])
+            ->all();
+    }
+
+    /** Turno de caja abierto del usuario actual, si tiene uno. Lookup fresco, sin cachear. */
+    public function arqueoAbierto(): ?ArqueoCaja
+    {
+        return app(ArqueoCajaService::class)->arqueoAbiertoDe(auth()->id());
+    }
+
     public function puedeCobrar(): bool
     {
-        return $this->clienteId !== null
+        return $this->arqueoAbierto() !== null
+            && $this->clienteId !== null
             && ! empty($this->carrito)
             && ! $this->hayLineasConStockInsuficiente()
             && ! $this->faltaRncComprador()
             && collect($this->carrito)->every(fn (array $linea) => (float) $linea['cantidad'] > 0);
     }
 
+    public function abrirCaja(string $fondoInicial): void
+    {
+        try {
+            app(ArqueoCajaService::class)->abrir($fondoInicial, auth()->id());
+        } catch (RuntimeException $e) {
+            Notification::make()->title($e->getMessage())->danger()->send();
+
+            return;
+        }
+
+        Notification::make()->title('Caja abierta')->success()->send();
+    }
+
+    public function cerrarCaja(string $efectivoContado, ?string $notas = null): void
+    {
+        $arqueo = $this->arqueoAbierto();
+
+        if ($arqueo === null) {
+            return;
+        }
+
+        try {
+            app(ArqueoCajaService::class)->cerrar($arqueo, $efectivoContado, $notas, auth()->id());
+        } catch (RuntimeException $e) {
+            Notification::make()->title($e->getMessage())->danger()->send();
+
+            return;
+        }
+
+        Notification::make()->title('Caja cerrada')->success()->send();
+    }
+
     public function cobrar(): void
     {
+        if ($this->arqueoAbierto() === null) {
+            Notification::make()->title('Debes abrir la caja antes de cobrar.')->danger()->send();
+
+            return;
+        }
+
         if (! $this->puedeCobrar()) {
             $mensaje = $this->mensajeFaltaRncComprador() ?? 'Revisa el carrito antes de cobrar: cliente, líneas y stock.';
 
@@ -307,6 +366,8 @@ class PuntoDeVenta extends Page
                 'user_id' => auth()->id(),
                 'tipo_comprobante' => $this->tipoComprobante,
                 'descuento_global' => $this->descuentoGlobal,
+                'forma_pago' => $this->formaPago,
+                'arqueo_caja_id' => $this->arqueoAbierto()?->id,
                 'lineas' => $this->lineasParaService(),
             ]);
         } catch (VentaInvalidaException|StockInsuficienteException|SecuenciaNcfAgotadaException $e) {

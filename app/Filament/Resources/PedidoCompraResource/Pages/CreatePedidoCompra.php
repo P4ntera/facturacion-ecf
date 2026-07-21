@@ -49,14 +49,12 @@ class CreatePedidoCompra extends CreateRecord
             }
         }
 
-        $this->form->fill([
-            ...$this->form->getState(),
-            'proveedor_id' => (int) $proveedorId,
-        ]);
-
-        // El Repeater no adopta bien su estado vía form->fill() en mount(); se asigna
+        // No usamos $this->form->fill()/getState() aquí: Schema::getState() valida el
+        // formulario completo, y como proveedor_id es required() y aún está vacío en este
+        // punto de mount(), eso aborta el prellenado con un error de validación. Se asigna
         // directo a $this->data, igual que hace agregarLinea() al agregar una línea.
-        $this->data['lineas'] = $lineas;
+        $this->data['proveedor_id'] = (int) $proveedorId;
+        $this->data['lineas']       = $lineas;
     }
 
     protected function getRedirectUrl(): string
