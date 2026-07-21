@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Enums\EstadoFiscal;
 use App\Enums\EstadoVenta;
+use App\Enums\FormaPago;
 use App\Enums\OrigenMovimiento;
 use App\Enums\TasaItbis;
 use App\Enums\TipoComprobante;
@@ -39,6 +40,8 @@ class VentaService
      *   user_id?: int|null,
      *   tipo_comprobante?: TipoComprobante|string|null,
      *   descuento_global?: string|float|int|null,
+     *   forma_pago?: FormaPago|string|null,
+     *   arqueo_caja_id?: int|null,
      *   lineas: array<int, array{
      *     producto_id: int,
      *     cantidad: float,
@@ -90,6 +93,8 @@ class VentaService
                 'user_id' => $datos['user_id'] ?? null,
                 'tipo_comprobante' => $tipoComprobante,
                 'ncf' => $ncf,
+                'forma_pago' => $datos['forma_pago'] ?? FormaPago::EFECTIVO,
+                'arqueo_caja_id' => $datos['arqueo_caja_id'] ?? null,
                 'fecha' => now(),
                 'moneda' => $settings->moneda,
                 'subtotal' => $acumulado['subtotal'],

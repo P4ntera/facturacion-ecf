@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\AmbienteEcf;
 use App\Enums\EstadoFiscal;
 use App\Enums\EstadoVenta;
+use App\Enums\FormaPago;
 use App\Enums\TipoComprobante;
 use App\Enums\TipoPago;
 use App\Observers\VentaObserver;
@@ -24,7 +25,7 @@ class Venta extends Model
 
     protected $fillable = [
         'cliente_id', 'user_id', 'tipo_comprobante', 'ncf', 'ncf_modifica',
-        'tipo_pago', 'fecha_limite_pago',
+        'tipo_pago', 'fecha_limite_pago', 'forma_pago', 'arqueo_caja_id',
         'fecha', 'moneda', 'tasa_cambio',
         'subtotal', 'descuento',
         'monto_gravado_18', 'monto_gravado_16', 'monto_gravado_0', 'monto_exento',
@@ -40,6 +41,7 @@ class Venta extends Model
         'estado' => EstadoVenta::class,
         'estado_fiscal' => EstadoFiscal::class,
         'tipo_pago' => TipoPago::class,
+        'forma_pago' => FormaPago::class,
         'ambiente' => AmbienteEcf::class,
         'fecha_limite_pago' => 'date',
         'fecha' => 'datetime',
@@ -72,6 +74,11 @@ class Venta extends Model
     public function detalles(): HasMany
     {
         return $this->hasMany(DetalleVenta::class);
+    }
+
+    public function arqueoCaja(): BelongsTo
+    {
+        return $this->belongsTo(ArqueoCaja::class);
     }
 
     /**

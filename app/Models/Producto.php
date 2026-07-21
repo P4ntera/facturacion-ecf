@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
@@ -55,6 +56,19 @@ class Producto extends Model
     public function movimientosInventario(): HasMany
     {
         return $this->hasMany(MovimientoInventario::class);
+    }
+
+    public function proveedores(): BelongsToMany
+    {
+        return $this->belongsToMany(Proveedor::class, 'producto_proveedor')
+            ->using(ProductoProveedor::class)
+            ->withPivot(['es_principal', 'costo_referencia', 'codigo_proveedor'])
+            ->withTimestamps();
+    }
+
+    public function proveedorPrincipal(): ?Proveedor
+    {
+        return $this->proveedores()->wherePivot('es_principal', true)->first();
     }
 
     public function scopeBajoMinimo(Builder $query): Builder

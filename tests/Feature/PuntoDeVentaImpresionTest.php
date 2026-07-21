@@ -72,6 +72,7 @@ class PuntoDeVentaImpresionTest extends TestCase
         Livewire::actingAs($this->vendedor())
             ->test(PuntoDeVenta::class)
             ->call('agregarProducto', $producto->id)
+            ->call('abrirCaja', '500.00')
             ->call('cobrar')
             ->assertDispatched('abrir-ticket')
             ->assertNotified();
@@ -93,6 +94,7 @@ class PuntoDeVentaImpresionTest extends TestCase
         Livewire::actingAs($this->vendedor())
             ->test(PuntoDeVenta::class)
             ->call('agregarProducto', $producto->id)
+            ->call('abrirCaja', '500.00')
             ->call('cobrar')
             ->assertDispatched('abrir-ticket', function (string $name, array $params) {
                 return str_contains($params['url'], 'ancho=58');
@@ -116,6 +118,7 @@ class PuntoDeVentaImpresionTest extends TestCase
         Livewire::actingAs($this->vendedor())
             ->test(PuntoDeVenta::class)
             ->call('agregarProducto', $producto->id)
+            ->call('abrirCaja', '500.00')
             ->call('cobrar')
             ->assertNotDispatched('abrir-ticket')
             ->assertNotified();

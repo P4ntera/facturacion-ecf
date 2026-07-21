@@ -10,6 +10,7 @@ use App\Enums\TipoMovimiento;
 use App\Models\Compra;
 use App\Models\DetalleCompra;
 use App\Models\Producto;
+use App\Models\ProductoProveedor;
 use App\Models\Proveedor;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -104,6 +105,19 @@ class CompraService
 
                     // Costo vigente = costo (sin ITBIS) de la línea de compra más reciente.
                     $producto->update(['costo' => $linea['costo_unitario']]);
+
+                    // Vincula producto-proveedor en el catálogo automáticamente al comprarle:
+                    // si es el primer proveedor del producto, queda como principal. En compras
+                    // posteriores al mismo proveedor solo se refresca el costo de referencia,
+                    // sin tocar "es_principal" (respeta lo que haya curado el usuario a mano).
+                    $vinculo = ProductoProveedor::firstOrCreate(
+                        ['producto_id' => $producto->id, 'proveedor_id' => $proveedor->id],
+                        ['costo_referencia' => $linea['costo_unitario'], 'es_principal' => ! $producto->proveedores()->exists()],
+                    );
+
+                    if (! $vinculo->wasRecentlyCreated) {
+                        $vinculo->update(['costo_referencia' => $linea['costo_unitario']]);
+                    }
                 }
             }
 

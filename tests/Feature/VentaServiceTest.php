@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\FormaPago;
 use App\Enums\TasaItbis;
 use App\Enums\TipoComprobante;
 use App\Enums\TipoProducto;
@@ -9,6 +10,8 @@ use App\Exceptions\VentaInvalidaException;
 use App\Models\Cliente;
 use App\Models\Producto;
 use App\Models\SecuenciaNcf;
+use App\Models\User;
+use App\Services\ArqueoCajaService;
 use App\Services\VentaService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -142,5 +145,41 @@ class VentaServiceTest extends TestCase
             'tipo_comprobante' => TipoComprobante::FACTURA_CREDITO_FISCAL->value,
             'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
         ]);
+    }
+
+    public function test_forma_pago_y_arqueo_caja_id_por_defecto_si_se_omiten(): void
+    {
+        $this->secuencia(TipoComprobante::FACTURA_CONSUMO, 'E32');
+
+        $producto = $this->producto('VS-FP-DEFAULT');
+        $cliente = Cliente::create(['nombre' => 'Consumidor Final', 'activo' => true]);
+
+        $venta = app(VentaService::class)->registrar([
+            'cliente_id' => $cliente->id,
+            'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
+        ]);
+
+        $this->assertSame(FormaPago::EFECTIVO, $venta->forma_pago);
+        $this->assertNull($venta->arqueo_caja_id);
+    }
+
+    public function test_forma_pago_y_arqueo_caja_id_se_persisten_cuando_se_pasan(): void
+    {
+        $this->secuencia(TipoComprobante::FACTURA_CONSUMO, 'E32');
+
+        $producto = $this->producto('VS-FP-EXPLICITO');
+        $cliente = Cliente::create(['nombre' => 'Consumidor Final', 'activo' => true]);
+        $cajero = User::factory()->create();
+        $arqueo = app(ArqueoCajaService::class)->abrir('500.00', $cajero->id);
+
+        $venta = app(VentaService::class)->registrar([
+            'cliente_id' => $cliente->id,
+            'forma_pago' => FormaPago::TARJETA,
+            'arqueo_caja_id' => $arqueo->id,
+            'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
+        ]);
+
+        $this->assertSame(FormaPago::TARJETA, $venta->forma_pago);
+        $this->assertSame($arqueo->id, $venta->arqueo_caja_id);
     }
 }

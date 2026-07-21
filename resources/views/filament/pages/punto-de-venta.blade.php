@@ -25,7 +25,54 @@
     "
     x-on:abrir-ticket.window="window.open($event.detail.url, '_blank')"
   >
-    <div class="pos-grid">
+    @if ($this->arqueoAbierto() === null)
+      {{-- Sin caja abierta: se bloquea la pantalla de venta hasta abrirla --}}
+      <div class="card pos-apertura-caja" x-data="{ fondoInicial: '0.00' }">
+        <h3 class="card-title">Abrir caja</h3>
+        <p class="pos-muted">Debes abrir la caja con un fondo inicial antes de poder cobrar.</p>
+        <div class="flex flex-wrap items-end gap-2 mt-2">
+          <div>
+            <label class="form-label">Fondo inicial</label>
+            <input type="number" min="0" step="0.01" class="form-input" x-model="fondoInicial" />
+          </div>
+          <button type="button" class="btn btn-primary" x-on:click="$wire.abrirCaja(fondoInicial)">
+            Abrir caja
+          </button>
+        </div>
+      </div>
+    @else
+      {{-- Caja abierta: estado del turno + acción de cierre --}}
+      <div class="card pos-estado-caja" x-data="{ cerrando: false, efectivoContado: '0.00', notas: '' }">
+        <div class="flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <span class="badge badge-success">Caja abierta</span>
+            <span class="pos-muted">
+              {{ $this->arqueoAbierto()->user->name }} —
+              desde {{ $this->arqueoAbierto()->abierto_en->format('d/m/Y H:i') }} —
+              fondo RD$ {{ number_format((float) $this->arqueoAbierto()->fondo_inicial, 2) }}
+            </span>
+          </div>
+          <button type="button" class="btn btn-secondary" x-on:click="cerrando = ! cerrando">
+            Cerrar caja
+          </button>
+        </div>
+
+        <div x-show="cerrando" class="mt-3 flex flex-wrap items-end gap-2">
+          <div>
+            <label class="form-label">Efectivo contado</label>
+            <input type="number" min="0" step="0.01" class="form-input" x-model="efectivoContado" />
+          </div>
+          <div>
+            <label class="form-label">Notas (opcional)</label>
+            <input type="text" class="form-input" x-model="notas" />
+          </div>
+          <button type="button" class="btn btn-primary" x-on:click="$wire.cerrarCaja(efectivoContado, notas)">
+            Confirmar cierre
+          </button>
+        </div>
+      </div>
+
+      <div class="pos-grid">
       <div class="pos-main">
         {{-- Cliente --}}
         <div class="card">
@@ -249,6 +296,15 @@
             </p>
           @endif
 
+          <div class="mt-2">
+            <label class="form-label">Forma de pago</label>
+            <select class="form-select" wire:model.live="formaPago">
+              @foreach ($this->formasPago() as $valor => $etiqueta)
+                <option value="{{ $valor }}">{{ $etiqueta }}</option>
+              @endforeach
+            </select>
+          </div>
+
           <button
             type="button"
             class="btn btn-primary btn-cobrar mt-2"
@@ -259,6 +315,7 @@
           </button>
         </div>
       </div>
-    </div>
+      </div>
+    @endif
   </div>
 </x-filament-panels::page>
