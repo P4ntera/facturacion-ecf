@@ -40,6 +40,13 @@ class User extends Authenticatable implements FilamentUser, HasDefaultTenant, Ha
         'remember_token',
     ];
 
+    // Refleja el default de la columna en la migración: sin esto, un User::create() que omite
+    // este campo deja el modelo en memoria con null (no false) hasta refrescarlo desde la BD,
+    // rompiendo el tipo bool que exige EmpresaPolicy::viewAny() (mismo patrón que Impresora).
+    protected $attributes = [
+        'es_super_admin' => false,
+    ];
+
     protected function casts(): array
     {
         return [
