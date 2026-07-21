@@ -23,6 +23,7 @@ use App\Services\VentaService;
 use App\Settings\FacturacionSettings;
 use BackedEnum;
 use Filament\Actions\Action;
+use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
@@ -80,9 +81,23 @@ class PuntoDeVenta extends Page
         }
     }
 
+    /**
+     * El POS es una página propia (no un Resource ni un ->relationship() de Filament), así que
+     * sus consultas directas a Cliente/Producto no heredan el scoping automático por tenant:
+     * hay que filtrar por empresa_id explícitamente en cada una (ver docs/estilos.md... el
+     * comentario real: PASO 5 del prompt de tenancy — este es justo el punto que advertía que
+     * se filtran datos entre empresas si se olvida).
+     */
+    private function empresaId(): int
+    {
+        return Filament::getTenant()->id;
+    }
+
     public function clienteSeleccionado(): ?Cliente
     {
-        return $this->clienteId ? Cliente::find($this->clienteId) : null;
+        return $this->clienteId
+            ? Cliente::query()->where('empresa_id', $this->empresaId())->find($this->clienteId)
+            : null;
     }
 
     /** @return Collection<int, Cliente> */
@@ -93,6 +108,7 @@ class PuntoDeVenta extends Page
         }
 
         return Cliente::query()
+            ->where('empresa_id', $this->empresaId())
             ->where('activo', true)
             ->where(fn (Builder $q) => $q
                 ->where('nombre', 'ilike', "%{$this->busquedaCliente}%")
@@ -137,8 +153,10 @@ class PuntoDeVenta extends Page
             return;
         }
 
+        // documento no es único entre empresas: sin empresa_id en la búsqueda, esto podría
+        // encontrar (y reutilizar) el cliente de OTRA empresa con el mismo documento.
         $cliente = Cliente::query()->firstOrCreate(
-            ['documento' => $resultado['documento']],
+            ['empresa_id' => $this->empresaId(), 'documento' => $resultado['documento']],
             ['nombre' => $resultado['nombre'], 'tipo_documento' => $resultado['tipo'], 'activo' => true],
         );
 
@@ -191,6 +209,7 @@ class PuntoDeVenta extends Page
         }
 
         return Producto::query()
+            ->where('empresa_id', $this->empresaId())
             ->where('activo', true)
             ->where(fn (Builder $q) => $q
                 ->where('codigo', 'ilike', "%{$this->busquedaProducto}%")
@@ -218,6 +237,7 @@ class PuntoDeVenta extends Page
         }
 
         $producto = Producto::query()
+            ->where('empresa_id', $this->empresaId())
             ->where(fn (Builder $q) => $q->where('codigo_barra', 'ilike', $texto)->orWhere('codigo', 'ilike', $texto))
             ->first();
 
@@ -243,7 +263,10 @@ class PuntoDeVenta extends Page
 
     public function agregarProducto(int $productoId): void
     {
-        $producto = Producto::query()->where('activo', true)->find($productoId);
+        $producto = Producto::query()
+            ->where('empresa_id', $this->empresaId())
+            ->where('activo', true)
+            ->find($productoId);
 
         if ($producto === null) {
             return;
@@ -286,7 +309,7 @@ class PuntoDeVenta extends Page
             return null;
         }
 
-        return (float) (Producto::find($linea['producto_id'])?->stock ?? 0);
+        return (float) (Producto::query()->where('empresa_id', $this->empresaId())->find($linea['producto_id'])?->stock ?? 0);
     }
 
     public function lineaConStockInsuficiente(array $linea): bool
@@ -533,8 +556,10 @@ class PuntoDeVenta extends Page
 
     private function clienteConsumidorFinal(): Cliente
     {
+        // Sin empresa_id en la búsqueda, todas las empresas colisionarían en el mismo
+        // "Consumidor Final" (nombre no es único): cada una necesita el suyo propio.
         return Cliente::query()->firstOrCreate(
-            ['nombre' => 'Consumidor Final'],
+            ['empresa_id' => $this->empresaId(), 'nombre' => 'Consumidor Final'],
             ['tipo_documento' => TipoDocumentoCliente::SIN_DOCUMENTO, 'activo' => true],
         );
     }
