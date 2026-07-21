@@ -18,16 +18,15 @@ class CreateDevolucionCompra extends CreateRecord
     protected static string $resource = DevolucionCompraResource::class;
 
     /** Permite llegar precargado desde el botón "Registrar devolución" de ViewCompra. */
-    public function mount(): void
+    protected function fillForm(): void
     {
-        parent::mount();
+        $this->callHook('beforeFill');
 
-        if ($compraId = request()->query('compra_id')) {
-            $this->form->fill([
-                ...$this->form->getState(),
-                'compra_id' => (int) $compraId,
-            ]);
-        }
+        $compraId = request()->query('compra_id');
+
+        $this->form->fill($compraId ? ['compra_id' => (int) $compraId] : []);
+
+        $this->callHook('afterFill');
     }
 
     protected function getRedirectUrl(): string

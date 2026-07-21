@@ -10,6 +10,7 @@ use App\Models\Proveedor;
 use App\Models\User;
 use App\Services\CompraService;
 use App\Services\DevolucionCompraService;
+use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use RuntimeException;
 use Tests\TestCase;
@@ -125,6 +126,10 @@ class DevolucionCompraServiceTest extends TestCase
 
     public function test_no_permite_devolver_de_una_compra_anulada(): void
     {
+        // Anular la compra baja el stock hasta el mínimo (0) y dispara la notificación
+        // de stock bajo de ProductoObserver, que requiere que el permiso exista.
+        $this->seed(RolePermissionSeeder::class);
+
         [$compra, $detalle, , $user] = $this->crearCompraDe10Unidades();
 
         app(CompraService::class)->anular($compra, 'Error de digitación', $user->id);
@@ -160,7 +165,8 @@ class DevolucionCompraServiceTest extends TestCase
 
         $this->assertEquals(10, (float) $producto->fresh()->stock);
         $this->assertTrue($devolucion->fresh()->estaAnulada());
-        $this->assertEqualsWithDelta(3.0, $detalle->fresh()->cantidadDisponibleParaDevolver(), 0.001);
+        // La devolución anulada ya no cuenta como "devuelto": vuelve a estar disponible el total.
+        $this->assertEqualsWithDelta(10.0, $detalle->fresh()->cantidadDisponibleParaDevolver(), 0.001);
     }
 
     public function test_no_permite_anular_una_devolucion_dos_veces(): void
