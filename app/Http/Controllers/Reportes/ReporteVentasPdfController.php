@@ -18,7 +18,7 @@ class ReporteVentasPdfController extends ReportePdfController
         $desde = $this->rangoDesde($request);
         $hasta = $this->rangoHasta($request);
 
-        $ventas = $servicio->ventasEnRangoQuery($desde, $hasta)
+        $ventas = $servicio->ventasEnRangoQuery($desde, $hasta, $this->empresaId($request))
             ->with('cliente')
             ->orderBy('fecha')
             ->get();

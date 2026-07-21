@@ -6,14 +6,22 @@ namespace App\Http\Controllers;
 
 use App\Models\Venta;
 use App\Services\Dgii\DgiiGatewayInterface;
+use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Response;
 
 class VentaEcfXmlController extends Controller
 {
-    /** Descarga el XML firmado: redirige a xml_url si ya la tenemos, o la pide al PAC. */
-    public function __invoke(Venta $venta): Response|RedirectResponse
+    /**
+     * Descarga el XML firmado: redirige a xml_url si ya la tenemos, o la pide al PAC.
+     *
+     * Ruta fuera del panel de Filament: el scoping automático por tenant no aplica aquí (ver
+     * BelongsToTenant de Filament), así que la pertenencia a la empresa se verifica a mano.
+     */
+    public function __invoke(Request $request, Venta $venta): Response|RedirectResponse
     {
+        abort_unless($request->user()->perteneceAEmpresa($venta->empresa_id), 403);
+
         if ($venta->xml_url !== null) {
             return redirect()->away($venta->xml_url);
         }

@@ -15,7 +15,7 @@ class ReporteFiscal607PdfController extends ReportePdfController
         $desde = $this->rangoDesde($request);
         $hasta = $this->rangoHasta($request);
 
-        $filas607 = $servicio->reporte607($desde, $hasta);
+        $filas607 = $servicio->reporte607($desde, $hasta, $this->empresaId($request));
 
         $filas = $filas607->map(fn (array $fila) => [
             'fecha' => $fila['fecha_comprobante']->format('d/m/Y'),

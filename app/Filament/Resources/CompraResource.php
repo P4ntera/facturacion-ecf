@@ -239,6 +239,11 @@ class CompraResource extends Resource
                         ->hiddenLabel()
                         ->placeholder('Selecciona un producto…')
                         ->actionSchemaModel(Producto::class)
+                        // Producto::query() ya sale filtrado a la empresa actual: Filament
+                        // registra un global scope sobre el modelo en cuanto ProductoResource
+                        // existe (BelongsToTenant::registerTenancyModelGlobalScope), así que
+                        // aplica sin importar si la consulta viene de un ->relationship() o,
+                        // como aquí, de un ->options() manual.
                         ->options(fn () => Producto::query()->activos()->pluck('nombre', 'id'))
                         ->searchable()
                         ->preload()

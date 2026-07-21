@@ -2,7 +2,6 @@
 
 namespace Database\Factories;
 
-use App\Models\Empresa;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
@@ -26,7 +25,9 @@ class UserFactory extends Factory
     public function definition(): array
     {
         return [
-            'empresa_id' => Empresa::factory(),
+            // empresa_id: sin default aquí a propósito. En producción lo asocia Filament (tenant
+            // ownership); en tests, Tests\Support\TenantDefaults lo rellena si no se pasa uno
+            // explícito.
             'name' => fake()->name(),
             'email' => fake()->unique()->safeEmail(),
             'email_verified_at' => now(),

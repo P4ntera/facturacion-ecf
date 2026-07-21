@@ -24,6 +24,11 @@ class RoleResource extends Resource
 {
     protected static ?string $model = Role::class;
 
+    // Los roles (spatie/permission) son globales, no datos de una empresa: no tienen relación
+    // "empresa" y no deben scopearse por tenant (Filament los escanearía y fallaría al no
+    // encontrarla).
+    protected static bool $isScopedToTenant = false;
+
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedShieldCheck;
 
     protected static ?string $navigationLabel = 'Roles';

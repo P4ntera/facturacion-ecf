@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Filament\Models\Contracts\HasName;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -9,7 +10,7 @@ use Illuminate\Support\Str;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 
-class Empresa extends Model
+class Empresa extends Model implements HasName
 {
     use HasFactory;
     use LogsActivity;
@@ -48,6 +49,12 @@ class Empresa extends Model
     public function users(): HasMany
     {
         return $this->hasMany(User::class);
+    }
+
+    /** Nombre que Filament usa en el switcher/menú de tenant (Empresa no tiene columna "name"). */
+    public function getFilamentName(): string
+    {
+        return $this->nombre_comercial ?: $this->razon_social;
     }
 
     public function getActivitylogOptions(): LogOptions

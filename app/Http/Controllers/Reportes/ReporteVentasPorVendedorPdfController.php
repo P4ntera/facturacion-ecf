@@ -15,7 +15,9 @@ class ReporteVentasPorVendedorPdfController extends ReportePdfController
         $desde = $this->rangoDesde($request);
         $hasta = $this->rangoHasta($request);
 
-        $vendedores = $servicio->ventasPorUsuario($desde, $hasta);
+        $vendedores = $servicio->ventasPorUsuarioQuery($desde, $hasta, $this->empresaId($request))
+            ->orderByDesc('total_vendido')
+            ->get();
 
         $filas = $vendedores->map(fn (object $fila) => [
             'vendedor' => $fila->user_nombre,

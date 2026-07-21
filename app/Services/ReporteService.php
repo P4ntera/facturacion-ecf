@@ -38,11 +38,16 @@ class ReporteService
     /**
      * Todas las ventas del rango (incluye ANULADAs) para el listado del reporte de ventas:
      * a diferencia de los agregados de ingresos, aquí interesa la trazabilidad completa.
+     *
+     * $empresaId: solo lo necesitan los controllers de PDF (rutas fuera del panel de Filament,
+     * donde el scoping automático por tenant no aplica). Los widgets del dashboard, que corren
+     * dentro del panel, no lo pasan porque ya llegan scopeados por el global scope de Filament.
      */
-    public function ventasEnRangoQuery(Carbon $desde, Carbon $hasta): Builder
+    public function ventasEnRangoQuery(Carbon $desde, Carbon $hasta, ?int $empresaId = null): Builder
     {
         return Venta::query()
-            ->whereBetween('fecha', [$desde->copy()->startOfDay(), $hasta->copy()->endOfDay()]);
+            ->whereBetween('fecha', [$desde->copy()->startOfDay(), $hasta->copy()->endOfDay()])
+            ->when($empresaId, fn (Builder $query, int $id) => $query->where('empresa_id', $id));
     }
 
     /**
@@ -54,12 +59,13 @@ class ReporteService
      * la operación ante la DGII. Solo se incluyen comprobantes con e-NCF asignado, ya que el
      * 607 es un reporte de comprobantes fiscales emitidos.
      */
-    public function reporte607Query(Carbon $desde, Carbon $hasta): Builder
+    public function reporte607Query(Carbon $desde, Carbon $hasta, ?int $empresaId = null): Builder
     {
         return Venta::query()
             ->whereBetween('fecha', [$desde->copy()->startOfDay(), $hasta->copy()->endOfDay()])
             ->where('estado', '!=', EstadoVenta::ANULADA)
             ->whereNotNull('ncf')
+            ->when($empresaId, fn (Builder $query, int $id) => $query->where('empresa_id', $id))
             ->with('cliente');
     }
 
@@ -88,9 +94,9 @@ class ReporteService
      *   monto_total: string,
      * }>
      */
-    public function reporte607(Carbon $desde, Carbon $hasta): Collection
+    public function reporte607(Carbon $desde, Carbon $hasta, ?int $empresaId = null): Collection
     {
-        return $this->reporte607Query($desde, $hasta)
+        return $this->reporte607Query($desde, $hasta, $empresaId)
             ->orderBy('fecha')
             ->get()
             ->map(fn (Venta $venta) => [
@@ -184,13 +190,14 @@ class ReporteService
             ->mapWithKeys(fn ($fila) => [(string) $fila->dia => (string) $fila->total]);
     }
 
-    public function productosVendidosQuery(Carbon $desde, Carbon $hasta): Builder
+    public function productosVendidosQuery(Carbon $desde, Carbon $hasta, ?int $empresaId = null): Builder
     {
         return Producto::query()
             ->join('detalle_ventas', 'detalle_ventas.producto_id', '=', 'productos.id')
             ->join('ventas', 'ventas.id', '=', 'detalle_ventas.venta_id')
             ->whereBetween('ventas.fecha', [$desde->copy()->startOfDay(), $hasta->copy()->endOfDay()])
             ->where('ventas.estado', '!=', EstadoVenta::ANULADA)
+            ->when($empresaId, fn (Builder $query, int $id) => $query->where('ventas.empresa_id', $id))
             ->groupBy('productos.id', 'productos.codigo', 'productos.nombre')
             ->selectRaw('productos.id, productos.codigo, productos.nombre')
             ->selectRaw('COALESCE(SUM(detalle_ventas.cantidad), 0) as cantidad_vendida')
@@ -210,9 +217,10 @@ class ReporteService
         ];
     }
 
-    public function ventasPorClienteQuery(Carbon $desde, Carbon $hasta): Builder
+    public function ventasPorClienteQuery(Carbon $desde, Carbon $hasta, ?int $empresaId = null): Builder
     {
         return $this->ventasEmitidasEnRango($desde, $hasta)
+            ->when($empresaId, fn (Builder $query, int $id) => $query->where('ventas.empresa_id', $id))
             ->join('clientes', 'clientes.id', '=', 'ventas.cliente_id')
             ->groupBy('clientes.id', 'clientes.nombre')
             // "id" además de "cliente_id": el modelo base de la consulta sigue siendo Venta,
@@ -227,9 +235,10 @@ class ReporteService
         return $this->ventasPorClienteQuery($desde, $hasta)->orderByDesc('total_vendido')->get();
     }
 
-    public function ventasPorUsuarioQuery(Carbon $desde, Carbon $hasta): Builder
+    public function ventasPorUsuarioQuery(Carbon $desde, Carbon $hasta, ?int $empresaId = null): Builder
     {
         return $this->ventasEmitidasEnRango($desde, $hasta)
+            ->when($empresaId, fn (Builder $query, int $id) => $query->where('ventas.empresa_id', $id))
             ->join('users', 'users.id', '=', 'ventas.user_id')
             ->groupBy('users.id', 'users.name')
             ->selectRaw('users.id as id, users.id as user_id, users.name as user_nombre')
@@ -261,17 +270,21 @@ class ReporteService
             ]);
     }
 
-    public function valorInventario(): string
+    public function valorInventario(?int $empresaId = null): string
     {
         return (string) Producto::query()
             ->where('controla_stock', true)
+            ->when($empresaId, fn (Builder $query, int $id) => $query->where('empresa_id', $id))
             ->selectRaw('COALESCE(SUM(costo * stock), 0) as valor')
             ->value('valor');
     }
 
-    public function productosBajoMinimoQuery(): Builder
+    public function productosBajoMinimoQuery(?int $empresaId = null): Builder
     {
-        return Producto::query()->activos()->bajoMinimo();
+        return Producto::query()
+            ->activos()
+            ->bajoMinimo()
+            ->when($empresaId, fn (Builder $query, int $id) => $query->where('empresa_id', $id));
     }
 
     /**

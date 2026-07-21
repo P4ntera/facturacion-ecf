@@ -3,7 +3,6 @@
 namespace Database\Factories;
 
 use App\Enums\TipoProveedor;
-use App\Models\Empresa;
 use App\Models\Proveedor;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -14,7 +13,9 @@ class ProveedorFactory extends Factory
     public function definition(): array
     {
         return [
-            'empresa_id' => Empresa::factory(),
+            // empresa_id: sin default aquí a propósito. En producción lo asocia Filament (tenant
+            // ownership); en tests, Tests\Support\TenantDefaults lo rellena si no se pasa uno
+            // explícito.
             'rnc' => fake()->unique()->numerify('#########'),
             'tipo' => TipoProveedor::FORMAL->value,
             'nombre' => fake()->company(),

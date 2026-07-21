@@ -19,6 +19,10 @@ class VentaTicketController extends Controller
 {
     public function __invoke(Request $request, Venta $venta): View
     {
+        // Ruta fuera del panel de Filament: el scoping automático por tenant no aplica aquí (ver
+        // BelongsToTenant de Filament), así que la pertenencia a la empresa se verifica a mano.
+        abort_unless($request->user()->perteneceAEmpresa($venta->empresa_id), 403);
+
         $venta->load('detalles.producto', 'cliente');
 
         return view('ventas.ticket', [

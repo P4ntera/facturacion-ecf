@@ -6,14 +6,17 @@ namespace App\Http\Controllers\Reportes;
 
 use App\Models\Producto;
 use App\Services\ReporteService;
+use Illuminate\Http\Request;
 use Illuminate\Support\Number;
 use Symfony\Component\HttpFoundation\Response;
 
 class ReporteInventarioPdfController extends ReportePdfController
 {
-    public function __invoke(ReporteService $servicio): Response
+    public function __invoke(Request $request, ReporteService $servicio): Response
     {
-        $productos = $servicio->productosBajoMinimo();
+        $empresaId = $this->empresaId($request);
+
+        $productos = $servicio->productosBajoMinimoQuery($empresaId)->orderBy('nombre')->get();
 
         $filas = $productos->map(fn (Producto $producto) => [
             'codigo' => $producto->codigo,
@@ -34,7 +37,7 @@ class ReporteInventarioPdfController extends ReportePdfController
             ],
             filas: $filas,
             resumen: [
-                'Valor total del inventario' => Number::currency((float) $servicio->valorInventario(), 'DOP'),
+                'Valor total del inventario' => Number::currency((float) $servicio->valorInventario($empresaId), 'DOP'),
                 'Productos bajo mínimo' => (string) $productos->count(),
             ],
         );

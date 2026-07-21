@@ -15,6 +15,18 @@ use Symfony\Component\HttpFoundation\Response;
 
 abstract class ReportePdfController extends Controller
 {
+    /**
+     * empresa_id del usuario autenticado, para scopear los *Query() de ReporteService: estas
+     * rutas están fuera del panel de Filament, así que el scoping automático por tenant no
+     * aplica (ver BelongsToTenant de Filament) y hay que filtrar a mano. Corta en seco (403) en
+     * vez de devolver un reporte sin filtrar: el super-admin no tiene empresa propia y no debe
+     * poder exportar un reporte mezclando datos de todas las empresas por esta vía.
+     */
+    protected function empresaId(Request $request): int
+    {
+        return $request->user()->empresa_id ?? abort(403);
+    }
+
     protected function rangoDesde(Request $request): Carbon
     {
         return Carbon::parse($request->query('desde', now()->startOfMonth()->toDateString()))->startOfDay();

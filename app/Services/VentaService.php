@@ -89,6 +89,10 @@ class VentaService
             $ncf = $this->ncfService->siguiente($tipoComprobante);
 
             $venta = Venta::create([
+                // Se deriva del cliente (ya validado arriba) en vez de depender de que Filament
+                // haya asociado el tenant automáticamente: este service puede invocarse fuera
+                // del ciclo de vida de una request de panel (colas, comandos, tests).
+                'empresa_id' => $cliente->empresa_id,
                 'cliente_id' => $cliente->id,
                 'user_id' => $datos['user_id'] ?? null,
                 'tipo_comprobante' => $tipoComprobante,
