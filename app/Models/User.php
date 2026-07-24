@@ -63,14 +63,23 @@ class User extends Authenticatable implements FilamentUser, HasDefaultTenant, Ha
      * legítimo a alguna pantalla. Cada Resource/Page sigue gateando su propia pantalla. Además,
      * fuera del super-admin, la empresa del usuario debe estar activa: desactivarla es la forma
      * de suspender el acceso de todos sus usuarios sin tener que revocar rol por rol.
+     *
+     * El super-admin se resuelve ANTES que nada: no pertenece a ninguna empresa (roles con
+     * 'teams' => true son por empresa) y su autorización la da Gate::before en AppServiceProvider,
+     * no un rol propio — comprobar getAllPermissions() primero lo bloquearía siempre, porque en
+     * su contexto de permisos (sin empresa) nunca hay nada que encontrar.
      */
     public function canAccessPanel(Panel $panel): bool
     {
+        if ($this->es_super_admin) {
+            return true;
+        }
+
         if ($this->getAllPermissions()->isEmpty()) {
             return false;
         }
 
-        return $this->es_super_admin || ($this->empresa?->activa ?? false);
+        return $this->empresa?->activa ?? false;
     }
 
     /**

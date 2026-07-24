@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Http\Middleware;
 
 use Closure;
-use Filament\Facades\Filament;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -17,13 +16,21 @@ use function setPermissionsTeamId;
  * encuentran nada (ven todo vacío), incluida la propia comprobación canAccessPanel() del login.
  *
  * Se registra en el array ->middleware() del panel, ANTES de SubstituteBindings (ver
- * AdminPanelProvider): en ese punto Filament::getTenant() todavía no está resuelto (lo resuelve
- * IdentifyTenant más adelante en el pipeline, dentro del grupo de rutas del tenant), así que aquí
- * se usa la empresa del propio usuario como valor de partida — suficiente para que
- * canAccessPanel() y el resto de checks tempranos ya tengan contexto. En cuanto IdentifyTenant
- * resuelve el tenant real (incluido el caso del super-admin cambiando de empresa con el
- * switcher), el listener de Filament\Events\TenantSet (ver AppServiceProvider) vuelve a fijar el
- * contexto con el tenant definitivo.
+ * AdminPanelProvider) — y también antes de Authenticate, ambos vía la lista de prioridad del
+ * framework en bootstrap/app.php: la posición en el array del panel NO basta, Laravel reordena
+ * el middleware "conocido" según esa lista sin importar en qué array se registró.
+ *
+ * Usa siempre la empresa del propio usuario, NUNCA Filament::getTenant(): en este punto del
+ * pipeline el tenant activo puede ser el de una request/sesión anterior a este mismo objeto
+ * FilamentManager (p. ej. en tests, que llaman Filament::setTenant() en el setUp() para que
+ * Livewire::test() pueda generar URLs con {tenant}), no necesariamente el de la request actual
+ * (que resuelve IdentifyTenant más adelante en el pipeline). Para un usuario normal esto no
+ * pierde nada: solo pertenece a una empresa, así que su contexto siempre es la suya. El
+ * super-admin no tiene empresa propia (empresa_id null): su caso lo cubre por completo
+ * Gate::before en AppServiceProvider (no depende de tener un team_id fijado), y en cuanto entra
+ * a una empresa concreta el listener de Filament\Events\TenantSet (ver AppServiceProvider) fija
+ * el contexto real y limpia las relaciones cacheadas — también cubre al super-admin cambiando de
+ * empresa con el switcher.
  */
 class EstablecerEmpresaPermisos
 {
@@ -32,7 +39,13 @@ class EstablecerEmpresaPermisos
         $usuario = $request->user();
 
         if ($usuario !== null) {
-            setPermissionsTeamId(Filament::getTenant()?->id ?? $usuario->empresa_id);
+            setPermissionsTeamId($usuario->empresa_id);
+
+            // El objeto User puede traer roles/permissions ya cargados en memoria de un
+            // contexto de empresa distinto (p. ej. en tests, que reutilizan la misma instancia
+            // entre requests simuladas vía actingAs()): sin esto, getAllPermissions() podría
+            // devolver datos de OTRA empresa hasta que algo más los invalide.
+            $usuario->unsetRelation('roles')->unsetRelation('permissions');
         }
 
         return $next($request);

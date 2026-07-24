@@ -14,6 +14,7 @@ use App\Models\Cliente;
 use App\Models\Empresa;
 use App\Models\Producto;
 use App\Models\User;
+use App\Services\RolesEmpresaService;
 use Database\Seeders\RolePermissionSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -36,8 +37,12 @@ class AislamientoEntreEmpresasTest extends TestCase
 
         $empresa = Empresa::create(['razon_social' => $razonSocial, 'rnc' => $rnc]);
 
+        // Los roles son por empresa (roles-per-empresa, T2): esta empresa nace DESPUÉS del
+        // seed() de arriba, así que RolePermissionSeeder no llegó a sembrarle los suyos.
+        app(RolesEmpresaService::class)->sembrarRolesBase($empresa);
+
         $admin = User::factory()->create(['empresa_id' => $empresa->id]);
-        $admin->assignRole('Administrador');
+        app(RolesEmpresaService::class)->asignarAdministrador($admin, $empresa);
 
         $producto = Producto::create([
             'empresa_id' => $empresa->id,
@@ -102,6 +107,9 @@ class AislamientoEntreEmpresasTest extends TestCase
 
         Filament::setTenant($empresaA, isQuiet: true);
         TenantDefaults::reiniciar($empresaA);
+        // isQuiet: true no dispara Filament\Events\TenantSet (el listener que sincroniza
+        // setPermissionsTeamId() en una request real): hay que igualarlo a mano aquí.
+        setPermissionsTeamId($empresaA->id);
 
         Livewire::actingAs($adminA)
             ->test(CreateProducto::class)
@@ -131,6 +139,9 @@ class AislamientoEntreEmpresasTest extends TestCase
             $this->crearEmpresaConDatos('Tobogán', '131000002');
 
         Filament::setTenant($empresaA, isQuiet: true);
+        // isQuiet: true no dispara Filament\Events\TenantSet (el listener que sincroniza
+        // setPermissionsTeamId() en una request real): hay que igualarlo a mano aquí.
+        setPermissionsTeamId($empresaA->id);
 
         $componente = Livewire::actingAs($adminA)
             ->test(PuntoDeVenta::class)
