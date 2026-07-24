@@ -11,6 +11,7 @@ use App\Models\Cliente;
 use App\Models\Empresa;
 use App\Models\Producto;
 use App\Models\User;
+use App\Services\RolesEmpresaService;
 use Illuminate\Database\Seeder;
 
 /**
@@ -50,6 +51,8 @@ class EmpresaSeeder extends Seeder
             ['razon_social' => $razonSocial, 'usa_ecf' => true, 'activa' => true],
         );
 
+        app(RolesEmpresaService::class)->sembrarRolesBase($empresa);
+
         $admin = User::firstOrCreate(
             ['email' => $emailAdmin],
             [
@@ -59,7 +62,8 @@ class EmpresaSeeder extends Seeder
                 'email_verified_at' => now(),
             ],
         );
-        $admin->assignRole('Administrador');
+
+        app(RolesEmpresaService::class)->asignarAdministrador($admin, $empresa);
 
         foreach ($productos as $producto) {
             Producto::firstOrCreate(

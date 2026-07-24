@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\EmpresaResource\Pages;
 use App\Models\Empresa;
 use App\Models\User;
+use App\Services\RolesEmpresaService;
 use Filament\Actions\Action;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -157,7 +158,12 @@ class EmpresaResource extends Resource
                             'email_verified_at' => now(),
                         ]);
 
-                        $usuario->assignRole('Administrador');
+                        // No basta con $usuario->assignRole('Administrador'): el contexto de
+                        // permisos activo en este momento es el tenant que el super-admin tiene
+                        // abierto en la URL (esta pantalla no está scopeada a un tenant), que
+                        // puede no ser $record. El service fija el contexto de $record antes de
+                        // asignar y lo restaura al terminar.
+                        app(RolesEmpresaService::class)->asignarAdministrador($usuario, $record);
 
                         Notification::make()
                             ->title("Usuario administrador creado para {$record->razon_social}")

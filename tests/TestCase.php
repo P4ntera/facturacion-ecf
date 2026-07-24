@@ -28,5 +28,12 @@ abstract class TestCase extends BaseTestCase
         // URL real vía middleware, algo que Livewire::test() no ejecuta).
         Filament::setCurrentPanel('admin');
         Filament::setTenant($this->empresaDefault, isQuiet: true);
+
+        // Roles con 'teams' => true: sin un contexto de permisos activo, assignRole()/hasRole()
+        // no encuentran nada. Los tests existentes (anteriores a roles-por-empresa) llaman
+        // $this->seed(RolePermissionSeeder::class) y luego $usuario->assignRole('X') sin saber
+        // de tenancy; RolePermissionSeeder siembra los roles base de toda empresa ya existente
+        // (aquí, empresaDefault), así que ambos quedan alineados sin tocar cada test.
+        setPermissionsTeamId($this->empresaDefault->id);
     }
 }
