@@ -3,6 +3,7 @@
 namespace App\Providers\Filament;
 
 use App\Filament\Pages\Auth\EditProfile;
+use App\Http\Middleware\EstablecerEmpresaPermisos;
 use App\Models\Empresa;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -79,6 +80,15 @@ class AdminPanelProvider extends PanelProvider
                 AuthenticateSession::class,
                 ShareErrorsFromSession::class,
                 VerifyCsrfToken::class,
+                // ANTES de SubstituteBindings a propósito: spatie/laravel-permission con
+                // 'teams' => true necesita un contexto de empresa activo para CUALQUIER consulta
+                // de roles/permisos (incluida canAccessPanel(), que corre más adelante en
+                // ->authMiddleware()). Si quedara después, esas consultas se resolverían sin
+                // contexto (ven todo vacío) y el binding de rutas fallaría en 404 en vez del 403
+                // que corresponde a un problema de autorización. Ver
+                // App\Http\Middleware\EstablecerEmpresaPermisos para el detalle del fallback
+                // usado antes de que IdentifyTenant resuelva el tenant real.
+                EstablecerEmpresaPermisos::class,
                 SubstituteBindings::class,
                 DisableBladeIconComponents::class,
                 DispatchServingFilamentEvent::class,
