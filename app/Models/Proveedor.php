@@ -5,11 +5,8 @@ namespace App\Models;
 use App\Enums\TipoProveedor;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-<<<<<<< HEAD
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-=======
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
->>>>>>> 23c0da1 (feat(tenant): empresa_id en las tablas de negocio + relación empresa en modelos)
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Activitylog\LogOptions;
