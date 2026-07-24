@@ -9,6 +9,7 @@ use App\Models\Role;
 use App\Support\Permisos;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
+use Filament\Facades\Filament;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
@@ -18,17 +19,16 @@ use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Validation\Rules\Unique;
 use Spatie\Permission\PermissionRegistrar;
 
 class RoleResource extends Resource
 {
     protected static ?string $model = Role::class;
 
-    // Los roles (spatie/permission) son globales, no datos de una empresa: no tienen relación
-    // "empresa" y no deben scopearse por tenant (Filament los escanearía y fallaría al no
-    // encontrarla).
-    protected static bool $isScopedToTenant = false;
-
+    // Los roles ahora son por empresa (spatie/laravel-permission con 'teams' => true, ver
+    // App\Models\Role): cada empresa tiene los suyos, así que sí se scopean por tenant como
+    // cualquier otro dato de negocio.
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedShieldCheck;
 
     protected static ?string $navigationLabel = 'Roles';
@@ -55,7 +55,13 @@ class RoleResource extends Resource
             TextInput::make('name')
                 ->label('Nombre del rol')
                 ->required()
-                ->unique(ignoreRecord: true)
+                ->unique(
+                    ignoreRecord: true,
+                    // El nombre es único POR EMPRESA (el índice real es [empresa_id, name,
+                    // guard_name]), no global: sin esto, dos empresas no podrían tener cada una
+                    // su propio "Vendedor".
+                    modifyRuleUsing: fn (Unique $rule) => $rule->where('empresa_id', Filament::getTenant()?->id),
+                )
                 ->maxLength(255),
 
             ...collect(Permisos::catalogo())

@@ -69,10 +69,28 @@ class AislamientoEntreEmpresasTest extends TestCase
         return compact('empresa', 'admin', 'producto', 'cliente');
     }
 
+    /**
+     * Sincroniza el tenant de Filament Y el contexto de permisos de spatie a $empresa antes de
+     * actuar como uno de sus usuarios. Hace falta explícitamente en este archivo (no en la
+     * mayoría de los tests) porque es el único que crea varias empresas y alterna entre ellas
+     * dentro del mismo test: Role ahora también lleva el scoping automático de Filament (ver
+     * RoleResource, PASO 5), así que si Filament::getTenant() se queda "atrás" (apuntando a la
+     * empresa por defecto de TestCase, o a la última empresa creada) mientras
+     * setPermissionsTeamId() ya apunta a la correcta, ambos scopes se contradicen y las
+     * consultas de roles/permisos no encuentran nada. En producción esto no pasa: cada request
+     * arranca con Filament::getTenant() en null y IdentifyTenant lo resuelve una sola vez.
+     */
+    private function comoEmpresa(Empresa $empresa): void
+    {
+        Filament::setTenant($empresa, isQuiet: true);
+        setPermissionsTeamId($empresa->id);
+    }
+
     /** 1. Login como usuario de Empresa A: entra DIRECTO a su empresa, sin selector. */
     public function test_1_usuario_de_una_sola_empresa_entra_directo_sin_selector(): void
     {
         ['empresa' => $empresaA, 'admin' => $adminA] = $this->crearEmpresaConDatos('Empresa A', '131000001');
+        $this->comoEmpresa($empresaA);
 
         $this->actingAs($adminA)
             ->get('/admin')
@@ -86,6 +104,7 @@ class AislamientoEntreEmpresasTest extends TestCase
             $this->crearEmpresaConDatos('Empresa A', '131000001');
         ['producto' => $productoTobogan, 'cliente' => $clienteTobogan] =
             $this->crearEmpresaConDatos('Tobogán', '131000002');
+        $this->comoEmpresa($empresaA);
 
         $this->actingAs($adminA)
             ->get(ProductoResource::getUrl('index', tenant: $empresaA))
@@ -105,11 +124,8 @@ class AislamientoEntreEmpresasTest extends TestCase
     {
         ['empresa' => $empresaA, 'admin' => $adminA] = $this->crearEmpresaConDatos('Empresa A', '131000001');
 
-        Filament::setTenant($empresaA, isQuiet: true);
+        $this->comoEmpresa($empresaA);
         TenantDefaults::reiniciar($empresaA);
-        // isQuiet: true no dispara Filament\Events\TenantSet (el listener que sincroniza
-        // setPermissionsTeamId() en una request real): hay que igualarlo a mano aquí.
-        setPermissionsTeamId($empresaA->id);
 
         Livewire::actingAs($adminA)
             ->test(CreateProducto::class)
@@ -138,10 +154,7 @@ class AislamientoEntreEmpresasTest extends TestCase
         ['producto' => $productoTobogan, 'cliente' => $clienteTobogan] =
             $this->crearEmpresaConDatos('Tobogán', '131000002');
 
-        Filament::setTenant($empresaA, isQuiet: true);
-        // isQuiet: true no dispara Filament\Events\TenantSet (el listener que sincroniza
-        // setPermissionsTeamId() en una request real): hay que igualarlo a mano aquí.
-        setPermissionsTeamId($empresaA->id);
+        $this->comoEmpresa($empresaA);
 
         $componente = Livewire::actingAs($adminA)
             ->test(PuntoDeVenta::class)
@@ -194,8 +207,9 @@ class AislamientoEntreEmpresasTest extends TestCase
      */
     public function test_6_no_puede_acceder_por_url_a_una_empresa_ajena(): void
     {
-        ['admin' => $adminA] = $this->crearEmpresaConDatos('Empresa A', '131000001');
+        ['empresa' => $empresaA, 'admin' => $adminA] = $this->crearEmpresaConDatos('Empresa A', '131000001');
         ['empresa' => $empresaTobogan] = $this->crearEmpresaConDatos('Tobogán', '131000002');
+        $this->comoEmpresa($empresaA);
 
         $this->actingAs($adminA)
             ->get(ProductoResource::getUrl('index', tenant: $empresaTobogan))
@@ -206,6 +220,7 @@ class AislamientoEntreEmpresasTest extends TestCase
     public function test_7_administrador_normal_no_ve_empresa_resource(): void
     {
         ['empresa' => $empresaA, 'admin' => $adminA] = $this->crearEmpresaConDatos('Empresa A', '131000001');
+        $this->comoEmpresa($empresaA);
 
         $this->actingAs($adminA)
             ->get(EmpresaResource::getUrl('index', tenant: $empresaA))
