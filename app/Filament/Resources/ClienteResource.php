@@ -2,7 +2,9 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\Modulo;
 use App\Enums\TipoDocumentoCliente;
+use App\Filament\Concerns\RestringidoPorModulo;
 use App\Filament\Resources\ClienteResource\Pages;
 use App\Models\Cliente;
 use App\Services\Dgii\ConsultaContribuyenteService;
@@ -24,7 +26,14 @@ use Filament\Tables\Table;
 
 class ClienteResource extends Resource
 {
+    use RestringidoPorModulo;
+
     protected static ?string $model = Cliente::class;
+
+    public static function modulo(): Modulo
+    {
+        return Modulo::MAESTROS_CLIENTES;
+    }
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-users';
 

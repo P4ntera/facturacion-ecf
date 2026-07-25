@@ -3,6 +3,8 @@
 namespace App\Filament\Resources;
 
 use App\Enums\EstadoArqueoCaja;
+use App\Enums\Modulo;
+use App\Filament\Concerns\RestringidoPorModulo;
 use App\Filament\Resources\ArqueoCajaResource\Pages;
 use App\Models\ArqueoCaja;
 use Filament\Actions\Action;
@@ -22,7 +24,14 @@ use Illuminate\Database\Eloquent\Builder;
 
 class ArqueoCajaResource extends Resource
 {
+    use RestringidoPorModulo;
+
     protected static ?string $model = ArqueoCaja::class;
+
+    public static function modulo(): Modulo
+    {
+        return Modulo::VENTAS_ARQUEO_CAJA;
+    }
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-banknotes';
 
@@ -172,7 +181,7 @@ class ArqueoCajaResource extends Resource
     {
         return [
             'index' => Pages\ListArqueosCaja::route('/'),
-            'view'  => Pages\ViewArqueoCaja::route('/{record}'),
+            'view' => Pages\ViewArqueoCaja::route('/{record}'),
         ];
     }
 }

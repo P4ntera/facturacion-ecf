@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace App\Filament\Pages;
 
 use App\Enums\FormaPago;
+use App\Enums\Modulo;
 use App\Enums\ModuloImpresion;
 use App\Enums\TipoComprobante;
 use App\Enums\TipoDocumentoCliente;
 use App\Exceptions\SecuenciaNcfAgotadaException;
 use App\Exceptions\StockInsuficienteException;
 use App\Exceptions\VentaInvalidaException;
+use App\Filament\Concerns\RestringidoPorModulo;
 use App\Models\ArqueoCaja;
 use App\Models\Cliente;
 use App\Models\Empresa;
@@ -34,6 +36,8 @@ use UnitEnum;
 
 class PuntoDeVenta extends Page
 {
+    use RestringidoPorModulo;
+
     protected string $view = 'filament.pages.punto-de-venta';
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedShoppingCart;
@@ -62,7 +66,12 @@ class PuntoDeVenta extends Page
     /** @var array<string, string> */
     public array $totales = [];
 
-    public static function canAccess(): bool
+    public static function modulo(): Modulo
+    {
+        return Modulo::VENTAS_POS;
+    }
+
+    public static function puedeAccederPorPermiso(): bool
     {
         return auth()->user()?->can('pos.acceder') ?? false;
     }

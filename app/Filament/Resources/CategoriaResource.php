@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\Modulo;
+use App\Filament\Concerns\RestringidoPorModulo;
 use App\Filament\Resources\CategoriaResource\Pages;
 use App\Models\Categoria;
 use Filament\Forms\Components\Textarea;
@@ -16,7 +18,14 @@ use Filament\Tables\Table;
 
 class CategoriaResource extends Resource
 {
+    use RestringidoPorModulo;
+
     protected static ?string $model = Categoria::class;
+
+    public static function modulo(): Modulo
+    {
+        return Modulo::MAESTROS_CATEGORIAS;
+    }
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-tag';
 

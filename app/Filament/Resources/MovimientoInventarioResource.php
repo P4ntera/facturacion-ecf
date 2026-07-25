@@ -2,8 +2,10 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\Modulo;
 use App\Enums\OrigenMovimiento;
 use App\Enums\TipoMovimiento;
+use App\Filament\Concerns\RestringidoPorModulo;
 use App\Filament\Resources\MovimientoInventarioResource\Pages;
 use App\Models\MovimientoInventario;
 use Filament\Actions\ViewAction;
@@ -19,7 +21,14 @@ use Illuminate\Database\Eloquent\Builder;
 
 class MovimientoInventarioResource extends Resource
 {
+    use RestringidoPorModulo;
+
     protected static ?string $model = MovimientoInventario::class;
+
+    public static function modulo(): Modulo
+    {
+        return Modulo::INVENTARIO_KARDEX;
+    }
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-archive-box';
 
@@ -45,14 +54,14 @@ class MovimientoInventarioResource extends Resource
             TextEntry::make('producto.nombre')->label('Producto'),
             TextEntry::make('tipo')->label('Tipo')->formatStateUsing(fn (TipoMovimiento $state) => match ($state) {
                 TipoMovimiento::ENTRADA => 'Entrada',
-                TipoMovimiento::SALIDA  => 'Salida',
-                TipoMovimiento::AJUSTE  => 'Ajuste',
+                TipoMovimiento::SALIDA => 'Salida',
+                TipoMovimiento::AJUSTE => 'Ajuste',
             }),
             TextEntry::make('origen')->label('Origen')->formatStateUsing(fn (OrigenMovimiento $state) => match ($state) {
-                OrigenMovimiento::VENTA             => 'Venta',
-                OrigenMovimiento::COMPRA            => 'Compra',
-                OrigenMovimiento::AJUSTE            => 'Ajuste',
-                OrigenMovimiento::ANULACION         => 'Anulación',
+                OrigenMovimiento::VENTA => 'Venta',
+                OrigenMovimiento::COMPRA => 'Compra',
+                OrigenMovimiento::AJUSTE => 'Ajuste',
+                OrigenMovimiento::ANULACION => 'Anulación',
                 OrigenMovimiento::DEVOLUCION_COMPRA => 'Devolución a proveedor',
             }),
             TextEntry::make('cantidad')->label('Cantidad')->numeric(decimalPlaces: 2),
@@ -78,27 +87,27 @@ class MovimientoInventarioResource extends Resource
                     ->badge()
                     ->formatStateUsing(fn ($state) => match ($state) {
                         TipoMovimiento::ENTRADA => 'Entrada',
-                        TipoMovimiento::SALIDA  => 'Salida',
-                        TipoMovimiento::AJUSTE  => 'Ajuste',
-                        default                 => $state,
+                        TipoMovimiento::SALIDA => 'Salida',
+                        TipoMovimiento::AJUSTE => 'Ajuste',
+                        default => $state,
                     })
                     ->color(fn ($state) => match ($state) {
                         TipoMovimiento::ENTRADA => 'success',
-                        TipoMovimiento::SALIDA  => 'danger',
-                        TipoMovimiento::AJUSTE  => 'warning',
-                        default                 => 'gray',
+                        TipoMovimiento::SALIDA => 'danger',
+                        TipoMovimiento::AJUSTE => 'warning',
+                        default => 'gray',
                     }),
 
                 TextColumn::make('origen')
                     ->label('Origen')
                     ->badge()
                     ->formatStateUsing(fn ($state) => match ($state) {
-                        OrigenMovimiento::VENTA             => 'Venta',
-                        OrigenMovimiento::COMPRA            => 'Compra',
-                        OrigenMovimiento::AJUSTE            => 'Ajuste',
-                        OrigenMovimiento::ANULACION         => 'Anulación',
+                        OrigenMovimiento::VENTA => 'Venta',
+                        OrigenMovimiento::COMPRA => 'Compra',
+                        OrigenMovimiento::AJUSTE => 'Ajuste',
+                        OrigenMovimiento::ANULACION => 'Anulación',
                         OrigenMovimiento::DEVOLUCION_COMPRA => 'Devolución a proveedor',
-                        default                              => $state,
+                        default => $state,
                     }),
 
                 TextColumn::make('cantidad')
@@ -152,7 +161,7 @@ class MovimientoInventarioResource extends Resource
     {
         return [
             'index' => Pages\ListMovimientoInventarios::route('/'),
-            'view'  => Pages\ViewMovimientoInventario::route('/{record}'),
+            'view' => Pages\ViewMovimientoInventario::route('/{record}'),
         ];
     }
 }

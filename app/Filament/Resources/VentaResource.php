@@ -7,9 +7,11 @@ use App\Enums\AnchoPapel;
 use App\Enums\EstadoFiscal;
 use App\Enums\EstadoVenta;
 use App\Enums\EventoEcf;
+use App\Enums\Modulo;
 use App\Enums\ModuloImpresion;
 use App\Enums\TipoComprobante;
 use App\Exceptions\VentaYaAnuladaException;
+use App\Filament\Concerns\RestringidoPorModulo;
 use App\Filament\Resources\VentaResource\Pages;
 use App\Jobs\EnviarEcfJob;
 use App\Models\Venta;
@@ -36,7 +38,14 @@ use Illuminate\Database\Eloquent\Builder;
 
 class VentaResource extends Resource
 {
+    use RestringidoPorModulo;
+
     protected static ?string $model = Venta::class;
+
+    public static function modulo(): Modulo
+    {
+        return Modulo::VENTAS_LISTADO;
+    }
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-receipt-percent';
 

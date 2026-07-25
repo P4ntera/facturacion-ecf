@@ -2,11 +2,13 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\Modulo;
 use App\Enums\OrigenMovimiento;
 use App\Enums\TasaItbis;
 use App\Enums\TipoMovimiento;
 use App\Enums\TipoProducto;
 use App\Exceptions\StockInsuficienteException;
+use App\Filament\Concerns\RestringidoPorModulo;
 use App\Filament\Resources\ProductoResource\Pages;
 use App\Models\Producto;
 use App\Services\InventarioService;
@@ -28,7 +30,14 @@ use Illuminate\Support\Facades\DB;
 
 class ProductoResource extends Resource
 {
+    use RestringidoPorModulo;
+
     protected static ?string $model = Producto::class;
+
+    public static function modulo(): Modulo
+    {
+        return Modulo::MAESTROS_PRODUCTOS;
+    }
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-cube';
 

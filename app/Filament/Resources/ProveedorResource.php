@@ -2,7 +2,9 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\Modulo;
 use App\Enums\TipoProveedor;
+use App\Filament\Concerns\RestringidoPorModulo;
 use App\Filament\Resources\ProveedorResource\Pages;
 use App\Filament\Resources\ProveedorResource\RelationManagers;
 use App\Models\Proveedor;
@@ -26,7 +28,14 @@ use Filament\Tables\Table;
 
 class ProveedorResource extends Resource
 {
+    use RestringidoPorModulo;
+
     protected static ?string $model = Proveedor::class;
+
+    public static function modulo(): Modulo
+    {
+        return Modulo::MAESTROS_PROVEEDORES;
+    }
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-truck';
 

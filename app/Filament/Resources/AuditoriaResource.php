@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\Modulo;
+use App\Filament\Concerns\RestringidoPorModulo;
 use App\Filament\Resources\AuditoriaResource\Pages;
 use App\Models\User;
 use Filament\Actions\ViewAction;
@@ -20,7 +22,14 @@ use Spatie\Activitylog\Models\Activity;
 
 class AuditoriaResource extends Resource
 {
+    use RestringidoPorModulo;
+
     protected static ?string $model = Activity::class;
+
+    public static function modulo(): Modulo
+    {
+        return Modulo::AUDITORIA;
+    }
 
     // Activity (spatie/activitylog) es una tabla compartida por todo tipo de modelos (algunos
     // con empresa_id, otros no: Role, la propia Empresa...); no tiene relación "empresa" directa,

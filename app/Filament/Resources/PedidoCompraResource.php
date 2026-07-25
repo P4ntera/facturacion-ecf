@@ -3,6 +3,8 @@
 namespace App\Filament\Resources;
 
 use App\Enums\EstadoPedidoCompra;
+use App\Enums\Modulo;
+use App\Filament\Concerns\RestringidoPorModulo;
 use App\Filament\Resources\PedidoCompraResource\Pages;
 use App\Mail\PedidoCompraEnviado;
 use App\Models\PedidoCompra;
@@ -38,7 +40,14 @@ use RuntimeException;
 
 class PedidoCompraResource extends Resource
 {
+    use RestringidoPorModulo;
+
     protected static ?string $model = PedidoCompra::class;
+
+    public static function modulo(): Modulo
+    {
+        return Modulo::COMPRAS_PEDIDOS;
+    }
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-clipboard-document-list';
 
@@ -102,7 +111,7 @@ class PedidoCompraResource extends Resource
                         ->preload()
                         ->live()
                         ->afterStateUpdated(function ($state, callable $set, Get $get) {
-                            $producto    = $state ? Producto::find($state) : null;
+                            $producto = $state ? Producto::find($state) : null;
                             $proveedorId = $get('proveedor_id');
 
                             $costoReferencia = ($producto && $proveedorId)
@@ -171,7 +180,7 @@ class PedidoCompraResource extends Resource
                         ->state(function (Get $get) {
                             $producto = Producto::find($get('producto_id'));
 
-                            return $producto ? $producto->tasa_itbis->porcentaje() . ' %' : '—';
+                            return $producto ? $producto->tasa_itbis->porcentaje().' %' : '—';
                         }),
                 ])
                 ->addable(false)
@@ -197,7 +206,7 @@ class PedidoCompraResource extends Resource
                             }
 
                             $service = app(PedidoCompraService::class);
-                            $calc    = $service->calcularLineas($lineas);
+                            $calc = $service->calcularLineas($lineas);
                             $totales = $service->calcularTotales($calc);
 
                             return sprintf(
@@ -385,9 +394,9 @@ class PedidoCompraResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index'  => Pages\ListPedidosCompra::route('/'),
+            'index' => Pages\ListPedidosCompra::route('/'),
             'create' => Pages\CreatePedidoCompra::route('/create'),
-            'view'   => Pages\ViewPedidoCompra::route('/{record}'),
+            'view' => Pages\ViewPedidoCompra::route('/{record}'),
         ];
     }
 }

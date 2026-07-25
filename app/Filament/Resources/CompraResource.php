@@ -4,10 +4,12 @@ namespace App\Filament\Resources;
 
 use App\Enums\EstadoCompra;
 use App\Enums\EstadoDevolucion;
+use App\Enums\Modulo;
 use App\Enums\TasaItbis;
 use App\Enums\TipoComprobante;
 use App\Enums\TipoProducto;
 use App\Enums\TipoProveedor;
+use App\Filament\Concerns\RestringidoPorModulo;
 use App\Filament\Resources\CompraResource\Pages;
 use App\Models\Compra;
 use App\Models\DetalleCompra;
@@ -45,7 +47,14 @@ use RuntimeException;
 
 class CompraResource extends Resource
 {
+    use RestringidoPorModulo;
+
     protected static ?string $model = Compra::class;
+
+    public static function modulo(): Modulo
+    {
+        return Modulo::COMPRAS;
+    }
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-shopping-cart';
 

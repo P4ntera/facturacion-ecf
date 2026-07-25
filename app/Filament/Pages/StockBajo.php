@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Filament\Pages;
 
+use App\Enums\Modulo;
+use App\Filament\Concerns\RestringidoPorModulo;
 use App\Models\Producto;
 use App\Models\Proveedor;
 use BackedEnum;
@@ -14,6 +16,8 @@ use UnitEnum;
 
 class StockBajo extends Page
 {
+    use RestringidoPorModulo;
+
     protected string $view = 'filament.pages.stock-bajo';
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedExclamationTriangle;
@@ -24,7 +28,12 @@ class StockBajo extends Page
 
     protected static ?string $title = 'Productos con Stock Bajo';
 
-    public static function canAccess(): bool
+    public static function modulo(): Modulo
+    {
+        return Modulo::COMPRAS_STOCK_BAJO;
+    }
+
+    public static function puedeAccederPorPermiso(): bool
     {
         return auth()->user()?->can('gestionar_compras') ?? false;
     }
@@ -41,8 +50,8 @@ class StockBajo extends Page
         return $this->productosBajoMinimo()
             ->groupBy(fn (Producto $producto) => $producto->proveedorPrincipal()?->id ?? 'sin_proveedor')
             ->map(fn (Collection $productos, $key) => [
-                'proveedor'  => $key === 'sin_proveedor' ? null : Proveedor::find($key),
-                'productos'  => $productos,
+                'proveedor' => $key === 'sin_proveedor' ? null : Proveedor::find($key),
+                'productos' => $productos,
             ])
             ->values();
     }

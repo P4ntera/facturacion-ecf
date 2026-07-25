@@ -4,6 +4,8 @@ namespace App\Filament\Resources;
 
 use App\Enums\EstadoCompra;
 use App\Enums\EstadoDevolucion;
+use App\Enums\Modulo;
+use App\Filament\Concerns\RestringidoPorModulo;
 use App\Filament\Resources\DevolucionCompraResource\Pages;
 use App\Models\Compra;
 use App\Models\DetalleCompra;
@@ -37,7 +39,14 @@ use RuntimeException;
 
 class DevolucionCompraResource extends Resource
 {
+    use RestringidoPorModulo;
+
     protected static ?string $model = DevolucionCompra::class;
+
+    public static function modulo(): Modulo
+    {
+        return Modulo::DEVOLUCIONES;
+    }
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-arrow-uturn-left';
 
