@@ -13,6 +13,7 @@ use App\Exceptions\StockInsuficienteException;
 use App\Exceptions\VentaInvalidaException;
 use App\Models\ArqueoCaja;
 use App\Models\Cliente;
+use App\Models\Empresa;
 use App\Models\Producto;
 use App\Models\Venta;
 use App\Services\ArqueoCajaService;
@@ -20,7 +21,6 @@ use App\Services\Dgii\ConsultaContribuyenteService;
 use App\Services\Impresion\ImpresionService;
 use App\Services\SecuenciaNcfService;
 use App\Services\VentaService;
-use App\Settings\FacturacionSettings;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
@@ -69,7 +69,7 @@ class PuntoDeVenta extends Page
 
     public function mount(): void
     {
-        $this->tipoComprobante = app(FacturacionSettings::class)->tipo_comprobante_defecto;
+        $this->tipoComprobante = $this->empresa()->config()->tipo_comprobante_defecto;
         $this->clienteId = $this->clienteConsumidorFinal()->id;
         $this->recalcularTotales();
     }
@@ -88,9 +88,15 @@ class PuntoDeVenta extends Page
      * comentario real: PASO 5 del prompt de tenancy — este es justo el punto que advertía que
      * se filtran datos entre empresas si se olvida).
      */
+    private function empresa(): Empresa
+    {
+        /** @var Empresa */
+        return Filament::getTenant();
+    }
+
     private function empresaId(): int
     {
-        return Filament::getTenant()->id;
+        return $this->empresa()->id;
     }
 
     public function clienteSeleccionado(): ?Cliente
@@ -141,7 +147,7 @@ class PuntoDeVenta extends Page
      */
     public function buscarClienteEnDgii(): void
     {
-        $resultado = app(ConsultaContribuyenteService::class)->buscar($this->busquedaCliente);
+        $resultado = app(ConsultaContribuyenteService::class)->buscar($this->busquedaCliente, $this->empresa());
 
         if ($resultado === null) {
             Notification::make()
@@ -433,7 +439,7 @@ class PuntoDeVenta extends Page
                 'forma_pago' => $this->formaPago,
                 'arqueo_caja_id' => $this->arqueoAbierto()?->id,
                 'lineas' => $this->lineasParaService(),
-            ]);
+            ], $this->empresa());
         } catch (VentaInvalidaException|StockInsuficienteException|SecuenciaNcfAgotadaException $e) {
             Notification::make()->title($e->getMessage())->danger()->send();
 
@@ -521,7 +527,7 @@ class PuntoDeVenta extends Page
             $this->totales = app(VentaService::class)->previsualizar([
                 'descuento_global' => $this->descuentoGlobal,
                 'lineas' => $this->lineasParaService(),
-            ]);
+            ], $this->empresa());
         } catch (VentaInvalidaException) {
             $this->totales = $this->totalesVacios();
         }

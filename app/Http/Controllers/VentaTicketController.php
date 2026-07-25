@@ -6,7 +6,6 @@ namespace App\Http\Controllers;
 
 use App\Enums\AnchoPapel;
 use App\Models\Venta;
-use App\Settings\EmpresaSettings;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
@@ -27,7 +26,7 @@ class VentaTicketController extends Controller
 
         return view('ventas.ticket', [
             'venta' => $venta,
-            'empresa' => app(EmpresaSettings::class),
+            'empresa' => $venta->empresa,
             'anchoPapel' => AnchoPapel::tryFrom((string) $request->query('ancho')) ?? AnchoPapel::MM80,
             'qrTimbre' => $venta->dgii_url !== null
                 ? base64_encode((string) QrCode::format('png')->size(120)->generate($venta->dgii_url))

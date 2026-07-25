@@ -2,10 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Models\Empresa;
 use App\Services\Dgii\DgiiGatewayInterface;
 use App\Services\Dgii\EcfPlatformGateway;
 use App\Services\Dgii\FakeGateway;
-use App\Settings\EmpresaSettings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
@@ -15,6 +15,15 @@ use Tests\TestCase;
 class DgiiGatewayTest extends TestCase
 {
     use RefreshDatabase;
+
+    /** EcfPlatformGateway ya no se resuelve del contenedor: se construye para UNA empresa. */
+    private function empresa(array $configuracion = []): Empresa
+    {
+        $empresa = $this->empresaDefault ?? Empresa::factory()->create();
+        $empresa->config()->update($configuracion);
+
+        return $empresa;
+    }
 
     public function test_el_contenedor_resuelve_al_fake_gateway_por_defecto_en_pruebas(): void
     {
@@ -39,11 +48,9 @@ class DgiiGatewayTest extends TestCase
         Http::fake(fn () => throw new ConnectionException('timeout'));
         Log::spy();
 
-        $settings = app(EmpresaSettings::class);
-        $settings->dgii_api_key = 'clave-secreta-de-prueba';
-        $settings->save();
+        $empresa = $this->empresa(['dgii_api_key' => 'clave-secreta-de-prueba']);
 
-        $respuesta = app(EcfPlatformGateway::class)->enviar(['encf' => 'E320000000001']);
+        $respuesta = (new EcfPlatformGateway($empresa))->enviar(['encf' => 'E320000000001']);
 
         $this->assertFalse($respuesta->exito);
         $this->assertNotNull($respuesta->errorMessage);
@@ -63,7 +70,7 @@ class DgiiGatewayTest extends TestCase
             'ambiente' => 'TesteCF',
         ], 200)]);
 
-        $respuesta = app(EcfPlatformGateway::class)->enviar(['encf' => 'E320000000001']);
+        $respuesta = (new EcfPlatformGateway($this->empresa()))->enviar(['encf' => 'E320000000001']);
 
         $this->assertTrue($respuesta->exito);
         $this->assertSame('PAC-123', $respuesta->pacId);

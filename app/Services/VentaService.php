@@ -16,9 +16,10 @@ use App\Exceptions\StockInsuficienteException;
 use App\Exceptions\VentaInvalidaException;
 use App\Exceptions\VentaYaAnuladaException;
 use App\Models\Cliente;
+use App\Models\Empresa;
+use App\Models\EmpresaConfiguracion;
 use App\Models\Producto;
 use App\Models\Venta;
-use App\Settings\FacturacionSettings;
 use App\Strategies\Impuesto\ConItbisIncluido;
 use App\Strategies\Impuesto\ImpuestoStrategy;
 use App\Strategies\Impuesto\SinItbisIncluido;
@@ -50,14 +51,19 @@ class VentaService
      *   }>,
      * } $datos
      *
+     * $empresa: quien llama la resuelve explícitamente (Filament::getTenant() en el panel) — este
+     * service no asume ningún tenant ambiente, para poder invocarse igual desde una cola o un
+     * comando. Su EmpresaConfiguracion decide comportamiento fiscal (ITBIS, tipo por defecto,
+     * moneda); empresa_id en la Venta se deriva del cliente (ya validado), no de este parámetro.
+     *
      * @throws VentaInvalidaException
      * @throws SecuenciaNcfAgotadaException
      * @throws StockInsuficienteException
      */
-    public function registrar(array $datos): Venta
+    public function registrar(array $datos, Empresa $empresa): Venta
     {
-        return DB::transaction(function () use ($datos) {
-            $settings = app(FacturacionSettings::class);
+        return DB::transaction(function () use ($datos, $empresa) {
+            $config = $empresa->config();
 
             $lineas = $datos['lineas'] ?? [];
 
@@ -71,11 +77,11 @@ class VentaService
                 throw new VentaInvalidaException('El cliente indicado no existe o está inactivo.');
             }
 
-            $tipoComprobante = $this->resolverTipoComprobante($datos['tipo_comprobante'] ?? null, $settings);
-            $estrategia = $settings->precio_incluye_itbis ? new ConItbisIncluido : new SinItbisIncluido;
+            $tipoComprobante = $this->resolverTipoComprobante($datos['tipo_comprobante'] ?? null, $config);
+            $estrategia = $config->precio_incluye_itbis ? new ConItbisIncluido : new SinItbisIncluido;
             $descuentoGlobal = $this->aMoneda($datos['descuento_global'] ?? '0');
 
-            [$detalles, $productosLineas, $acumulado] = $this->procesarLineas($lineas, $settings, $estrategia);
+            [$detalles, $productosLineas, $acumulado] = $this->procesarLineas($lineas, $config, $estrategia);
 
             $total = $this->calcularTotalFinal($acumulado, $descuentoGlobal);
 
@@ -100,7 +106,7 @@ class VentaService
                 'forma_pago' => $datos['forma_pago'] ?? FormaPago::EFECTIVO,
                 'arqueo_caja_id' => $datos['arqueo_caja_id'] ?? null,
                 'fecha' => now(),
-                'moneda' => $settings->moneda,
+                'moneda' => $config->moneda,
                 'subtotal' => $acumulado['subtotal'],
                 'descuento' => $descuentoGlobal,
                 'monto_gravado_18' => $acumulado['monto_gravado_18'],
@@ -152,19 +158,19 @@ class VentaService
      *
      * @throws VentaInvalidaException
      */
-    public function previsualizar(array $datos): array
+    public function previsualizar(array $datos, Empresa $empresa): array
     {
-        $settings = app(FacturacionSettings::class);
+        $config = $empresa->config();
         $lineas = $datos['lineas'] ?? [];
 
         if (empty($lineas)) {
             throw new VentaInvalidaException('La venta debe tener al menos una línea.');
         }
 
-        $estrategia = $settings->precio_incluye_itbis ? new ConItbisIncluido : new SinItbisIncluido;
+        $estrategia = $config->precio_incluye_itbis ? new ConItbisIncluido : new SinItbisIncluido;
         $descuentoGlobal = $this->aMoneda($datos['descuento_global'] ?? '0');
 
-        [, , $acumulado] = $this->procesarLineas($lineas, $settings, $estrategia);
+        [, , $acumulado] = $this->procesarLineas($lineas, $config, $estrategia);
 
         return [
             ...$acumulado,
@@ -234,13 +240,13 @@ class VentaService
         throw new VentaInvalidaException($mensaje);
     }
 
-    private function resolverTipoComprobante(TipoComprobante|string|null $valor, FacturacionSettings $settings): TipoComprobante
+    private function resolverTipoComprobante(TipoComprobante|string|null $valor, EmpresaConfiguracion $config): TipoComprobante
     {
         if ($valor instanceof TipoComprobante) {
             return $valor;
         }
 
-        return TipoComprobante::from($valor ?? $settings->tipo_comprobante_defecto);
+        return TipoComprobante::from($valor ?? $config->tipo_comprobante_defecto);
     }
 
     /**
@@ -256,7 +262,7 @@ class VentaService
      *
      * @throws VentaInvalidaException
      */
-    private function procesarLineas(array $lineas, FacturacionSettings $settings, ImpuestoStrategy $estrategia): array
+    private function procesarLineas(array $lineas, EmpresaConfiguracion $config, ImpuestoStrategy $estrategia): array
     {
         $detalles = [];
         $productosLineas = [];
@@ -287,7 +293,7 @@ class VentaService
 
             $precioUnitario = $this->aMoneda($linea['precio_unitario'] ?? $producto->precio);
             $descuentoLinea = $this->aMoneda($linea['descuento'] ?? '0');
-            $tasaEfectiva = $settings->aplica_itbis ? $producto->tasa_itbis : TasaItbis::CERO;
+            $tasaEfectiva = $config->aplica_itbis ? $producto->tasa_itbis : TasaItbis::CERO;
 
             $desglose = $estrategia->calcular($precioUnitario, $cantidad, $descuentoLinea, $tasaEfectiva);
 

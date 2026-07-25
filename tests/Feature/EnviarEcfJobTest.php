@@ -57,7 +57,7 @@ class EnviarEcfJobTest extends TestCase
         return app(VentaService::class)->registrar([
             'cliente_id' => $cliente->id,
             'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
-        ])->refresh();
+        ], $this->empresaDefault)->refresh();
     }
 
     public function test_no_reenvia_si_la_venta_ya_esta_aceptada(): void
@@ -230,7 +230,7 @@ class EnviarEcfJobTest extends TestCase
             'cliente_id' => $cliente->id,
             'tipo_comprobante' => TipoComprobante::FACTURA_CREDITO_FISCAL->value,
             'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
-        ])->refresh();
+        ], $this->empresaDefault)->refresh();
 
         $cliente->update(['documento' => null]);
 
@@ -271,7 +271,7 @@ class EnviarEcfJobTest extends TestCase
         $venta = app(VentaService::class)->registrar([
             'cliente_id' => $cliente->id,
             'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
-        ]);
+        ], $this->empresaDefault);
 
         Queue::assertPushedOn('ecf', EnviarEcfJob::class, fn (EnviarEcfJob $job) => $job->venta->is($venta));
     }
@@ -311,7 +311,7 @@ class EnviarEcfJobTest extends TestCase
         $venta = app(VentaService::class)->registrar([
             'cliente_id' => $cliente->id,
             'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
-        ]);
+        ], $this->empresaDefault);
 
         // La cola 'sync' de pruebas ya corrió el job; se refresca para leer el resultado final.
         $venta->refresh();

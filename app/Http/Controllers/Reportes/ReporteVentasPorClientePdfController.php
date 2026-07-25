@@ -32,6 +32,7 @@ class ReporteVentasPorClientePdfController extends ReportePdfController
         ];
 
         return $this->responder(
+            request: $request,
             titulo: 'Ventas por cliente',
             columnas: [
                 ['key' => 'cliente', 'label' => 'Cliente'],

@@ -71,7 +71,7 @@ class VentaFiscalDetailTest extends TestCase
         return app(VentaService::class)->registrar([
             'cliente_id' => $cliente->id,
             'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
-        ])->refresh();
+        ], $this->empresaDefault)->refresh();
     }
 
     public function test_muestra_trackid_codigo_de_seguridad_y_ambiente(): void

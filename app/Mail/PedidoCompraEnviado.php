@@ -3,7 +3,6 @@
 namespace App\Mail;
 
 use App\Models\PedidoCompra;
-use App\Settings\EmpresaSettings;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
@@ -35,11 +34,14 @@ class PedidoCompraEnviado extends Mailable
     /** @return array<int, Attachment> */
     public function attachments(): array
     {
-        $pedido = $this->pedido->loadMissing('detalles.producto', 'proveedor');
+        // PedidoCompra todavía no tiene empresa_id propio (hueco de tenancy preexistente,
+        // señalado en el T2 y fuera del alcance de T3): se usa la empresa de quien lo creó para
+        // el membrete en vez de $pedido->empresa, que no existe.
+        $pedido = $this->pedido->loadMissing('detalles.producto', 'proveedor', 'user.empresa');
 
         $pdf = Pdf::loadView('pedidos.pedido-compra-pdf', [
-            'pedido'  => $pedido,
-            'empresa' => app(EmpresaSettings::class),
+            'pedido' => $pedido,
+            'empresa' => $pedido->user->empresa,
         ]);
 
         return [

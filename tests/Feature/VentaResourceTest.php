@@ -66,7 +66,7 @@ class VentaResourceTest extends TestCase
             'cliente_id' => $cliente->id,
             'user_id' => null,
             'lineas' => [['producto_id' => $this->producto->id, 'cantidad' => 2]],
-        ]);
+        ], $this->empresaDefault);
     }
 
     private function usuarioConPermisos(array $permisos): User

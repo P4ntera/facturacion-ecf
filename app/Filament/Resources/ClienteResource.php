@@ -7,6 +7,7 @@ use App\Filament\Resources\ClienteResource\Pages;
 use App\Models\Cliente;
 use App\Services\Dgii\ConsultaContribuyenteService;
 use Filament\Actions\Action;
+use Filament\Facades\Filament;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -59,7 +60,10 @@ class ClienteResource extends Resource
                             ->label('Buscar en DGII')
                             ->icon('heroicon-o-magnifying-glass')
                             ->action(function (Get $get, Set $set): void {
-                                $resultado = app(ConsultaContribuyenteService::class)->buscar((string) ($get('documento') ?? ''));
+                                $resultado = app(ConsultaContribuyenteService::class)->buscar(
+                                    (string) ($get('documento') ?? ''),
+                                    Filament::getTenant(),
+                                );
 
                                 if ($resultado === null) {
                                     Notification::make()

@@ -33,6 +33,7 @@ class ReporteTopProductosPdfController extends ReportePdfController
         ];
 
         return $this->responder(
+            request: $request,
             titulo: 'Top de productos',
             columnas: [
                 ['key' => 'codigo', 'label' => 'Código'],

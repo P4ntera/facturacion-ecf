@@ -65,7 +65,7 @@ class VentaComprobanteTest extends TestCase
             'cliente_id' => $cliente->id,
             'user_id' => null,
             'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
-        ]);
+        ], $this->empresaDefault);
     }
 
     public function test_genera_el_pdf_del_comprobante(): void

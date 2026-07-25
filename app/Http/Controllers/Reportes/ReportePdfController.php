@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Reportes;
 
 use App\Http\Controllers\Controller;
-use App\Settings\EmpresaSettings;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -58,6 +57,7 @@ abstract class ReportePdfController extends Controller
      * @param  array<string, string>  $resumen
      */
     protected function responder(
+        Request $request,
         string $titulo,
         array $columnas,
         array $filas,
@@ -68,7 +68,7 @@ abstract class ReportePdfController extends Controller
     ): Response {
         $pdf = Pdf::loadView('reportes.pdf', [
             'titulo' => $titulo,
-            'empresa' => app(EmpresaSettings::class),
+            'empresa' => $request->user()->empresa,
             'columnas' => $columnas,
             'filas' => $filas,
             'totales' => $totales,

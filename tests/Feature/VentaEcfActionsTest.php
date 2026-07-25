@@ -75,7 +75,7 @@ class VentaEcfActionsTest extends TestCase
         return app(VentaService::class)->registrar([
             'cliente_id' => $cliente->id,
             'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
-        ])->refresh();
+        ], $this->empresaDefault)->refresh();
     }
 
     public function test_refrescar_estado_no_es_visible_sin_el_permiso_ecf_gestionar(): void

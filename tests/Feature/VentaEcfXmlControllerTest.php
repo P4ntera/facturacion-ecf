@@ -63,7 +63,7 @@ class VentaEcfXmlControllerTest extends TestCase
         return app(VentaService::class)->registrar([
             'cliente_id' => $cliente->id,
             'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
-        ])->refresh();
+        ], $this->empresaDefault)->refresh();
     }
 
     public function test_redirige_a_xml_url_si_ya_esta_disponible(): void

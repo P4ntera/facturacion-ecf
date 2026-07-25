@@ -45,6 +45,7 @@ class ReporteVentasPdfController extends ReportePdfController
         ];
 
         return $this->responder(
+            request: $request,
             titulo: 'Reporte de ventas',
             columnas: [
                 ['key' => 'fecha', 'label' => 'Fecha'],

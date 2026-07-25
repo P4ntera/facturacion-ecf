@@ -64,7 +64,7 @@ class ArqueoCajaServiceTest extends TestCase
             'forma_pago' => $formaPago,
             'arqueo_caja_id' => $arqueoId,
             'lineas' => [['producto_id' => $this->producto($codigoProducto)->id, 'cantidad' => 1]],
-        ]);
+        ], $this->empresaDefault);
     }
 
     public function test_abrir_crea_arqueo_en_estado_abierto(): void

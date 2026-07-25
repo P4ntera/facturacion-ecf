@@ -9,7 +9,6 @@ use App\Enums\ModuloImpresion;
 use App\Models\Impresora;
 use App\Models\User;
 use App\Models\Venta;
-use App\Settings\EmpresaSettings;
 use Illuminate\Support\Str;
 use Mike42\Escpos\PrintConnectors\NetworkPrintConnector;
 use Mike42\Escpos\Printer;
@@ -92,7 +91,7 @@ class ImpresionService
 
     private function escribirTicket(Printer $printer, Venta $venta, AnchoPapel $anchoPapel): void
     {
-        $empresa = app(EmpresaSettings::class);
+        $empresa = $venta->empresa;
         $columnas = $anchoPapel->columnas();
 
         $printer->setJustification(Printer::JUSTIFY_CENTER);

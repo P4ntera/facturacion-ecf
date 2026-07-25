@@ -27,6 +27,7 @@ class ReporteInventarioPdfController extends ReportePdfController
         ])->all();
 
         return $this->responder(
+            request: $request,
             titulo: 'Reporte de inventario',
             columnas: [
                 ['key' => 'codigo', 'label' => 'Código'],

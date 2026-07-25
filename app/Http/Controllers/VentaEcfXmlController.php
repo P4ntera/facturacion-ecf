@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Models\Venta;
-use App\Services\Dgii\DgiiGatewayInterface;
+use App\Services\Dgii\DgiiGatewayFactory;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Response;
@@ -28,7 +28,7 @@ class VentaEcfXmlController extends Controller
 
         abort_if($venta->pac_id === null, 404, 'Esta venta todavía no se ha enviado al PAC.');
 
-        $xml = app(DgiiGatewayInterface::class)->descargarXml($venta->pac_id);
+        $xml = app(DgiiGatewayFactory::class)->make($venta->empresa)->descargarXml($venta->pac_id);
 
         return response($xml, 200, [
             'Content-Type' => 'application/xml',

@@ -37,6 +37,7 @@ class ReporteFiscal607PdfController extends ReportePdfController
         ];
 
         return $this->responder(
+            request: $request,
             titulo: 'Formato 607 — Envío de ventas',
             columnas: [
                 ['key' => 'fecha', 'label' => 'Fecha'],

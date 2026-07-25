@@ -7,7 +7,6 @@ use App\Enums\EstadoReenvioPac;
 use App\Services\Dgii\DgiiGatewayInterface;
 use App\Services\Dgii\RecepcionEcfService;
 use App\Services\Dgii\RespuestaEcf;
-use App\Settings\EmpresaSettings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -21,9 +20,7 @@ class RecepcionEcfServiceTest extends TestCase
     {
         parent::setUp();
 
-        $settings = app(EmpresaSettings::class);
-        $settings->rnc = self::RNC_EMPRESA;
-        $settings->save();
+        $this->empresaDefault->update(['rnc' => self::RNC_EMPRESA]);
     }
 
     private function xml(string $rncComprador = self::RNC_EMPRESA, string $rncEmisor = '999999999'): string

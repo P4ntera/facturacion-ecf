@@ -8,9 +8,10 @@ use App\Enums\EstadoReenvioPac;
 use App\Enums\TipoComprobante;
 use App\Filament\Resources\DocumentoRecibidoResource\Pages;
 use App\Models\DocumentoRecibido;
-use App\Services\Dgii\DgiiGatewayInterface;
+use App\Services\Dgii\DgiiGatewayFactory;
 use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
+use Filament\Facades\Filament;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -193,7 +194,7 @@ class DocumentoRecibidoResource extends Resource
                     ->action(function (DocumentoRecibido $record, array $data): void {
                         $decision = EstadoAprobacionComercial::from($data['decision']);
 
-                        $respuesta = app(DgiiGatewayInterface::class)->registrarAprobacionComercial([
+                        $respuesta = app(DgiiGatewayFactory::class)->make(Filament::getTenant())->registrarAprobacionComercial([
                             'encf' => $record->encf,
                             'rncEmisor' => $record->rnc_emisor,
                             'decision' => $decision->value,
