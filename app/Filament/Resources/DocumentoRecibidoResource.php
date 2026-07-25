@@ -45,6 +45,11 @@ class DocumentoRecibidoResource extends Resource
 
     protected static string|\UnitEnum|null $navigationGroup = 'Compras';
 
+    public static function canAccess(): bool
+    {
+        return parent::canAccess() && (Filament::getTenant()?->usaEcf() ?? false);
+    }
+
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()->where('canal', CanalRecepcionEcf::RECEPCION);

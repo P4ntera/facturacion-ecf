@@ -8,6 +8,7 @@ use App\Filament\Resources\SecuenciaNcfResource\Pages;
 use App\Models\SecuenciaNcf;
 use App\Services\SecuenciaNcfService;
 use Filament\Actions\Action;
+use Filament\Facades\Filament;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -38,6 +39,11 @@ class SecuenciaNcfResource extends Resource
     protected static ?string $pluralModelLabel = 'Secuencias NCF';
 
     protected static string|\UnitEnum|null $navigationGroup = 'Configuración';
+
+    public static function canAccess(): bool
+    {
+        return parent::canAccess() && (Filament::getTenant()?->usaEcf() ?? false);
+    }
 
     public static function form(Schema $schema): Schema
     {

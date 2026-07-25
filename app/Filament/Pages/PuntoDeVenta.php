@@ -88,6 +88,11 @@ class PuntoDeVenta extends Page
      * comentario real: PASO 5 del prompt de tenancy — este es justo el punto que advertía que
      * se filtran datos entre empresas si se olvida).
      */
+    public function usaEcf(): bool
+    {
+        return $this->empresa()->usaEcf();
+    }
+
     private function empresa(): Empresa
     {
         /** @var Empresa */
@@ -180,7 +185,7 @@ class PuntoDeVenta extends Page
      */
     public function requiereRncComprador(): bool
     {
-        if (blank($this->tipoComprobante)) {
+        if (blank($this->tipoComprobante) || ! $this->usaEcf()) {
             return false;
         }
 
@@ -343,7 +348,7 @@ class PuntoDeVenta extends Page
 
     public function proximoNcf(): ?string
     {
-        if (blank($this->tipoComprobante)) {
+        if (blank($this->tipoComprobante) || ! $this->usaEcf()) {
             return null;
         }
 

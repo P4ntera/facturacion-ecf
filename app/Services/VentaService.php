@@ -64,6 +64,7 @@ class VentaService
     {
         return DB::transaction(function () use ($datos, $empresa) {
             $config = $empresa->config();
+            $usaEcf = $empresa->usaEcf();
 
             $lineas = $datos['lineas'] ?? [];
 
@@ -85,14 +86,19 @@ class VentaService
 
             $total = $this->calcularTotalFinal($acumulado, $descuentoGlobal);
 
-            // Antes de consumir el e-NCF: si el comprobante exige RNC del comprador (Crédito
-            // Fiscal siempre; Consumo desde Venta::UMBRAL_CONSUMO) y el cliente no lo tiene, no
-            // tiene sentido "quemar" un número que el PAC rechazaría de todas formas.
-            $this->validarComprador($tipoComprobante, $cliente, $total);
+            // Las reglas de RNC obligatorio son de e-CF (DGII); una empresa sin e-CF activo no
+            // transmite nada, así que no tiene sentido exigirlas.
+            if ($usaEcf) {
+                // Antes de consumir el e-NCF: si el comprobante exige RNC del comprador (Crédito
+                // Fiscal siempre; Consumo desde Venta::UMBRAL_CONSUMO) y el cliente no lo tiene,
+                // no tiene sentido "quemar" un número que el PAC rechazaría de todas formas.
+                $this->validarComprador($tipoComprobante, $cliente, $total);
+            }
 
             // Se asigna DESPUÉS de validar: si algo más falla y la transacción hace rollback, el
-            // e-NCF no se "quema" (el contador también se revierte).
-            $ncf = $this->ncfService->siguiente($tipoComprobante);
+            // e-NCF no se "quema" (el contador también se revierte). Sin e-CF activo, la venta no
+            // consume secuencia ni lleva NCF.
+            $ncf = $usaEcf ? $this->ncfService->siguiente($tipoComprobante) : null;
 
             $venta = Venta::create([
                 // Se deriva del cliente (ya validado arriba) en vez de depender de que Filament
@@ -119,8 +125,9 @@ class VentaService
                 'total' => $total,
                 'estado' => EstadoVenta::EMITIDA,
                 // Toda venta con e-NCF asignado debe transmitirse como e-CF: queda PENDIENTE y
-                // VentaObserver dispara EnviarEcfJob (a cola, sin bloquear el cobro).
-                'estado_fiscal' => EstadoFiscal::PENDIENTE,
+                // VentaObserver dispara EnviarEcfJob (a cola, sin bloquear el cobro). Sin e-CF
+                // activo en la empresa, no hay nada que transmitir.
+                'estado_fiscal' => $usaEcf ? EstadoFiscal::PENDIENTE : EstadoFiscal::NO_APLICA,
             ]);
 
             $venta->detalles()->createMany($detalles);
