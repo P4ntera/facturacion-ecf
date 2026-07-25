@@ -2,11 +2,13 @@
 
 namespace App\Models;
 
+use App\Enums\Modulo;
 use Filament\Models\Contracts\HasName;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
@@ -26,6 +28,9 @@ class Empresa extends Model implements HasName
         'usa_ecf' => 'boolean',
         'activa' => 'boolean',
     ];
+
+    /** @var Collection<string, EmpresaModulo>|null */
+    private ?Collection $modulosCache = null;
 
     protected static function booted(): void
     {
@@ -73,6 +78,31 @@ class Empresa extends Model implements HasName
     public function usaEcf(): bool
     {
         return $this->usa_ecf;
+    }
+
+    public function modulos(): HasMany
+    {
+        return $this->hasMany(EmpresaModulo::class);
+    }
+
+    /**
+     * Único punto de verdad para "¿esta empresa tiene encendido este módulo?": los bloqueados
+     * siempre están disponibles; el resto se lee de empresa_modulos, con "habilitado" por
+     * defecto si aún no tiene fila propia (empresas sembradas antes de que existiera el módulo,
+     * o alta fuera de CreateEmpresa::afterCreate()). Se cachea en la instancia para no repetir
+     * la consulta en cada canAccess()/shouldRegisterNavigation() de la misma request.
+     */
+    public function tieneModulo(Modulo $modulo): bool
+    {
+        if ($modulo->esBloqueado()) {
+            return true;
+        }
+
+        if ($this->modulosCache === null) {
+            $this->modulosCache = $this->modulos()->get()->keyBy(fn (EmpresaModulo $m) => $m->modulo->value);
+        }
+
+        return $this->modulosCache->get($modulo->value)?->habilitado ?? true;
     }
 
     /** Nombre que Filament usa en el switcher/menú de tenant (Empresa no tiene columna "name"). */

@@ -11,6 +11,7 @@ use App\Models\Cliente;
 use App\Models\Empresa;
 use App\Models\Producto;
 use App\Models\User;
+use App\Services\ModulosEmpresaService;
 use App\Services\RolesEmpresaService;
 use Illuminate\Database\Seeder;
 
@@ -52,6 +53,7 @@ class EmpresaSeeder extends Seeder
         );
 
         app(RolesEmpresaService::class)->sembrarRolesBase($empresa);
+        app(ModulosEmpresaService::class)->sembrarModulos($empresa);
 
         $admin = User::firstOrCreate(
             ['email' => $emailAdmin],
