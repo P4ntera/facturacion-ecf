@@ -5,7 +5,9 @@ namespace App\Filament\Resources;
 use App\Enums\CanalRecepcionEcf;
 use App\Enums\EstadoAprobacionComercial;
 use App\Enums\EstadoReenvioPac;
+use App\Enums\Modulo;
 use App\Enums\TipoComprobante;
+use App\Filament\Concerns\RestringidoPorModulo;
 use App\Filament\Resources\DocumentoRecibidoResource\Pages;
 use App\Models\DocumentoRecibido;
 use App\Services\Dgii\DgiiGatewayFactory;
@@ -33,7 +35,14 @@ use Illuminate\Database\Eloquent\Builder;
  */
 class DocumentoRecibidoResource extends Resource
 {
+    use RestringidoPorModulo;
+
     protected static ?string $model = DocumentoRecibido::class;
+
+    public static function modulo(): Modulo
+    {
+        return Modulo::ECF_RECIBIDOS;
+    }
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-inbox-arrow-down';
 
@@ -44,11 +53,6 @@ class DocumentoRecibidoResource extends Resource
     protected static ?string $pluralModelLabel = 'e-CF Recibidos';
 
     protected static string|\UnitEnum|null $navigationGroup = 'Compras';
-
-    public static function canAccess(): bool
-    {
-        return parent::canAccess() && (Filament::getTenant()?->usaEcf() ?? false);
-    }
 
     public static function getEloquentQuery(): Builder
     {

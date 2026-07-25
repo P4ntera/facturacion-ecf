@@ -2,13 +2,14 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\Modulo;
 use App\Enums\TipoComprobante;
 use App\Exceptions\RangoNcfSolapadoException;
+use App\Filament\Concerns\RestringidoPorModulo;
 use App\Filament\Resources\SecuenciaNcfResource\Pages;
 use App\Models\SecuenciaNcf;
 use App\Services\SecuenciaNcfService;
 use Filament\Actions\Action;
-use Filament\Facades\Filament;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -28,7 +29,14 @@ use Illuminate\Support\Carbon;
 
 class SecuenciaNcfResource extends Resource
 {
+    use RestringidoPorModulo;
+
     protected static ?string $model = SecuenciaNcf::class;
+
+    public static function modulo(): Modulo
+    {
+        return Modulo::ECF_SECUENCIAS;
+    }
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-hashtag';
 
@@ -39,11 +47,6 @@ class SecuenciaNcfResource extends Resource
     protected static ?string $pluralModelLabel = 'Secuencias NCF';
 
     protected static string|\UnitEnum|null $navigationGroup = 'Configuración';
-
-    public static function canAccess(): bool
-    {
-        return parent::canAccess() && (Filament::getTenant()?->usaEcf() ?? false);
-    }
 
     public static function form(Schema $schema): Schema
     {

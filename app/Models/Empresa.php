@@ -98,6 +98,10 @@ class Empresa extends Model implements HasName
             return true;
         }
 
+        if ($modulo->requiereEcf() && ! $this->usaEcf()) {
+            return false;
+        }
+
         if ($this->modulosCache === null) {
             $this->modulosCache = $this->modulos()->get()->keyBy(fn (EmpresaModulo $m) => $m->modulo->value);
         }

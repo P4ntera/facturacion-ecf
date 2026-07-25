@@ -87,4 +87,33 @@ enum Modulo: string
     {
         return false;
     }
+
+    /**
+     * Módulos mínimos sin los que este no tiene sentido: no se puede vender sin productos, ni
+     * devolver algo a un proveedor sin el módulo de Compras (las devoluciones de este sistema son
+     * siempre CONTRA una compra registrada, ver DevolucionCompra::compra()).
+     *
+     * @return array<Modulo>
+     */
+    public function dependeDe(): array
+    {
+        return match ($this) {
+            self::VENTAS_POS => [self::MAESTROS_PRODUCTOS],
+            self::DEVOLUCIONES => [self::COMPRAS],
+            default => [],
+        };
+    }
+
+    /**
+     * Los módulos e-CF no son solo un toggle de empresa_modulos: además exigen usa_ecf=true (T3).
+     * Empresa::tieneModulo() consulta esto para que, con usa_ecf=false, queden ocultos sin
+     * importar lo que diga su fila en empresa_modulos.
+     */
+    public function requiereEcf(): bool
+    {
+        return match ($this) {
+            self::ECF_SECUENCIAS, self::ECF_RECIBIDOS => true,
+            default => false,
+        };
+    }
 }
