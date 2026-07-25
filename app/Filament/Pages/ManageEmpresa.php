@@ -3,18 +3,24 @@
 namespace App\Filament\Pages;
 
 use App\Enums\AmbienteEcf;
-use App\Settings\EmpresaSettings;
+use App\Models\Empresa;
 use BackedEnum;
+use Filament\Actions\Action;
+use Filament\Facades\Filament;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
-use Filament\Pages\SettingsPage;
+use Filament\Notifications\Notification;
+use Filament\Pages\Page;
+use Filament\Schemas\Components\Actions;
+use Filament\Schemas\Components\EmbeddedSchema;
+use Filament\Schemas\Components\Form;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use UnitEnum;
 
-class ManageEmpresa extends SettingsPage
+class ManageEmpresa extends Page
 {
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedCog6Tooth;
 
@@ -24,16 +30,37 @@ class ManageEmpresa extends SettingsPage
 
     protected static ?string $title = 'Datos de la Empresa';
 
-    protected static string $settings = EmpresaSettings::class;
+    /** @var array<string, mixed>|null */
+    public ?array $data = [];
 
     public static function canAccess(): bool
     {
         return auth()->user()?->can('empresa.administrar') ?? false;
     }
 
+    public function mount(): void
+    {
+        $empresa = $this->empresa();
+        $config = $empresa->config();
+
+        $this->form->fill([
+            'razon_social' => $empresa->razon_social,
+            'nombre_comercial' => $empresa->nombre_comercial,
+            'rnc' => $empresa->rnc,
+            'telefono' => $empresa->telefono,
+            'direccion' => $empresa->direccion,
+            'email' => $empresa->email,
+            'logo' => $empresa->logo,
+            'dgii_api_key' => $config->dgii_api_key,
+            'dgii_ambiente' => $config->dgii_ambiente->value,
+            'dgii_base_url' => $config->dgii_base_url,
+        ]);
+    }
+
     public function form(Schema $schema): Schema
     {
         return $schema
+            ->statePath('data')
             ->columns(2)
             ->components([
                 TextInput::make('razon_social')
@@ -103,5 +130,52 @@ class ManageEmpresa extends SettingsPage
                             ->maxLength(255),
                     ]),
             ]);
+    }
+
+    public function save(): void
+    {
+        $data = $this->form->getState();
+        $empresa = $this->empresa();
+
+        $empresa->update([
+            'razon_social' => $data['razon_social'],
+            'nombre_comercial' => $data['nombre_comercial'],
+            'rnc' => $data['rnc'],
+            'telefono' => $data['telefono'],
+            'direccion' => $data['direccion'],
+            'email' => $data['email'],
+            'logo' => $data['logo'],
+        ]);
+
+        $empresa->config()->update([
+            'dgii_api_key' => $data['dgii_api_key'],
+            'dgii_ambiente' => $data['dgii_ambiente'],
+            'dgii_base_url' => $data['dgii_base_url'],
+        ]);
+
+        Notification::make()->title('Datos guardados')->success()->send();
+    }
+
+    public function content(Schema $schema): Schema
+    {
+        return $schema->components([
+            Form::make([EmbeddedSchema::make('form')])
+                ->id('form')
+                ->livewireSubmitHandler('save')
+                ->footer([
+                    Actions::make([
+                        Action::make('save')
+                            ->label('Guardar')
+                            ->submit('save')
+                            ->keyBindings(['mod+s']),
+                    ]),
+                ]),
+        ]);
+    }
+
+    private function empresa(): Empresa
+    {
+        /** @var Empresa */
+        return Filament::getTenant();
     }
 }

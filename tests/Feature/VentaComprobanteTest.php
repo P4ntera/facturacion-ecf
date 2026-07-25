@@ -11,7 +11,6 @@ use App\Models\SecuenciaNcf;
 use App\Models\User;
 use App\Models\Venta;
 use App\Services\VentaService;
-use App\Settings\EmpresaSettings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
 use Spatie\Permission\Models\Permission;
@@ -101,7 +100,7 @@ class VentaComprobanteTest extends TestCase
 
         $html = view('ventas.comprobante', [
             'venta' => $venta,
-            'empresa' => app(EmpresaSettings::class),
+            'empresa' => $venta->empresa,
             'qrTimbre' => base64_encode((string) QrCode::format('png')->size(120)->generate($venta->dgii_url)),
         ])->render();
 
@@ -116,7 +115,7 @@ class VentaComprobanteTest extends TestCase
 
         $html = view('ventas.comprobante', [
             'venta' => $venta,
-            'empresa' => app(EmpresaSettings::class),
+            'empresa' => $venta->empresa,
             'qrTimbre' => null,
         ])->render();
 

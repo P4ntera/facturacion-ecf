@@ -56,6 +56,7 @@ class EmpresaConfiguracion extends Model
         'tipo_comprobante_defecto' => '32',
         'moneda' => 'DOP',
         'dgii_ambiente' => 'TesteCF',
+        'dgii_base_url' => 'https://sandbox.pac-ecf.example.do/api/v1',
     ];
 
     public function empresa(): BelongsTo
