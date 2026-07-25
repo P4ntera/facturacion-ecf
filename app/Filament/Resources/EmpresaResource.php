@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\Modulo;
 use App\Filament\Resources\EmpresaResource\Pages;
 use App\Models\Empresa;
 use App\Models\User;
@@ -9,8 +10,10 @@ use App\Services\RolesEmpresaService;
 use Filament\Actions\Action;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\IconColumn;
@@ -75,6 +78,29 @@ class EmpresaResource extends Resource
                     ->label('Activa')
                     ->helperText('Desactivarla bloquea el acceso al panel a todos sus usuarios.')
                     ->default(true),
+
+                Section::make('Módulos')
+                    ->description('Qué partes del sistema puede usar esta empresa. Desactivar un módulo solo lo oculta: sus datos existentes se conservan y reaparecen al reactivarlo.')
+                    ->columnSpanFull()
+                    ->visible(fn (string $operation): bool => $operation === 'edit')
+                    ->components([
+                        TextEntry::make('modulos_nota')
+                            ->hiddenLabel()
+                            ->state('Configuración de la Empresa, Usuarios y Roles siempre están disponibles y no aparecen aquí: sin ellos la empresa se queda sin forma de administrarse.')
+                            ->columnSpanFull(),
+
+                        ...collect(Modulo::cases())
+                            ->groupBy(fn (Modulo $modulo) => $modulo->grupo())
+                            ->map(fn ($modulos, string $grupo) => Section::make($grupo)
+                                ->columns(2)
+                                ->components(
+                                    $modulos->map(fn (Modulo $modulo) => Toggle::make("modulos.{$modulo->value}")
+                                        ->label($modulo->etiqueta())
+                                        ->default(true))->all()
+                                ))
+                            ->values()
+                            ->all(),
+                    ]),
             ]);
     }
 
