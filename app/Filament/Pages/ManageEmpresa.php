@@ -276,10 +276,10 @@ class ManageEmpresa extends Page
     {
         // El estado de un FileUpload es client-controllable (Livewire): antes de confiar en la
         // ruta hay que confirmar que cae dentro del directorio propio de ESTA empresa, o un
-        // usuario de otra empresa podría apuntar al certificado ya subido por un tercero.
+        // usuario de otra empresa podría apuntar al certificado ya subido por un tercero. Nunca
+        // se borra aquí: el archivo no es nuestro (sea de otra empresa o basura), así que no es
+        // seguro asumir que "limpiarlo" es correcto.
         if (! str_starts_with($path, "certificados/{$this->empresa()->id}/")) {
-            Storage::disk('local')->delete($path);
-
             Notification::make()->title('Ruta de certificado inválida.')->danger()->send();
 
             return null;
