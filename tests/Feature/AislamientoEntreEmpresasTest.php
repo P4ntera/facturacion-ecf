@@ -5,20 +5,27 @@ namespace Tests\Feature;
 use App\Enums\TasaItbis;
 use App\Enums\TipoDocumentoCliente;
 use App\Enums\TipoProducto;
+use App\Enums\TipoProveedor;
 use App\Filament\Pages\PuntoDeVenta;
+use App\Filament\Resources\ArqueoCajaResource;
 use App\Filament\Resources\ClienteResource;
 use App\Filament\Resources\EmpresaResource;
+use App\Filament\Resources\PedidoCompraResource;
 use App\Filament\Resources\ProductoResource;
 use App\Filament\Resources\ProductoResource\Pages\CreateProducto;
 use App\Models\Cliente;
 use App\Models\Empresa;
 use App\Models\Producto;
+use App\Models\Proveedor;
 use App\Models\User;
+use App\Services\ArqueoCajaService;
+use App\Services\PedidoCompraService;
 use App\Services\RolesEmpresaService;
 use Database\Seeders\RolePermissionSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use RuntimeException;
 use Tests\Support\TenantDefaults;
 use Tests\TestCase;
 
@@ -66,7 +73,15 @@ class AislamientoEntreEmpresasTest extends TestCase
             'activo' => true,
         ]);
 
-        return compact('empresa', 'admin', 'producto', 'cliente');
+        $proveedor = Proveedor::create([
+            'empresa_id' => $empresa->id,
+            'rnc' => '02'.$empresa->id.'2222222',
+            'tipo' => TipoProveedor::FORMAL,
+            'nombre' => "Proveedor de {$razonSocial}",
+            'activo' => true,
+        ]);
+
+        return compact('empresa', 'admin', 'producto', 'cliente', 'proveedor');
     }
 
     /**
@@ -225,5 +240,142 @@ class AislamientoEntreEmpresasTest extends TestCase
         $this->actingAs($adminA)
             ->get(EmpresaResource::getUrl('index', tenant: $empresaA))
             ->assertForbidden();
+    }
+
+    /**
+     * 8. ArqueoCaja y PedidoCompra (hueco de tenancy alineado en este cambio): cada empresa solo
+     * ve sus propios arqueos de caja y pedidos de compra en el índice, nunca los de la otra.
+     */
+    public function test_8_cada_empresa_solo_ve_sus_propios_arqueos_y_pedidos_de_compra(): void
+    {
+        ['empresa' => $empresaA, 'admin' => $adminA, 'producto' => $productoA, 'proveedor' => $proveedorA] =
+            $this->crearEmpresaConDatos('Empresa A', '131000001');
+        ['empresa' => $empresaTobogan, 'admin' => $adminTobogan, 'producto' => $productoTobogan, 'proveedor' => $proveedorTobogan] =
+            $this->crearEmpresaConDatos('Tobogán', '131000002');
+
+        $this->comoEmpresa($empresaA);
+        app(ArqueoCajaService::class)->abrir('500.00', $adminA->id, $empresaA);
+        app(PedidoCompraService::class)->crear([
+            'proveedor_id' => $proveedorA->id,
+            'fecha' => now(),
+            'notas' => null,
+            'lineas' => [['producto_id' => $productoA->id, 'cantidad' => 1, 'costo_unitario' => 50]],
+        ], $adminA->id, $empresaA);
+
+        $this->comoEmpresa($empresaTobogan);
+        app(ArqueoCajaService::class)->abrir('700.00', $adminTobogan->id, $empresaTobogan);
+        app(PedidoCompraService::class)->crear([
+            'proveedor_id' => $proveedorTobogan->id,
+            'fecha' => now(),
+            'notas' => null,
+            'lineas' => [['producto_id' => $productoTobogan->id, 'cantidad' => 1, 'costo_unitario' => 50]],
+        ], $adminTobogan->id, $empresaTobogan);
+
+        $this->comoEmpresa($empresaA);
+
+        $this->actingAs($adminA)
+            ->get(ArqueoCajaResource::getUrl('index', tenant: $empresaA))
+            ->assertOk()
+            ->assertSee($adminA->name)
+            ->assertDontSee($adminTobogan->name);
+
+        $this->actingAs($adminA)
+            ->get(PedidoCompraResource::getUrl('index', tenant: $empresaA))
+            ->assertOk()
+            ->assertSee($proveedorA->nombre)
+            ->assertDontSee($proveedorTobogan->nombre);
+    }
+
+    /** 9. El PDF de un arqueo o pedido de OTRA empresa se rechaza, aunque el usuario tenga el permiso. */
+    public function test_9_no_puede_descargar_pdf_de_arqueo_o_pedido_de_otra_empresa(): void
+    {
+        ['empresa' => $empresaA, 'admin' => $adminA] = $this->crearEmpresaConDatos('Empresa A', '131000001');
+        ['empresa' => $empresaTobogan, 'admin' => $adminTobogan, 'producto' => $productoTobogan, 'proveedor' => $proveedorTobogan] =
+            $this->crearEmpresaConDatos('Tobogán', '131000002');
+
+        $this->comoEmpresa($empresaTobogan);
+        $arqueoTobogan = app(ArqueoCajaService::class)->abrir('500.00', $adminTobogan->id, $empresaTobogan);
+        $arqueoTobogan = app(ArqueoCajaService::class)->cerrar($arqueoTobogan, '500.00', null, $adminTobogan->id);
+        $pedidoTobogan = app(PedidoCompraService::class)->crear([
+            'proveedor_id' => $proveedorTobogan->id,
+            'fecha' => now(),
+            'notas' => null,
+            'lineas' => [['producto_id' => $productoTobogan->id, 'cantidad' => 1, 'costo_unitario' => 50]],
+        ], $adminTobogan->id, $empresaTobogan);
+
+        $this->comoEmpresa($empresaA);
+
+        $this->actingAs($adminA)
+            ->get(route('arqueos-caja.pdf', $arqueoTobogan))
+            ->assertForbidden();
+
+        $this->actingAs($adminA)
+            ->get(route('pedidos-compra.pdf', $pedidoTobogan))
+            ->assertForbidden();
+    }
+
+    /** 10. Abrir un arqueo y crear un pedido de compra los asocia automáticamente a la empresa actual. */
+    public function test_10_abrir_arqueo_y_crear_pedido_los_asocia_a_la_empresa_actual(): void
+    {
+        ['empresa' => $empresaA, 'admin' => $adminA, 'producto' => $productoA, 'proveedor' => $proveedorA] =
+            $this->crearEmpresaConDatos('Empresa A', '131000001');
+        $this->comoEmpresa($empresaA);
+
+        $arqueo = app(ArqueoCajaService::class)->abrir('500.00', $adminA->id, $empresaA);
+        $pedido = app(PedidoCompraService::class)->crear([
+            'proveedor_id' => $proveedorA->id,
+            'fecha' => now(),
+            'notas' => null,
+            'lineas' => [['producto_id' => $productoA->id, 'cantidad' => 1, 'costo_unitario' => 50]],
+        ], $adminA->id, $empresaA);
+
+        $this->assertDatabaseHas('arqueos_caja', ['id' => $arqueo->id, 'empresa_id' => $empresaA->id]);
+        $this->assertDatabaseHas('pedidos_compra', ['id' => $pedido->id, 'empresa_id' => $empresaA->id]);
+    }
+
+    /**
+     * 11. No se puede crear un pedido de compra con un proveedor o un producto de OTRA empresa,
+     * ni siquiera manipulando directamente los ids enviados al service (el Select ya los filtra,
+     * pero el service es la segunda capa: nunca confía en que el id recibido sea de la empresa
+     * activa).
+     */
+    public function test_11_no_se_puede_crear_un_pedido_con_proveedor_o_producto_de_otra_empresa(): void
+    {
+        ['empresa' => $empresaA, 'admin' => $adminA, 'producto' => $productoA] =
+            $this->crearEmpresaConDatos('Empresa A', '131000001');
+        ['proveedor' => $proveedorTobogan, 'producto' => $productoTobogan] =
+            $this->crearEmpresaConDatos('Tobogán', '131000002');
+
+        $this->comoEmpresa($empresaA);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('El proveedor indicado no existe o no pertenece a esta empresa.');
+
+        app(PedidoCompraService::class)->crear([
+            'proveedor_id' => $proveedorTobogan->id,
+            'fecha' => now(),
+            'notas' => null,
+            'lineas' => [['producto_id' => $productoA->id, 'cantidad' => 1, 'costo_unitario' => 50]],
+        ], $adminA->id, $empresaA);
+    }
+
+    /** 11b. Mismo caso pero con un producto ajeno (proveedor propio, línea con producto de otra empresa). */
+    public function test_11b_no_se_puede_crear_un_pedido_con_producto_de_otra_empresa(): void
+    {
+        ['empresa' => $empresaA, 'admin' => $adminA, 'proveedor' => $proveedorA] =
+            $this->crearEmpresaConDatos('Empresa A', '131000001');
+        ['producto' => $productoTobogan] = $this->crearEmpresaConDatos('Tobogán', '131000002');
+
+        $this->comoEmpresa($empresaA);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Uno o más productos del pedido no existen o no pertenecen a esta empresa.');
+
+        app(PedidoCompraService::class)->crear([
+            'proveedor_id' => $proveedorA->id,
+            'fecha' => now(),
+            'notas' => null,
+            'lineas' => [['producto_id' => $productoTobogan->id, 'cantidad' => 1, 'costo_unitario' => 50]],
+        ], $adminA->id, $empresaA);
     }
 }

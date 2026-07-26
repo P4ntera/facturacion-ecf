@@ -7,18 +7,25 @@ namespace Database\Seeders;
 use App\Enums\TasaItbis;
 use App\Enums\TipoDocumentoCliente;
 use App\Enums\TipoProducto;
+use App\Enums\TipoProveedor;
+use App\Models\ArqueoCaja;
 use App\Models\Cliente;
 use App\Models\Empresa;
+use App\Models\PedidoCompra;
 use App\Models\Producto;
+use App\Models\Proveedor;
 use App\Models\User;
+use App\Services\ArqueoCajaService;
 use App\Services\ModulosEmpresaService;
+use App\Services\PedidoCompraService;
 use App\Services\RolesEmpresaService;
 use Illuminate\Database\Seeder;
 
 /**
  * Dos empresas de prueba para verificar aislamiento entre tenants (cada una con su propio
- * usuario administrador y datos propios): "Empresa A" y "Tobogán". Nombres de producto/cliente
- * a propósito distintos entre sí para que una fuga entre empresas sea obvia a simple vista.
+ * usuario administrador y datos propios): "Empresa A" y "Tobogán". Nombres de producto/cliente/
+ * proveedor a propósito distintos entre sí (incluye un ArqueoCaja y un PedidoCompra por empresa)
+ * para que una fuga entre empresas sea obvia a simple vista.
  */
 class EmpresaSeeder extends Seeder
 {
@@ -29,6 +36,8 @@ class EmpresaSeeder extends Seeder
             ['codigo' => 'A-002', 'nombre' => 'Producto Empresa A 2', 'precio' => 200],
         ], [
             ['nombre' => 'Cliente Empresa A', 'documento' => '00100000001'],
+        ], [
+            'rnc' => '131500001', 'nombre' => 'Proveedor Empresa A',
         ]);
 
         $tobogan = $this->crearEmpresa('Tobogán Diversiones SRL', '131000002', 'admin@tobogan.test', [
@@ -36,6 +45,8 @@ class EmpresaSeeder extends Seeder
             ['codigo' => 'T-002', 'nombre' => 'Producto Tobogán 2', 'precio' => 400],
         ], [
             ['nombre' => 'Cliente Tobogán', 'documento' => '00200000002'],
+        ], [
+            'rnc' => '131500002', 'nombre' => 'Proveedor Tobogán',
         ]);
 
         $this->command->info("Empresas de prueba listas: {$empresaA->slug} / {$tobogan->slug}");
@@ -44,8 +55,9 @@ class EmpresaSeeder extends Seeder
     /**
      * @param  array<int, array{codigo: string, nombre: string, precio: int}>  $productos
      * @param  array<int, array{nombre: string, documento: string}>  $clientes
+     * @param  array{rnc: string, nombre: string}  $proveedor
      */
-    private function crearEmpresa(string $razonSocial, string $rnc, string $emailAdmin, array $productos, array $clientes): Empresa
+    private function crearEmpresa(string $razonSocial, string $rnc, string $emailAdmin, array $productos, array $clientes, array $proveedor): Empresa
     {
         $empresa = Empresa::firstOrCreate(
             ['rnc' => $rnc],
@@ -67,15 +79,17 @@ class EmpresaSeeder extends Seeder
 
         app(RolesEmpresaService::class)->asignarAdministrador($admin, $empresa);
 
-        foreach ($productos as $producto) {
-            Producto::firstOrCreate(
-                ['codigo' => $producto['codigo']],
+        $primerProducto = null;
+
+        foreach ($productos as $datosProducto) {
+            $producto = Producto::firstOrCreate(
+                ['codigo' => $datosProducto['codigo']],
                 [
                     'empresa_id' => $empresa->id,
-                    'nombre' => $producto['nombre'],
+                    'nombre' => $datosProducto['nombre'],
                     'tipo' => TipoProducto::PRODUCTO,
-                    'costo' => $producto['precio'] * 0.6,
-                    'precio' => $producto['precio'],
+                    'costo' => $datosProducto['precio'] * 0.6,
+                    'precio' => $datosProducto['precio'],
                     'tasa_itbis' => TasaItbis::DIECIOCHO,
                     'controla_stock' => true,
                     'stock' => 50,
@@ -83,18 +97,46 @@ class EmpresaSeeder extends Seeder
                     'activo' => true,
                 ],
             );
+
+            $primerProducto ??= $producto;
         }
 
-        foreach ($clientes as $cliente) {
+        foreach ($clientes as $datosCliente) {
             Cliente::firstOrCreate(
-                ['documento' => $cliente['documento']],
+                ['documento' => $datosCliente['documento']],
                 [
                     'empresa_id' => $empresa->id,
                     'tipo_documento' => TipoDocumentoCliente::CEDULA,
-                    'nombre' => $cliente['nombre'],
+                    'nombre' => $datosCliente['nombre'],
                     'activo' => true,
                 ],
             );
+        }
+
+        $proveedorCreado = Proveedor::firstOrCreate(
+            ['rnc' => $proveedor['rnc']],
+            [
+                'empresa_id' => $empresa->id,
+                'tipo' => TipoProveedor::FORMAL,
+                'nombre' => $proveedor['nombre'],
+                'activo' => true,
+            ],
+        );
+
+        if ($primerProducto !== null && ! PedidoCompra::where('empresa_id', $empresa->id)->exists()) {
+            app(PedidoCompraService::class)->crear([
+                'proveedor_id' => $proveedorCreado->id,
+                'fecha' => now(),
+                'notas' => 'Pedido de prueba sembrado por EmpresaSeeder.',
+                'lineas' => [
+                    ['producto_id' => $primerProducto->id, 'cantidad' => 10, 'costo_unitario' => (float) $primerProducto->costo],
+                ],
+            ], $admin->id, $empresa);
+        }
+
+        if (! ArqueoCaja::where('empresa_id', $empresa->id)->exists()) {
+            $arqueo = app(ArqueoCajaService::class)->abrir('1000.00', $admin->id, $empresa);
+            app(ArqueoCajaService::class)->cerrar($arqueo, '1000.00', 'Arqueo de prueba sembrado por EmpresaSeeder.', $admin->id);
         }
 
         return $empresa;
