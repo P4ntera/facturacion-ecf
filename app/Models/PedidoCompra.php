@@ -15,27 +15,32 @@ class PedidoCompra extends Model
     protected $table = 'pedidos_compra';
 
     protected $fillable = [
-        'proveedor_id', 'user_id', 'fecha', 'notas',
+        'empresa_id', 'proveedor_id', 'user_id', 'fecha', 'notas',
         'subtotal', 'monto_gravado_18', 'monto_gravado_16', 'monto_gravado_0', 'monto_exento',
         'itbis_18', 'itbis_16', 'itbis', 'total',
         'estado', 'enviado_en', 'enviado_a', 'motivo_cancelacion', 'cancelado_en',
     ];
 
     protected $casts = [
-        'estado'               => EstadoPedidoCompra::class,
-        'fecha'                => 'datetime',
-        'enviado_en'           => 'datetime',
-        'cancelado_en'         => 'datetime',
-        'subtotal'             => 'decimal:2',
-        'monto_gravado_18'     => 'decimal:2',
-        'monto_gravado_16'     => 'decimal:2',
-        'monto_gravado_0'      => 'decimal:2',
-        'monto_exento'         => 'decimal:2',
-        'itbis_18'             => 'decimal:2',
-        'itbis_16'             => 'decimal:2',
-        'itbis'                => 'decimal:2',
-        'total'                => 'decimal:2',
+        'estado' => EstadoPedidoCompra::class,
+        'fecha' => 'datetime',
+        'enviado_en' => 'datetime',
+        'cancelado_en' => 'datetime',
+        'subtotal' => 'decimal:2',
+        'monto_gravado_18' => 'decimal:2',
+        'monto_gravado_16' => 'decimal:2',
+        'monto_gravado_0' => 'decimal:2',
+        'monto_exento' => 'decimal:2',
+        'itbis_18' => 'decimal:2',
+        'itbis_16' => 'decimal:2',
+        'itbis' => 'decimal:2',
+        'total' => 'decimal:2',
     ];
+
+    public function empresa(): BelongsTo
+    {
+        return $this->belongsTo(Empresa::class);
+    }
 
     public function proveedor(): BelongsTo
     {
