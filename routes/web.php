@@ -4,7 +4,6 @@ use App\Http\Controllers\AprobacionComercialEcfController;
 use App\Http\Controllers\ArqueoCajaPdfController;
 use App\Http\Controllers\ImpresoraPruebaController;
 use App\Http\Controllers\PedidoCompraPdfController;
-use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RecepcionEcfController;
 use App\Http\Controllers\Reportes\ReporteFiscal607PdfController;
 use App\Http\Controllers\Reportes\ReporteInventarioPdfController;
@@ -34,7 +33,7 @@ Route::get('/ventas/{venta}/xml', VentaEcfXmlController::class)
     ->name('ventas.ecf.xml');
 
 Route::get('/pedidos-compra/{pedidoCompra}/pdf', PedidoCompraPdfController::class)
-    ->middleware(['auth', 'can:gestionar_compras'])
+    ->middleware(['auth', 'can:compras.ver'])
     ->name('pedidos-compra.pdf');
 
 Route::get('/arqueos-caja/{arqueoCaja}/pdf', ArqueoCajaPdfController::class)

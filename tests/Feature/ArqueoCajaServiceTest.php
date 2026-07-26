@@ -71,7 +71,7 @@ class ArqueoCajaServiceTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $arqueo = app(ArqueoCajaService::class)->abrir('500.00', $user->id);
+        $arqueo = app(ArqueoCajaService::class)->abrir('500.00', $user->id, $this->empresaDefault);
 
         $this->assertEquals(EstadoArqueoCaja::ABIERTO, $arqueo->estado);
         $this->assertEquals(500.00, (float) $arqueo->fondo_inicial);
@@ -84,10 +84,10 @@ class ArqueoCajaServiceTest extends TestCase
         $user = User::factory()->create();
         $service = app(ArqueoCajaService::class);
 
-        $service->abrir('500.00', $user->id);
+        $service->abrir('500.00', $user->id, $this->empresaDefault);
 
         $this->expectException(RuntimeException::class);
-        $service->abrir('300.00', $user->id);
+        $service->abrir('300.00', $user->id, $this->empresaDefault);
     }
 
     public function test_cerrar_calcula_efectivo_esperado_y_diferencia_correctamente(): void
@@ -96,7 +96,7 @@ class ArqueoCajaServiceTest extends TestCase
         $user = User::factory()->create();
         $service = app(ArqueoCajaService::class);
 
-        $arqueo = $service->abrir('500.00', $user->id);
+        $arqueo = $service->abrir('500.00', $user->id, $this->empresaDefault);
         $this->vender($arqueo->id, $user->id, FormaPago::EFECTIVO, 'ARQ-EF-1');
         $this->vender($arqueo->id, $user->id, FormaPago::EFECTIVO, 'ARQ-EF-2');
 
@@ -117,7 +117,7 @@ class ArqueoCajaServiceTest extends TestCase
         $user = User::factory()->create();
         $service = app(ArqueoCajaService::class);
 
-        $arqueo = $service->abrir('500.00', $user->id);
+        $arqueo = $service->abrir('500.00', $user->id, $this->empresaDefault);
         $this->vender($arqueo->id, $user->id, FormaPago::EFECTIVO, 'ARQ-ANUL-1');
 
         $venta = $arqueo->ventas()->first();
@@ -135,7 +135,7 @@ class ArqueoCajaServiceTest extends TestCase
         $user = User::factory()->create();
         $service = app(ArqueoCajaService::class);
 
-        $arqueo = $service->abrir('500.00', $user->id);
+        $arqueo = $service->abrir('500.00', $user->id, $this->empresaDefault);
         $this->vender($arqueo->id, $user->id, FormaPago::EFECTIVO, 'ARQ-MIX-EF');
         $this->vender($arqueo->id, $user->id, FormaPago::TARJETA, 'ARQ-MIX-TAR');
         $this->vender($arqueo->id, $user->id, FormaPago::TRANSFERENCIA, 'ARQ-MIX-TRA');
@@ -154,7 +154,7 @@ class ArqueoCajaServiceTest extends TestCase
         $user = User::factory()->create();
         $service = app(ArqueoCajaService::class);
 
-        $arqueo = $service->abrir('500.00', $user->id);
+        $arqueo = $service->abrir('500.00', $user->id, $this->empresaDefault);
         $service->cerrar($arqueo, '500.00', null, $user->id);
 
         $this->expectException(RuntimeException::class);
@@ -167,7 +167,7 @@ class ArqueoCajaServiceTest extends TestCase
         $otro = User::factory()->create();
         $service = app(ArqueoCajaService::class);
 
-        $arqueo = $service->abrir('500.00', $cajero->id);
+        $arqueo = $service->abrir('500.00', $cajero->id, $this->empresaDefault);
 
         $this->expectException(RuntimeException::class);
         $service->cerrar($arqueo, '500.00', null, $otro->id);
@@ -177,6 +177,6 @@ class ArqueoCajaServiceTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $this->assertNull(app(ArqueoCajaService::class)->arqueoAbiertoDe($user->id));
+        $this->assertNull(app(ArqueoCajaService::class)->arqueoAbiertoDe($user->id, $this->empresaDefault));
     }
 }

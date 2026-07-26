@@ -9,6 +9,7 @@ use App\Filament\Concerns\RestringidoPorModulo;
 use App\Models\Producto;
 use App\Models\Proveedor;
 use BackedEnum;
+use Filament\Facades\Filament;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Collection;
@@ -35,13 +36,23 @@ class StockBajo extends Page
 
     public static function puedeAccederPorPermiso(): bool
     {
-        return auth()->user()?->can('gestionar_compras') ?? false;
+        return auth()->user()?->can('compras.crear') ?? false;
     }
 
-    /** @return Collection<int, Producto> */
+    /**
+     * Página propia (no un Resource): sus consultas directas a Producto no heredan el scoping
+     * automático de Filament, hay que filtrar por empresa a mano (mismo criterio que PuntoDeVenta).
+     *
+     * @return Collection<int, Producto>
+     */
     public function productosBajoMinimo(): Collection
     {
-        return Producto::query()->bajoMinimo()->with('proveedores')->orderBy('nombre')->get();
+        return Producto::query()
+            ->where('empresa_id', Filament::getTenant()->id)
+            ->bajoMinimo()
+            ->with('proveedores')
+            ->orderBy('nombre')
+            ->get();
     }
 
     /** @return Collection<int, array{proveedor: ?Proveedor, productos: Collection}> */

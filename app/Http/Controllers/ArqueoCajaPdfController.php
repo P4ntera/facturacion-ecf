@@ -14,17 +14,18 @@ class ArqueoCajaPdfController extends Controller
     /**
      * Genera el PDF del arqueo. Solo lee datos ya guardados; no recalcula nada.
      *
-     * ArqueoCaja todavía no tiene empresa_id propio (hueco de tenancy preexistente, señalado en
-     * el T2 y fuera del alcance de T3): se usa la empresa del usuario autenticado para el
-     * membrete en vez de $arqueoCaja->empresa, que no existe.
+     * Ruta fuera del panel de Filament: el scoping automático por tenant no aplica aquí (ver
+     * BelongsToTenant de Filament), así que la pertenencia a la empresa se verifica a mano.
      */
     public function __invoke(Request $request, ArqueoCaja $arqueoCaja): Response
     {
+        abort_unless($request->user()->perteneceAEmpresa($arqueoCaja->empresa_id), 403);
+
         $arqueoCaja->load('ventas.cliente', 'user');
 
         $pdf = Pdf::loadView('arqueos-caja.arqueo', [
             'arqueo' => $arqueoCaja,
-            'empresa' => $request->user()->empresa,
+            'empresa' => $arqueoCaja->empresa,
         ]);
 
         return $pdf->stream("arqueo-caja-{$arqueoCaja->id}.pdf");

@@ -12,6 +12,7 @@ use App\Models\Producto;
 use App\Services\PedidoCompraService;
 use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
+use Filament\Facades\Filament;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Hidden;
@@ -70,7 +71,10 @@ class PedidoCompraResource extends Resource
                 ->schema([
                     Select::make('proveedor_id')
                         ->label('Proveedor')
-                        ->relationship('proveedor', 'nombre')
+                        // ->relationship() no hereda el scoping automático de Filament: sin
+                        // modifyQueryUsing, se ven (y se pueden elegir) proveedores de otras
+                        // empresas.
+                        ->relationship('proveedor', 'nombre', modifyQueryUsing: fn (Builder $query) => $query->where('empresa_id', Filament::getTenant()->id))
                         ->searchable()
                         ->preload()
                         ->live()
@@ -99,7 +103,9 @@ class PedidoCompraResource extends Resource
                         ->options(function (Get $get) {
                             $proveedorId = $get('proveedor_id');
 
-                            $query = Producto::query()->activos();
+                            // Consulta directa a Producto: no hereda el scoping automático de
+                            // Filament, así que se filtra a mano (ver nota en proveedor_id).
+                            $query = Producto::query()->where('empresa_id', Filament::getTenant()->id)->activos();
 
                             if ($proveedorId) {
                                 $query->whereHas('proveedores', fn (Builder $q) => $q->where('proveedores.id', $proveedorId));
@@ -308,7 +314,7 @@ class PedidoCompraResource extends Resource
             ->filters([
                 SelectFilter::make('proveedor_id')
                     ->label('Proveedor')
-                    ->relationship('proveedor', 'nombre')
+                    ->relationship('proveedor', 'nombre', modifyQueryUsing: fn (Builder $query) => $query->where('empresa_id', Filament::getTenant()->id))
                     ->searchable()
                     ->preload(),
 
@@ -343,7 +349,7 @@ class PedidoCompraResource extends Resource
                     ->label('Enviar por correo')
                     ->icon('heroicon-o-envelope')
                     ->color('gray')
-                    ->visible(fn (PedidoCompra $record): bool => ! $record->estaCancelado() && (auth()->user()?->can('gestionar_compras') ?? false))
+                    ->visible(fn (PedidoCompra $record): bool => ! $record->estaCancelado() && (auth()->user()?->can('compras.crear') ?? false))
                     ->schema([
                         TextInput::make('email')
                             ->label('Correo del proveedor')
@@ -369,7 +375,7 @@ class PedidoCompraResource extends Resource
                     ->icon('heroicon-o-x-circle')
                     ->color('danger')
                     ->requiresConfirmation()
-                    ->visible(fn (PedidoCompra $record): bool => ! $record->estaCancelado() && (auth()->user()?->can('anular_compras') ?? false))
+                    ->visible(fn (PedidoCompra $record): bool => ! $record->estaCancelado() && (auth()->user()?->can('compras.anular') ?? false))
                     ->schema([
                         Textarea::make('motivo')
                             ->label('Motivo de cancelación')

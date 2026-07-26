@@ -4,8 +4,11 @@ namespace App\Services;
 
 use App\Enums\EstadoPedidoCompra;
 use App\Models\DetallePedidoCompra;
+use App\Models\Empresa;
 use App\Models\PedidoCompra;
+use App\Models\Producto;
 use App\Models\Proveedor;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -21,14 +24,20 @@ class PedidoCompraService
      * Producto::costo — el pedido no mueve stock ni fija costo vigente. Eso solo ocurre
      * cuando más adelante se registra la Compra real correspondiente.
      *
+     * $empresa la resuelve el llamador explícitamente (Filament::getTenant() en el panel), igual
+     * que VentaService/CompraService — nunca se asume del proveedor/producto recibidos, porque
+     * esos ids son client-controllable (vienen del formulario) y una consulta directa a
+     * Proveedor::findOrFail()/Producto::find() NO hereda el scoping automático de Filament fuera
+     * de la query del propio Resource. Por eso se valida aquí que ambos sean de $empresa.
+     *
      * @param  array{
      *   proveedor_id: int,
-     *   fecha:        \Carbon\Carbon,
+     *   fecha:        Carbon,
      *   notas:        string|null,
      *   lineas: array<int, array{producto_id: int, cantidad: float, costo_unitario: float}>
      * } $datos
      */
-    public function crear(array $datos, int $userId): PedidoCompra
+    public function crear(array $datos, int $userId, Empresa $empresa): PedidoCompra
     {
         $datos['lineas'] = array_values(array_filter(
             $datos['lineas'] ?? [],
@@ -39,29 +48,42 @@ class PedidoCompraService
             throw new RuntimeException('El pedido de compra debe tener al menos una línea.');
         }
 
-        return DB::transaction(function () use ($datos, $userId) {
-            $proveedor    = Proveedor::findOrFail($datos['proveedor_id']);
+        return DB::transaction(function () use ($datos, $userId, $empresa) {
+            $proveedor = Proveedor::where('empresa_id', $empresa->id)->find($datos['proveedor_id']);
+
+            if ($proveedor === null) {
+                throw new RuntimeException('El proveedor indicado no existe o no pertenece a esta empresa.');
+            }
+
+            $productoIds = collect($datos['lineas'])->pluck('producto_id')->unique();
+            $productosValidos = Producto::where('empresa_id', $empresa->id)->whereIn('id', $productoIds)->count();
+
+            if ($productosValidos !== $productoIds->count()) {
+                throw new RuntimeException('Uno o más productos del pedido no existen o no pertenecen a esta empresa.');
+            }
+
             $detallesCalc = $this->calcularLineas($datos['lineas']);
-            $totales      = $this->calcularTotales($detallesCalc);
+            $totales = $this->calcularTotales($detallesCalc);
 
             $pedido = PedidoCompra::create([
+                'empresa_id' => $empresa->id,
                 'proveedor_id' => $proveedor->id,
-                'user_id'      => $userId,
-                'fecha'        => $datos['fecha'],
-                'notas'        => $datos['notas'] ?? null,
-                'estado'       => EstadoPedidoCompra::PENDIENTE,
+                'user_id' => $userId,
+                'fecha' => $datos['fecha'],
+                'notas' => $datos['notas'] ?? null,
+                'estado' => EstadoPedidoCompra::PENDIENTE,
                 ...$totales,
             ]);
 
             foreach ($detallesCalc as $linea) {
                 DetallePedidoCompra::create([
                     'pedido_compra_id' => $pedido->id,
-                    'producto_id'      => $linea['producto_id'],
-                    'cantidad'         => $linea['cantidad'],
-                    'costo_unitario'   => $linea['costo_unitario'],
-                    'tasa_itbis'       => $linea['tasa_itbis'],
-                    'itbis_monto'      => $linea['itbis_monto'],
-                    'subtotal'         => $linea['subtotal'],
+                    'producto_id' => $linea['producto_id'],
+                    'cantidad' => $linea['cantidad'],
+                    'costo_unitario' => $linea['costo_unitario'],
+                    'tasa_itbis' => $linea['tasa_itbis'],
+                    'itbis_monto' => $linea['itbis_monto'],
+                    'subtotal' => $linea['subtotal'],
                 ]);
             }
 
@@ -77,9 +99,9 @@ class PedidoCompraService
         }
 
         $pedido->update([
-            'estado'              => EstadoPedidoCompra::CANCELADO,
-            'motivo_cancelacion'  => $motivo,
-            'cancelado_en'        => now(),
+            'estado' => EstadoPedidoCompra::CANCELADO,
+            'motivo_cancelacion' => $motivo,
+            'cancelado_en' => now(),
         ]);
 
         return $pedido->refresh();

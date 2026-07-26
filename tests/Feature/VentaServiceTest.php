@@ -170,7 +170,7 @@ class VentaServiceTest extends TestCase
         $producto = $this->producto('VS-FP-EXPLICITO');
         $cliente = Cliente::create(['nombre' => 'Consumidor Final', 'activo' => true]);
         $cajero = User::factory()->create();
-        $arqueo = app(ArqueoCajaService::class)->abrir('500.00', $cajero->id);
+        $arqueo = app(ArqueoCajaService::class)->abrir('500.00', $cajero->id, $this->empresaDefault);
 
         $venta = app(VentaService::class)->registrar([
             'cliente_id' => $cliente->id,

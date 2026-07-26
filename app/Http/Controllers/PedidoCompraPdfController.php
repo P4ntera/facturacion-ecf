@@ -14,17 +14,18 @@ class PedidoCompraPdfController extends Controller
     /**
      * Genera el PDF del pedido de compra. Solo lee datos ya guardados; no recalcula nada.
      *
-     * PedidoCompra todavía no tiene empresa_id propio (hueco de tenancy preexistente, señalado
-     * en el T2 y fuera del alcance de T3): se usa la empresa del usuario autenticado para el
-     * membrete en vez de $pedidoCompra->empresa, que no existe.
+     * Ruta fuera del panel de Filament: el scoping automático por tenant no aplica aquí (ver
+     * BelongsToTenant de Filament), así que la pertenencia a la empresa se verifica a mano.
      */
     public function __invoke(Request $request, PedidoCompra $pedidoCompra): Response
     {
+        abort_unless($request->user()->perteneceAEmpresa($pedidoCompra->empresa_id), 403);
+
         $pedidoCompra->load('detalles.producto', 'proveedor', 'user');
 
         $pdf = Pdf::loadView('pedidos.pedido-compra-pdf', [
             'pedido' => $pedidoCompra,
-            'empresa' => $request->user()->empresa,
+            'empresa' => $pedidoCompra->empresa,
         ]);
 
         return $pdf->stream("pedido-compra-{$pedidoCompra->id}.pdf");

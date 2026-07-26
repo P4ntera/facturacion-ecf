@@ -9,6 +9,7 @@ use App\Filament\Resources\ArqueoCajaResource\Pages;
 use App\Models\ArqueoCaja;
 use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
+use Filament\Facades\Filament;
 use Filament\Forms\Components\DatePicker;
 use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Infolists\Components\RepeatableEntry\TableColumn as InfolistTableColumn;
@@ -142,7 +143,10 @@ class ArqueoCajaResource extends Resource
             ->filters([
                 SelectFilter::make('user_id')
                     ->label('Cajero')
-                    ->relationship('user', 'name')
+                    // ->relationship() no hereda el scoping automático de Filament (solo aplica a
+                    // lo que arma el propio framework en la query del Resource, no a relaciones
+                    // resueltas aparte): sin esto, se ven cajeros de otras empresas en el filtro.
+                    ->relationship('user', 'name', modifyQueryUsing: fn (Builder $query) => $query->where('empresa_id', Filament::getTenant()->id))
                     ->searchable()
                     ->preload(),
 

@@ -10,6 +10,7 @@ use App\Filament\Pages\PuntoDeVenta;
 use App\Models\ArqueoCaja;
 use App\Models\Cliente;
 use App\Models\Producto;
+use App\Models\Role;
 use App\Models\SecuenciaNcf;
 use App\Models\User;
 use App\Models\Venta;
@@ -18,7 +19,6 @@ use App\Services\Dgii\DgiiGatewayInterface;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Permission;
-use Spatie\Permission\Models\Role;
 use Tests\Support\GatewayStub;
 use Tests\TestCase;
 
@@ -29,7 +29,7 @@ class PuntoDeVentaTest extends TestCase
     private function vendedor(): User
     {
         Permission::firstOrCreate(['name' => 'pos.acceder', 'guard_name' => 'web']);
-        $rol = Role::firstOrCreate(['name' => 'Vendedor', 'guard_name' => 'web']);
+        $rol = Role::firstOrCreate(['empresa_id' => $this->empresaDefault->id, 'name' => 'Vendedor', 'guard_name' => 'web']);
         $rol->syncPermissions(['pos.acceder']);
 
         $usuario = User::factory()->create();
@@ -275,7 +275,7 @@ class PuntoDeVentaTest extends TestCase
     public function test_la_pagina_trae_el_wrapper_del_design_system_y_el_script_de_sidebar(): void
     {
         $usuario = $this->vendedor();
-        app(ArqueoCajaService::class)->abrir('500.00', $usuario->id);
+        app(ArqueoCajaService::class)->abrir('500.00', $usuario->id, $this->empresaDefault);
 
         $response = $this->actingAs($usuario)->get(PuntoDeVenta::getUrl());
 

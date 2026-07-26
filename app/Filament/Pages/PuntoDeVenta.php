@@ -383,7 +383,7 @@ class PuntoDeVenta extends Page
     /** Turno de caja abierto del usuario actual, si tiene uno. Lookup fresco, sin cachear. */
     public function arqueoAbierto(): ?ArqueoCaja
     {
-        return app(ArqueoCajaService::class)->arqueoAbiertoDe(auth()->id());
+        return app(ArqueoCajaService::class)->arqueoAbiertoDe(auth()->id(), $this->empresa());
     }
 
     public function puedeCobrar(): bool
@@ -399,7 +399,7 @@ class PuntoDeVenta extends Page
     public function abrirCaja(string $fondoInicial): void
     {
         try {
-            app(ArqueoCajaService::class)->abrir($fondoInicial, auth()->id());
+            app(ArqueoCajaService::class)->abrir($fondoInicial, auth()->id(), $this->empresa());
         } catch (RuntimeException $e) {
             Notification::make()->title($e->getMessage())->danger()->send();
 
