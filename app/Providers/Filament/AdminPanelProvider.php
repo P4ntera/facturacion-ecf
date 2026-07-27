@@ -80,19 +80,32 @@ class AdminPanelProvider extends PanelProvider
                 AuthenticateSession::class,
                 ShareErrorsFromSession::class,
                 VerifyCsrfToken::class,
-                // ANTES de SubstituteBindings a propósito: spatie/laravel-permission con
-                // 'teams' => true necesita un contexto de empresa activo para CUALQUIER consulta
-                // de roles/permisos (incluida canAccessPanel(), que corre más adelante en
-                // ->authMiddleware()). Si quedara después, esas consultas se resolverían sin
-                // contexto (ven todo vacío) y el binding de rutas fallaría en 404 en vez del 403
-                // que corresponde a un problema de autorización. Ver
-                // App\Http\Middleware\EstablecerEmpresaPermisos para el detalle del fallback
-                // usado antes de que IdentifyTenant resuelva el tenant real.
-                EstablecerEmpresaPermisos::class,
                 SubstituteBindings::class,
                 DisableBladeIconComponents::class,
                 DispatchServingFilamentEvent::class,
             ])
+            // ANTES de SubstituteBindings a propósito (ver bootstrap/app.php, que lo ancla antes
+            // de AuthenticatesRequests con prioridad): spatie/laravel-permission con
+            // 'teams' => true necesita un contexto de empresa activo para CUALQUIER consulta de
+            // roles/permisos (incluida canAccessPanel(), que corre más adelante en
+            // ->authMiddleware()). Si quedara después, esas consultas se resolverían sin contexto
+            // (ven todo vacío) y el binding de rutas fallaría en 404 en vez del 403 que
+            // corresponde a un problema de autorización.
+            //
+            // isPersistent: true es OBLIGATORIO además de la prioridad: sin esto, el middleware
+            // solo corre en la carga de página completa. Filament navega DENTRO del panel (tablas,
+            // paginación, wire:navigate, cualquier interacción de un componente Livewire ya
+            // montado) vía peticiones a /livewire/update, que Livewire enruta por SU PROPIO
+            // mecanismo (Livewire\Mechanisms\PersistentMiddleware) — este solo reaplica el
+            // middleware de la ruta original que esté en la lista persistente (la de Filament
+            // mismo: Authenticate, IdentifyTenant, SetUpPanel... registrada en
+            // FilamentServiceProvider::boot()), no la pipeline completa de la request inicial. Sin
+            // marcarlo persistente, setPermissionsTeamId() nunca se ejecuta en esas peticiones: el
+            // usuario entra bien (la carga inicial sí pasa por la pipeline completa), pero cualquier
+            // interacción posterior ve permisos vacíos, como si no tuviera ningún rol.
+            ->middleware([
+                EstablecerEmpresaPermisos::class,
+            ], isPersistent: true)
             ->authMiddleware([
                 Authenticate::class,
             ]);

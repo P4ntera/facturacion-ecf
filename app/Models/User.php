@@ -75,6 +75,13 @@ class User extends Authenticatable implements FilamentUser, HasDefaultTenant, Ha
             return true;
         }
 
+        // Fija el contexto de permisos a la empresa del usuario ANTES de leer permisos,
+        // porque en el login canAccessPanel corre antes del middleware de tenant.
+        if ($this->empresa_id) {
+            setPermissionsTeamId($this->empresa_id);
+            $this->unsetRelation('roles')->unsetRelation('permissions');
+        }
+
         if ($this->getAllPermissions()->isEmpty()) {
             return false;
         }
