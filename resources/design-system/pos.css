@@ -54,7 +54,7 @@
     justify-content:center;
     gap:var(--space-xs);
     padding:var(--space-xs) var(--space-sm);
-    border-radius:var(--radius-md);
+    border-radius:var(--radius);
     border:1px solid transparent;
     font-family:var(--font-family);
     font-size:var(--fs-small);
@@ -158,7 +158,7 @@
     width:100%;
     padding:var(--space-xs) var(--space-sm);
     border:1px solid var(--gray-300);
-    border-radius:var(--radius-md);
+    border-radius:var(--radius);
     font-family:var(--font-family);
     font-size:var(--fs-small);
     color:var(--gray-900);
@@ -193,7 +193,7 @@
     color:var(--gray-700);
 }
 
-.pos-screen .badge-success{ background-color:var(--secondary-dark); color:var(--white); }
+.pos-screen .badge-success{ background-color:var(--success-dark); color:var(--white); }
 .pos-screen .badge-warning{ background-color:var(--warning-dark); color:var(--white); }
 .pos-screen .badge-danger{ background-color:var(--danger-dark); color:var(--white); }
 
@@ -219,7 +219,7 @@
 .pos-screen .pos-resultados{
     margin-top:var(--space-xs);
     border:1px solid var(--border);
-    border-radius:var(--radius-md);
+    border-radius:var(--radius);
     max-height:14rem;
     overflow-y:auto;
 }

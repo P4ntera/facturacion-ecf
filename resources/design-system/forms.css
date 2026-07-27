@@ -14,7 +14,7 @@
     width:100%;
     padding:var(--space-sm) var(--space-md);
     border:1px solid var(--gray-300);
-    border-radius:0.375rem;
+    border-radius:var(--radius);
     font-family:var(--font-family);
     font-size:var(--fs-body);
     color:var(--gray-900);

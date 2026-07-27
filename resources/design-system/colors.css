@@ -2,15 +2,15 @@
 
     /*======== TOKENS SEMÁNTICOS (alias sobre la paleta de variables.css) ========*/
 
-    --text:var(--gray-900);
-    --text-muted:var(--gray-500);
+    --text:var(--neutral-900);
+    --text-muted:var(--neutral-500);
     --text-inverse:var(--white);
 
-    --border:var(--gray-200);
-    --border-strong:var(--gray-300);
+    --border:var(--neutral-200);
+    --border-strong:var(--neutral-300);
 
     --surface:var(--white);
-    --surface-muted:var(--gray-100);
+    --surface-muted:var(--neutral-100);
 
     --link:var(--primary);
     --link-hover:var(--primary-dark);

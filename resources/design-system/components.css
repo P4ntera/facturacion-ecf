@@ -2,7 +2,7 @@
     padding:var(--space-lg);
     background-color:var(--white);
     border:1px solid var(--gray-200);
-    border-radius:0.5rem;
+    border-radius:var(--radius-lg);
     box-shadow:var(--shadow-card);
 }
 
