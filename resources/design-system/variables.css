@@ -104,10 +104,25 @@
     --gray-200:var(--neutral-200);
     --gray-100:var(--neutral-100);
 
-    --background:#F9FAFB; /* fondo general de páginas no-Filament (.bg-app). El fondo del panel
-       Filament en sí no sale de aquí, sino del slot 'gray' + darkMode(false) configurados en
-       AdminPanelProvider (ver docs/estilos.md). */
+    --background:#F9FAFB; /* fondo general de páginas no-Filament (.bg-app), sin relación con el
+       panel de Filament — ver --fondo-pagina más abajo para ESE fondo. */
     --white:#FFFFFF;
+
+    /*======== SUPERFICIES / FONDOS DEL PANEL ========
+       Un token con nombre obvio por cada fondo/borde/sombra que se ve en el panel — para no tener
+       que adivinar cuál controla qué. Todos con el MISMO valor que ya se veía antes de nombrarlos
+       así: esto es organizar y documentar, no recolorear. Receta de "cómo cambio X" en
+       docs/estilos.md. */
+
+    --fondo-pagina:#F4F6FA;   /* fondo general del panel, detrás de las tarjetas — .fi-body en
+       theme.css lo lee directo de este token (no del slot 'gray' de Filament). */
+    --fondo-tarjeta:#FFFFFF;  /* fondo de tarjetas/secciones: Sections, stat cards, modales,
+       tablas y las tarjetas del POS. */
+    --fondo-sidebar:#F7F7F8;  /* fondo del menú lateral. */
+    --borde-tarjeta:#E5E7EB;  /* borde de tarjetas/secciones; el sidebar y los paneles flotantes
+       (menú de usuario, notificaciones) reusan el mismo valor para su borde. */
+    --sombra-tarjeta:0 1px 3px rgb(16 24 40 / 0.06), 0 1px 2px rgb(16 24 40 / 0.04); /* sombra de
+       tarjetas/secciones y paneles flotantes. */
 
     /*======== FORMAS ========*/
 

@@ -6,15 +6,14 @@
     --text-muted:var(--neutral-500);
     --text-inverse:var(--white);
 
-    --border:#E5E7EB;
     --border-strong:var(--neutral-300);
 
-    --surface:var(--white);
     --surface-muted:var(--neutral-100);
-    --surface-app:#F4F6FA; /* fondo de la app DETRÁS de las tarjetas: gris azulado muy suave, un
-       pelín más oscuro que blanco para que una tarjeta blanca resalte claramente encima (ver
-       docs/estilos.md, "capas de superficie"). No confundir con --surface (blanco, las tarjetas
-       mismas) ni con --background (fondo de páginas no-Filament, sin relación). */
+
+    /* --border, --surface y --surface-app vivían aquí antes: ahora son --borde-tarjeta,
+       --fondo-tarjeta y --fondo-pagina en variables.css (sección "SUPERFICIES / FONDOS DEL
+       PANEL") — un solo lugar para los tokens de superficie del panel, en vez de repartidos
+       entre variables.css, colors.css y shadows.css. */
 
     --link:var(--primary);
     --link-hover:var(--primary-dark);

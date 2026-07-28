@@ -217,10 +217,10 @@
 
 .pos-screen .card{
     padding:var(--space-md);
-    background-color:var(--surface);
-    border:1px solid var(--border);
+    background-color:var(--fondo-tarjeta);
+    border:1px solid var(--borde-tarjeta);
     border-radius:var(--radius-lg);
-    box-shadow:var(--shadow-card);
+    box-shadow:var(--sombra-tarjeta);
 }
 
 .pos-screen .card-title{
@@ -234,14 +234,14 @@
 
 .pos-screen .pos-resultados{
     margin-top:var(--space-xs);
-    border:1px solid var(--border);
+    border:1px solid var(--borde-tarjeta);
     border-radius:var(--radius);
     max-height:14rem;
     overflow-y:auto;
 }
 
 .pos-screen .pos-resultados li + li{
-    border-top:1px solid var(--border);
+    border-top:1px solid var(--borde-tarjeta);
 }
 
 .pos-screen .pos-resultados button{
@@ -285,7 +285,7 @@
     justify-content:space-between;
     margin-top:var(--space-sm);
     padding-top:var(--space-sm);
-    border-top:1px solid var(--border);
+    border-top:1px solid var(--borde-tarjeta);
 }
 
 .pos-screen .pos-total-final .pos-total-label{
