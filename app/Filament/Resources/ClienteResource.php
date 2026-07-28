@@ -137,7 +137,8 @@ class ClienteResource extends Resource
                         TipoDocumentoCliente::CEDULA => 'Cédula',
                         TipoDocumentoCliente::SIN_DOCUMENTO => '—',
                         default => $state,
-                    }),
+                    })
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('documento')
                     ->label('Documento')
@@ -146,12 +147,13 @@ class ClienteResource extends Resource
 
                 TextColumn::make('telefono')
                     ->label('Teléfono')
-                    ->placeholder('—'),
+                    ->placeholder('—')
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('email')
                     ->label('Correo')
                     ->placeholder('—')
-                    ->toggleable(),
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 ToggleColumn::make('activo')
                     ->label('Activo')

@@ -292,6 +292,7 @@ class PedidoCompraResource extends Resource
                 TextColumn::make('total')
                     ->label('Total')
                     ->money('DOP')
+                    ->alignEnd()
                     ->sortable(),
 
                 TextColumn::make('estado')

@@ -48,38 +48,41 @@ class EmpresaResource extends Resource
     public static function form(Schema $schema): Schema
     {
         return $schema
-            ->columns(2)
             ->components([
-                TextInput::make('razon_social')
-                    ->label('Razón social')
-                    ->required()
-                    ->maxLength(255),
+                Section::make('Datos generales')
+                    ->columns(2)
+                    ->components([
+                        TextInput::make('razon_social')
+                            ->label('Razón social')
+                            ->required()
+                            ->maxLength(255),
 
-                TextInput::make('nombre_comercial')
-                    ->label('Nombre comercial')
-                    ->maxLength(255),
+                        TextInput::make('nombre_comercial')
+                            ->label('Nombre comercial')
+                            ->maxLength(255),
 
-                TextInput::make('rnc')
-                    ->label('RNC')
-                    ->required()
-                    ->regex('/^\d{9}(\d{2})?$/')
-                    ->validationMessages(['regex' => 'El RNC debe tener 9 u 11 dígitos.'])
-                    ->maxLength(11),
+                        TextInput::make('rnc')
+                            ->label('RNC')
+                            ->required()
+                            ->regex('/^\d{9}(\d{2})?$/')
+                            ->validationMessages(['regex' => 'El RNC debe tener 9 u 11 dígitos.'])
+                            ->maxLength(11),
 
-                TextInput::make('slug')
-                    ->label('Slug (URL)')
-                    ->helperText('Se genera solo desde la razón social si lo dejas vacío.')
-                    ->unique(ignoreRecord: true)
-                    ->maxLength(255),
+                        TextInput::make('slug')
+                            ->label('Slug (URL)')
+                            ->helperText('Se genera solo desde la razón social si lo dejas vacío.')
+                            ->unique(ignoreRecord: true)
+                            ->maxLength(255),
 
-                Toggle::make('usa_ecf')
-                    ->label('Usa e-CF (facturación electrónica)')
-                    ->default(true),
+                        Toggle::make('usa_ecf')
+                            ->label('Usa e-CF (facturación electrónica)')
+                            ->default(true),
 
-                Toggle::make('activa')
-                    ->label('Activa')
-                    ->helperText('Desactivarla bloquea el acceso al panel a todos sus usuarios.')
-                    ->default(true),
+                        Toggle::make('activa')
+                            ->label('Activa')
+                            ->helperText('Desactivarla bloquea el acceso al panel a todos sus usuarios.')
+                            ->default(true),
+                    ]),
 
                 Section::make('Módulos')
                     ->description('Qué partes del sistema puede usar esta empresa. Desactivar un módulo solo lo oculta: sus datos existentes se conservan y reaparecen al reactivarlo.')
@@ -118,7 +121,8 @@ class EmpresaResource extends Resource
                 TextColumn::make('nombre_comercial')
                     ->label('Nombre comercial')
                     ->placeholder('—')
-                    ->searchable(),
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('rnc')
                     ->label('RNC')
@@ -127,7 +131,8 @@ class EmpresaResource extends Resource
                 TextColumn::make('slug')
                     ->label('Slug')
                     ->badge()
-                    ->color('gray'),
+                    ->color('gray')
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 IconColumn::make('usa_ecf')
                     ->label('e-CF')

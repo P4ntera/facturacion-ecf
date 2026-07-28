@@ -130,11 +130,13 @@ class DocumentoRecibidoResource extends Resource
                     ->placeholder('—')
                     ->formatStateUsing(fn (?string $state) => $state !== null
                         ? (TipoComprobante::tryFrom($state)?->etiqueta() ?? $state)
-                        : null),
+                        : null)
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('monto_total')
                     ->label('Monto')
                     ->money('DOP')
+                    ->alignEnd()
                     ->placeholder('—')
                     ->sortable(),
 

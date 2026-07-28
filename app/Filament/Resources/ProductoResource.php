@@ -19,6 +19,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
@@ -54,103 +55,111 @@ class ProductoResource extends Resource
     public static function form(Schema $schema): Schema
     {
         return $schema
-            ->columns(2)
             ->components([
-                // --- Identificación ---
-                TextInput::make('codigo')
-                    ->label('Código')
-                    ->required()
-                    ->unique(ignoreRecord: true)
-                    ->validationMessages(['unique' => 'Ya existe un producto con este código.'])
-                    ->maxLength(50),
+                Section::make('Identificación')
+                    ->columns(2)
+                    ->components([
+                        TextInput::make('codigo')
+                            ->label('Código')
+                            ->required()
+                            ->unique(ignoreRecord: true)
+                            ->validationMessages(['unique' => 'Ya existe un producto con este código.'])
+                            ->maxLength(50),
 
-                TextInput::make('codigo_barra')
-                    ->label('Código de barras')
-                    ->helperText('Escanea o escribe el código de barras.')
-                    ->unique(ignoreRecord: true)
-                    ->validationMessages(['unique' => 'Ya existe un producto con este código de barras.'])
-                    ->maxLength(50),
+                        TextInput::make('codigo_barra')
+                            ->label('Código de barras')
+                            ->helperText('Escanea o escribe el código de barras.')
+                            ->unique(ignoreRecord: true)
+                            ->validationMessages(['unique' => 'Ya existe un producto con este código de barras.'])
+                            ->maxLength(50),
 
-                TextInput::make('nombre')
-                    ->label('Nombre')
-                    ->required()
-                    ->maxLength(255),
+                        TextInput::make('nombre')
+                            ->label('Nombre')
+                            ->required()
+                            ->maxLength(255),
 
-                Select::make('tipo')
-                    ->label('Tipo')
-                    ->options([
-                        TipoProducto::PRODUCTO->value => 'Producto',
-                        TipoProducto::SERVICIO->value => 'Servicio',
-                    ])
-                    ->required()
-                    ->default(TipoProducto::PRODUCTO->value),
+                        Select::make('tipo')
+                            ->label('Tipo')
+                            ->options([
+                                TipoProducto::PRODUCTO->value => 'Producto',
+                                TipoProducto::SERVICIO->value => 'Servicio',
+                            ])
+                            ->required()
+                            ->default(TipoProducto::PRODUCTO->value),
 
-                Select::make('categoria_id')
-                    ->label('Categoría')
-                    ->relationship('categoria', 'nombre')
-                    ->searchable()
-                    ->preload()
-                    ->nullable(),
+                        Select::make('categoria_id')
+                            ->label('Categoría')
+                            ->relationship('categoria', 'nombre')
+                            ->searchable()
+                            ->preload()
+                            ->nullable(),
 
-                Textarea::make('descripcion')
-                    ->label('Descripción')
-                    ->rows(2)
-                    ->columnSpanFull(),
+                        Textarea::make('descripcion')
+                            ->label('Descripción')
+                            ->rows(2)
+                            ->columnSpanFull(),
+                    ]),
 
-                // --- Precios ---
-                TextInput::make('precio')
-                    ->label('Precio de venta')
-                    ->numeric()
-                    ->prefix('RD$')
-                    ->required()
-                    ->minValue(0)
-                    ->default(0),
+                Section::make('Precios')
+                    ->columns(3)
+                    ->components([
+                        TextInput::make('precio')
+                            ->label('Precio de venta')
+                            ->numeric()
+                            ->prefix('RD$')
+                            ->required()
+                            ->minValue(0)
+                            ->default(0),
 
-                TextInput::make('costo')
-                    ->label('Costo')
-                    ->numeric()
-                    ->prefix('RD$')
-                    ->minValue(0)
-                    ->default(0),
+                        TextInput::make('costo')
+                            ->label('Costo')
+                            ->numeric()
+                            ->prefix('RD$')
+                            ->minValue(0)
+                            ->default(0),
 
-                Select::make('tasa_itbis')
-                    ->label('Tasa ITBIS')
-                    ->options([
-                        TasaItbis::DIECIOCHO->value => '18 %',
-                        TasaItbis::DIECISEIS->value => '16 %',
-                        TasaItbis::CERO->value => '0 % (Exento)',
-                    ])
-                    ->required()
-                    ->default(TasaItbis::DIECIOCHO->value),
+                        Select::make('tasa_itbis')
+                            ->label('Tasa ITBIS')
+                            ->options([
+                                TasaItbis::DIECIOCHO->value => '18 %',
+                                TasaItbis::DIECISEIS->value => '16 %',
+                                TasaItbis::CERO->value => '0 % (Exento)',
+                            ])
+                            ->required()
+                            ->default(TasaItbis::DIECIOCHO->value),
+                    ]),
 
-                // --- Inventario ---
-                Toggle::make('controla_stock')
-                    ->label('Controla stock')
-                    ->default(false)
-                    ->live()
-                    ->columnSpanFull(),
+                Section::make('Inventario')
+                    ->columns(2)
+                    ->components([
+                        Toggle::make('controla_stock')
+                            ->label('Controla stock')
+                            ->default(false)
+                            ->live()
+                            ->columnSpanFull(),
 
-                // Solo lectura: el stock se mueve exclusivamente vía InventarioService
-                // (acción "Ajustar stock", ventas, compras), nunca editando este campo a mano.
-                TextInput::make('stock')
-                    ->label('Stock actual')
-                    ->numeric()
-                    ->default(0)
-                    ->disabled()
-                    ->dehydrated(false)
-                    ->hidden(fn (Get $get): bool => ! $get('controla_stock')),
+                        // Solo lectura: el stock se mueve exclusivamente vía InventarioService
+                        // (acción "Ajustar stock", ventas, compras), nunca editando este campo a mano.
+                        TextInput::make('stock')
+                            ->label('Stock actual')
+                            ->numeric()
+                            ->default(0)
+                            ->disabled()
+                            ->dehydrated(false)
+                            ->hidden(fn (Get $get): bool => ! $get('controla_stock')),
 
-                TextInput::make('stock_minimo')
-                    ->label('Stock mínimo')
-                    ->numeric()
-                    ->minValue(0)
-                    ->default(0)
-                    ->hidden(fn (Get $get): bool => ! $get('controla_stock')),
+                        TextInput::make('stock_minimo')
+                            ->label('Stock mínimo')
+                            ->numeric()
+                            ->minValue(0)
+                            ->default(0)
+                            ->hidden(fn (Get $get): bool => ! $get('controla_stock')),
 
-                Toggle::make('activo')
-                    ->label('Activo')
-                    ->default(true)
-                    ->columnSpanFull(),
+                        Toggle::make('activo')
+                            ->label('Activo')
+                            ->default(true)
+                            ->columnSpanFull(),
+                    ]),
             ]);
     }
 
@@ -166,7 +175,7 @@ class ProductoResource extends Resource
                 TextColumn::make('codigo_barra')
                     ->label('Código de barras')
                     ->searchable()
-                    ->toggleable()
+                    ->toggleable(isToggledHiddenByDefault: true)
                     ->placeholder('—'),
 
                 TextColumn::make('nombre')
@@ -185,11 +194,13 @@ class ProductoResource extends Resource
                         TipoProducto::PRODUCTO => 'Producto',
                         TipoProducto::SERVICIO => 'Servicio',
                         default => $state,
-                    }),
+                    })
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('precio')
                     ->label('Precio')
                     ->money('DOP')
+                    ->alignEnd()
                     ->sortable(),
 
                 TextColumn::make('tasa_itbis')
@@ -199,11 +210,13 @@ class ProductoResource extends Resource
                         TasaItbis::DIECISEIS => '16 %',
                         TasaItbis::CERO => '0 % (Exento)',
                         default => $state,
-                    }),
+                    })
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('stock')
                     ->label('Stock')
                     ->numeric(decimalPlaces: 2)
+                    ->alignEnd()
                     ->sortable()
                     ->placeholder('—'),
 

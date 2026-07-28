@@ -274,11 +274,13 @@ class DevolucionCompraResource extends Resource
 
                 TextColumn::make('compra.ncf')
                     ->label('NCF de la compra')
-                    ->placeholder('—'),
+                    ->placeholder('—')
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('motivo')
                     ->label('Motivo')
-                    ->limit(40),
+                    ->limit(40)
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('fecha')
                     ->label('Fecha')
@@ -288,6 +290,7 @@ class DevolucionCompraResource extends Resource
                 TextColumn::make('total')
                     ->label('Total')
                     ->money('DOP')
+                    ->alignEnd()
                     ->sortable(),
 
                 TextColumn::make('estado')

@@ -5,6 +5,8 @@ namespace App\Providers;
 use App\Models\User;
 use App\Policies\ActivityPolicy;
 use Filament\Events\TenantSet;
+use Filament\Schemas\Schema;
+use Filament\Tables\Table;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
@@ -56,5 +58,25 @@ class AppServiceProvider extends ServiceProvider
         // de forma transversal aquí. No ensucia los roles de cada empresa y es el único punto que
         // hay que tocar si algún día cambia cómo se identifica al super-admin.
         Gate::before(fn (User $user, string $ability) => $user->es_super_admin ? true : null);
+
+        // Densidad y formato por defecto de TODAS las tablas del panel (PASO 5): un solo lugar en
+        // vez de repetir estas llamadas en cada Resource. 'es_DO' es lo que hace que ->money('DOP')
+        // (tablas e infolists, ambos leen su locale de aquí) se muestre como "RD$1,234.50" — con
+        // el locale de la app ('en', ver config/app.php) sale "1.234,50 DOP". No se toca
+        // config('app.locale') porque afectaría fechas/traducciones fuera del panel; esto solo
+        // cambia el formato numérico que usan los componentes de Filament.
+        Table::configureUsing(function (Table $table): void {
+            $table
+                ->defaultNumberLocale('es_DO')
+                ->defaultCurrency('DOP')
+                ->paginationPageOptions([10, 25])
+                ->defaultPaginationPageOption(10);
+        });
+
+        Schema::configureUsing(function (Schema $schema): void {
+            $schema
+                ->defaultNumberLocale('es_DO')
+                ->defaultCurrency('DOP');
+        });
     }
 }

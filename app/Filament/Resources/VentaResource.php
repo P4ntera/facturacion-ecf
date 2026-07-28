@@ -203,11 +203,13 @@ class VentaResource extends Resource
                 TextColumn::make('tipo_comprobante')
                     ->label('Tipo')
                     ->formatStateUsing(fn (TipoComprobante $state) => $state->etiqueta())
+                    ->toggleable(isToggledHiddenByDefault: true)
                     ->sortable(),
 
                 TextColumn::make('total')
                     ->label('Total')
-                    ->formatStateUsing(fn (Venta $record) => "{$record->moneda} ".number_format((float) $record->total, 2))
+                    ->money(fn (Venta $record) => $record->moneda)
+                    ->alignEnd()
                     ->sortable(),
 
                 TextColumn::make('estado')

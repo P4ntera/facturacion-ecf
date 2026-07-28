@@ -109,7 +109,8 @@ class UserResource extends Resource
             TextColumn::make('created_at')
                 ->label('Creado')
                 ->dateTime('d/m/Y H:i')
-                ->sortable(),
+                ->sortable()
+                ->toggleable(isToggledHiddenByDefault: true),
         ]);
     }
 

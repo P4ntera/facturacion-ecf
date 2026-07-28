@@ -512,7 +512,8 @@ class CompraResource extends Resource
                 TextColumn::make('tipo_comprobante')
                     ->label('Tipo')
                     ->badge()
-                    ->formatStateUsing(fn (TipoComprobante $state) => $state->etiqueta()),
+                    ->formatStateUsing(fn (TipoComprobante $state) => $state->etiqueta())
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('fecha')
                     ->label('Fecha')
@@ -522,6 +523,7 @@ class CompraResource extends Resource
                 TextColumn::make('total')
                     ->label('Total')
                     ->money('DOP')
+                    ->alignEnd()
                     ->sortable(),
 
                 TextColumn::make('estado')

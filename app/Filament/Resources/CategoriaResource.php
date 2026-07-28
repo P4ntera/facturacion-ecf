@@ -72,7 +72,8 @@ class CategoriaResource extends Resource
                 TextColumn::make('descripcion')
                     ->label('Descripción')
                     ->limit(50)
-                    ->placeholder('—'),
+                    ->placeholder('—')
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('productos_count')
                     ->label('Productos')

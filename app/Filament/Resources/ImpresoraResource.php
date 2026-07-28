@@ -135,11 +135,13 @@ class ImpresoraResource extends Resource
 
                 TextColumn::make('destino')
                     ->label('Destino')
-                    ->getStateUsing(fn (Impresora $record) => $record->esDeRed() ? "{$record->ip}:{$record->puerto}" : 'Navegador'),
+                    ->getStateUsing(fn (Impresora $record) => $record->esDeRed() ? "{$record->ip}:{$record->puerto}" : 'Navegador')
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('ancho_papel')
                     ->label('Ancho')
-                    ->formatStateUsing(fn (AnchoPapel $state) => $state->etiqueta()),
+                    ->formatStateUsing(fn (AnchoPapel $state) => $state->etiqueta())
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('modulo')
                     ->label('Módulo')

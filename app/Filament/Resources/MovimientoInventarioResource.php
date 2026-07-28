@@ -115,15 +115,20 @@ class MovimientoInventarioResource extends Resource
                 TextColumn::make('cantidad')
                     ->label('Cantidad')
                     ->numeric(decimalPlaces: 2)
+                    ->alignEnd()
                     ->sortable(),
 
                 TextColumn::make('stock_anterior')
                     ->label('Stock anterior')
-                    ->numeric(decimalPlaces: 2),
+                    ->numeric(decimalPlaces: 2)
+                    ->alignEnd()
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('stock_nuevo')
                     ->label('Stock nuevo')
-                    ->numeric(decimalPlaces: 2),
+                    ->numeric(decimalPlaces: 2)
+                    ->alignEnd()
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('user.name')
                     ->label('Usuario')

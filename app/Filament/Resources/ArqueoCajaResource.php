@@ -118,21 +118,28 @@ class ArqueoCajaResource extends Resource
 
                 TextColumn::make('fondo_inicial')
                     ->label('Fondo inicial')
-                    ->money('DOP'),
+                    ->money('DOP')
+                    ->alignEnd()
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('efectivo_esperado')
                     ->label('Efectivo esperado')
                     ->money('DOP')
-                    ->placeholder('—'),
+                    ->alignEnd()
+                    ->placeholder('—')
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('efectivo_contado')
                     ->label('Efectivo contado')
                     ->money('DOP')
-                    ->placeholder('—'),
+                    ->alignEnd()
+                    ->placeholder('—')
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('diferencia')
                     ->label('Diferencia')
                     ->money('DOP')
+                    ->alignEnd()
                     ->placeholder('—')
                     ->color(fn (?string $state) => $state === null ? null : (bccomp($state, '0', 2) < 0 ? 'danger' : 'success')),
 
