@@ -2,11 +2,11 @@
  * Design-system del Punto de Venta.
  *
  * El tema del panel Filament (resources/css/filament/admin/theme.css) solo importa tokens
- * (variables/colors/typography/shadows): no importa buttons/tables/forms/badges/components,
- * porque Filament ya trae sus propios componentes y no queremos que choquen en el resto del
- * panel. Por eso, para que el POS se vea con el design-system del proyecto, este archivo
- * "porta" esas mismas reglas (mismos tokens, mismos valores) pero con el selector `.pos-screen`
- * por delante, así quedan scopeadas exclusivamente a esta pantalla.
+ * (variables/colors/typography/shadows): Filament ya trae sus propios componentes y no queremos
+ * que choquen con los del resto del panel. El Punto de Venta (app/Filament/Pages/PuntoDeVenta.php)
+ * es la única pantalla que necesita una pequeña librería propia de componentes (.card/.table/
+ * .btn/.badge/.form-input), así que vive aquí, scopeada bajo `.pos-screen` para no afectar nada
+ * fuera de esta página.
  */
 
 .pos-screen{
@@ -46,7 +46,7 @@
     }
 }
 
-/*======== BOTONES (ver buttons.css) ========*/
+/*======== BOTONES ========*/
 
 .pos-screen .btn{
     display:inline-flex;
@@ -116,7 +116,7 @@
     font-size:var(--fs-body);
 }
 
-/*======== TABLAS (ver tables.css) ========*/
+/*======== TABLAS ========*/
 
 .pos-screen .table{
     width:100%;
@@ -156,7 +156,7 @@
     text-align:right;
 }
 
-/*======== FORMULARIOS (ver forms.css) ========*/
+/*======== FORMULARIOS ========*/
 
 .pos-screen .form-label{
     display:block;
@@ -194,7 +194,7 @@
     color:var(--text-muted);
 }
 
-/*======== BADGES (ver badges.css) ========*/
+/*======== BADGES ========*/
 
 .pos-screen .badge{
     display:inline-flex;
@@ -213,7 +213,7 @@
 .pos-screen .badge-warning{ background-color:var(--warning-dark); color:var(--white); }
 .pos-screen .badge-danger{ background-color:var(--danger-dark); color:var(--white); }
 
-/*======== TARJETAS (ver components.css) ========*/
+/*======== TARJETAS ========*/
 
 .pos-screen .card{
     padding:var(--space-md);
