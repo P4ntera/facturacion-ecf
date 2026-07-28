@@ -123,6 +123,32 @@
     color:var(--text-muted);
 }
 
+/*======== SIDEBAR: separado del contenido, ítem activo con tinte primary ========
+   Filament deja el sidebar transparente en escritorio (`lg:bg-transparent`), así que hoy hereda
+   el fondo de `.fi-body` (--surface-app) sin querer — se ve "pegado" al contenido. Se fuerza un
+   fondo casi blanco (--neutral-50, un pelín distinto del blanco puro de las tarjetas) y un borde
+   derecho para separarlo. El ítem activo ya sale con texto/ícono primary por defecto de Filament
+   (ring-primary-700): solo hacía falta que el fondo detrás fuera un tinte de primary en vez del
+   gris genérico (bg-gray-100) que trae por defecto. */
+
+.fi-sidebar{
+    background-color:var(--neutral-50);
+    border-inline-end:1px solid var(--border);
+}
+
+.fi-sidebar-item.fi-active > .fi-sidebar-item-btn{
+    background-color:var(--primary-100);
+}
+
+/*======== REMATE: paneles flotantes (menú de usuario, notificaciones...) con el mismo
+   radio/borde/sombra que el resto de las tarjetas, para que se sientan del mismo sistema. ========*/
+
+.fi-dropdown-panel{
+    border-radius:var(--radius);
+    border:1px solid var(--border);
+    box-shadow:var(--shadow-card);
+}
+
 /* Ejemplo (a): escalar todo el panel cambiando el font-size base.
    :root { font-size: 15px; } */
 
