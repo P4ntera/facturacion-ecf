@@ -217,8 +217,8 @@
 
 .pos-screen .card{
     padding:var(--space-md);
-    background-color:var(--white);
-    border:1px solid var(--gray-200);
+    background-color:var(--surface);
+    border:1px solid var(--border);
     border-radius:var(--radius-lg);
     box-shadow:var(--shadow-card);
 }

@@ -27,10 +27,62 @@ Uno solo: `resources/css/filament/admin/theme.css` (`->viteTheme(...)` en
 @import '../../../design-system/pos.css';           /* .card/.btn/.table/... SOLO para el POS */
 ```
 
-Después de los imports, `theme.css` tiene además unas pocas reglas propias (radios de Filament,
-fondo de tarjetas, tipografía de titulares) — ver secciones 3 y 4.
+Después de los imports, `theme.css` tiene además varias reglas propias (capas de superficie,
+radios de Filament, stat cards, tipografía, sidebar) — ver el resto de este documento.
 
-## 2. La paleta: un solo lugar, dos consumidores
+## 2. Capas de superficie: fondo de app vs. tarjeta vs. borde/sombra
+
+Esto es lo que corrige el bug de "fondo blanco y cuadros raritos": tres capas con tres tokens
+distintos, cada uno con un único trabajo.
+
+| Capa | Token | Valor | Dónde se aplica |
+|---|---|---|---|
+| Fondo de la app (la más atrás, detrás de todo) | `--surface-app` | `#F4F6FA` (gris azulado muy suave) | `.fi-body` en `theme.css` |
+| Tarjeta / superficie | `--surface` | `#FFFFFF` (blanco puro) | `.fi-section`, stat cards, modales, `.fi-ta-ctn`, `.pos-screen .card` |
+| Borde de la tarjeta | `--border` | `#E5E7EB` | Junto con `--surface` en el mismo selector |
+| Sombra de la tarjeta | `--shadow-card` | `0 1px 3px rgb(16 24 40 / .06), 0 1px 2px rgb(16 24 40 / .04)` | Idem |
+
+**El error que esto reemplaza:** una versión anterior pintaba de gris
+`.fi-section-content-ctn` — que no es la tarjeta (`.fi-section`) sino su contenedor INTERNO de
+contenido — mientras la tarjeta en sí seguía blanca por default de Filament. El resultado era un
+rectángulo gris flotando dentro de una tarjeta blanca ("cuadro rarito"). La regla ahora vive en
+`.fi-section`, `.fi-wi-stats-overview-stat`, `.fi-modal-window` y `.fi-ta-ctn` directamente (los
+selectores que Filament usa de verdad para pintar cada tarjeta — confirmado leyendo
+`vendor/filament/support/resources/css/components/section.css`,
+`vendor/filament/widgets/resources/css/stats-overview-widget.css` y
+`vendor/filament/tables/resources/css/container.css`), no en su contenedor interno.
+
+**Para cambiar el contraste de capas**: `--surface-app`/`--border` en
+`resources/design-system/colors.css`, `--shadow-card` en `shadows.css`. El bloque que los aplica
+está en `theme.css`, sección "CAPAS DE SUPERFICIE" — no hace falta tocarlo salvo que cambie qué
+elementos de Filament deban considerarse "tarjeta".
+
+## 3. Stat cards (KPIs): ícono con fondo de color
+
+`app/Filament/Widgets/ReporteStatsOverviewWidget.php` (el widget de KPIs del dashboard) usa
+`Stat::make(...)->icon(...)->color(...)->descriptionIcon(...)`. Filament NO colorea el ícono de
+un Stat por defecto — solo la descripción y el mini-gráfico reaccionan a `->color()`. La única
+forma de lograr el ícono con fondo de color suave es un override de la vista de Filament:
+
+- `resources/views/vendor/filament-widgets/stats-overview-widget/stat.blade.php` — copia del
+  original de `vendor/filament/widgets/resources/views/stats-overview-widget/stat.blade.php` que
+  envuelve el ícono en `<span class="stat-icon-chip stat-icon-chip-{color}">`. Si Filament cambia
+  esta vista en una actualización del paquete, hay que revisar el diff a mano (está documentado en
+  un comentario al principio del archivo).
+- `theme.css`, sección "STAT CARDS" — define `.stat-icon-chip-primary` (etc.) con los tokens del
+  proyecto (`--primary-100` de fondo, `--primary-600` de ícono), no con la paleta OKLCH interna de
+  Filament.
+
+Formato de moneda: `ReporteStatsOverviewWidget` arma sus valores con `Number::currency(...)` de
+Laravel directo en PHP, NO con un componente `->money()` de Filament — así que no lo cubre el
+`Table::configureUsing()`/`Schema::configureUsing()` de la sección 9. Se fija por separado con
+`Number::useLocale('es_DO')` en `AppServiceProvider::boot()`, mismo motivo y mismo locale.
+
+**Para agregar/cambiar un KPI**: `ReporteStatsOverviewWidget::getStats()`. Para cambiar el color
+del chip de ícono: los tokens en `variables.css` (el chip ya lee `--{color}-100`/`-600` según el
+`->color()` del Stat, no hace falta tocar el override de la vista).
+
+## 4. La paleta: un solo lugar, dos consumidores
 
 `resources/design-system/variables.css` define 6 colores base (`--primary`, `--secondary`,
 `--tertiary`, `--neutral`, `--warning`, `--danger`), cada uno con su escala completa `-50` a
@@ -49,15 +101,15 @@ Mapeo de slots de Filament ↔ tokens:
 
 | Slot de Filament | Token | Uso |
 |---|---|---|
-| `primary` | `--primary` (`#5D87FF`) | Acento principal, botones primary |
+| `primary` | `--primary` (`#5D87FF`) | Acento principal, botones primary, ítem activo del sidebar |
 | `info` | `--secondary` (`#49BEFF`) | Filament no tiene slot "secondary"; el rol informativo de Filament es el que mejor mapea al secondary de Stitch |
 | `success` | `--tertiary` / `--success` (`#13DEB9`) | Estados de éxito |
 | `warning` | `--warning` (`#F59E0B`) | Estados de alerta |
 | `danger` | `--danger` (`#EF4444`) | Estados de error/peligro |
-| `gray` | `--neutral` (`#7C808D`) | Fondos, bordes, superficies de TODO el panel (sidebar, topbar, tablas...) |
-| `dark` (slot extra, no nativo) | `--neutral-900`/`950` | Variante "Inverted" de botones (ver sección 5) |
+| `gray` | `--neutral` (`#7C808D`) | Ya no controla el fondo del panel (eso lo hace `--surface-app`, sección 2); sigue controlando grises puntuales de Filament (bordes de tabla, texto secundario por defecto, etc.) |
+| `dark` (slot extra, no nativo) | `--neutral-900`/`950` | Variante "Inverted" de botones (ver sección 7) |
 
-## 3. Radios: el truco de la variable compartida
+## 5. Radios: el truco de la variable compartida
 
 Tailwind v4 expone su escala de radios como variables CSS propias (`--radius-lg`, `--radius-xl`,
 que las utilidades compiladas de Filament usan directo: `rounded-lg` en botones/inputs,
@@ -74,7 +126,7 @@ tarjeta) al mismo valor, para que no quede más chico que su contenido:
 **Para cambiar el radio de TODO el panel + POS: edita `--radius`/`--radius-lg` en
 `variables.css`.** No hay que tocar `theme.css` ni ningún Resource.
 
-## 4. Tipografía
+## 6. Tipografía
 
 - `--font-body` (Inter) — cuerpo de texto. `AdminPanelProvider.php` usa `->font('Inter')`
   (proveedor Bunny Fonts, el mismo que usa Filament por defecto).
@@ -82,12 +134,16 @@ tarjeta) al mismo valor, para que no quede más chico que su contenido:
   headings vía `->font()`, así que se aplica en `theme.css` sobre las hook classes de heading de
   Filament (`.fi-header-heading`, `.fi-section-header-heading`, `.fi-modal-heading`, etc.) y se
   carga con su propio `@import url(...)` de Bunny Fonts al inicio de `theme.css`.
+- El título de página (`.fi-header-heading`) además tiene un tamaño fijo (1.875rem) en vez del
+  `text-2xl`/`text-3xl` responsive de Filament, para que pese lo mismo en cualquier pantalla. El
+  texto secundario (`.fi-header-subheading`, descripciones de Section, labels de los stat cards)
+  usa `--text-muted` explícitamente, para no depender de qué gris le toque a Filament por default.
 
 **Para cambiar de fuente: edita `--font-headline`/`--font-body` en
 `resources/design-system/typography.css` y actualiza el `@import` de Bunny Fonts en `theme.css`
 (y `->font()` en `AdminPanelProvider.php` si cambia la de cuerpo).**
 
-## 5. Botones: 4 variantes, nativas de Filament
+## 7. Botones: 4 variantes, nativas de Filament
 
 Los 4 estilos de Stitch (Primary/Secondary/Inverted/Outlined) mapean 1:1 a mecanismos nativos de
 Filament — no hace falta CSS custom para el panel:
@@ -99,13 +155,29 @@ Filament — no hace falta CSS custom para el panel:
 | Inverted (oscuro) | `->color('dark')` — slot custom registrado en `AdminPanelProvider.php` | `.btn-inverted` |
 | Outlined (borde) | `->outlined()` | `.btn-outlined` |
 
-El slot `dark` (ver sección 2) usa una escala explícita en vez de `Color::hex()`: Filament pinta
+El slot `dark` (ver sección 4) usa una escala explícita en vez de `Color::hex()`: Filament pinta
 el fondo sólido de un botón con el shade 600 de su color, así que ese shade tiene que ser YA el
 oscuro que se quiere (los shades 700-950 son los mismos pasos de `--neutral-900`/`--neutral-950`
 de `variables.css` — si esos tokens cambian, hay que actualizar también el array en
 `AdminPanelProvider.php`).
 
-## 6. Densidad: tablas y formularios
+## 8. Sidebar y remate
+
+- **Fondo**: Filament deja el sidebar transparente en escritorio (`lg:bg-transparent`), así que
+  por default hereda el fondo de `.fi-body`. Se fuerza `background-color:var(--neutral-50)` (casi
+  blanco, un pelín distinto del blanco puro de las tarjetas) + un borde derecho
+  (`border-inline-end:1px solid var(--border)`), para que quede claramente separado del contenido.
+- **Ítem activo**: Filament ya lo pinta con texto/ícono `primary-700` por defecto; solo hacía
+  falta que el fondo detrás fuera un tinte de `primary` (`--primary-100`) en vez del gris genérico
+  que trae Filament (`bg-gray-100`).
+- **Paneles flotantes** (menú de usuario, notificaciones, cualquier `.fi-dropdown-panel`): mismo
+  radio/borde/sombra que el resto de las tarjetas (`--radius`/`--border`/`--shadow-card`), para
+  que se sientan del mismo sistema visual.
+- **Widget de bienvenida de Filament** (el bloque de Documentación/GitHub que trae por defecto):
+  quitado de `AdminPanelProvider.php::widgets([...])` — es material promocional del framework, no
+  algo que un usuario del ERP necesite ver en su dashboard.
+
+## 9. Densidad: tablas y formularios
 
 - **Paginación y formato de moneda**, en un solo lugar para TODO el panel:
   `app/Providers/AppServiceProvider.php::boot()`, vía `Table::configureUsing()` y
@@ -113,28 +185,33 @@ de `variables.css` — si esos tokens cambian, hay que actualizar también el ar
   en cada Resource). De ahí sale que `->money('DOP')` se vea como `RD$1,234.50` (se fija
   `defaultNumberLocale('es_DO')` solo para los componentes de Filament, sin tocar
   `config('app.locale')`, que seguiría afectando fechas/traducciones de toda la app) y que las
-  tablas paginen en 10/25.
+  tablas paginen en 10/25. Los KPIs del dashboard usan un mecanismo aparte —
+  `Number::useLocale('es_DO')`, mismo archivo — porque arman su valor con `Number::currency()` de
+  Laravel en vez de un componente de Filament (ver sección 3).
 - **Columnas secundarias** (teléfono, email, metadatos de auditoría...): `->toggleable
   (isToggledHiddenByDefault: true)` en cada `TextColumn` del Resource — ocultas por defecto, el
   usuario las reactiva desde el selector de columnas de la tabla.
 - **Formularios**: agrupados en `Section::make('Título')` con 2-3 columnas donde aporta (ver
   `ProductoResource`, `ProveedorResource`, `CompraResource`, `EmpresaResource` como referencia).
 
-## 7. El POS: la única pantalla con markup propio
+## 10. El POS: la única pantalla con markup propio
 
 El Punto de Venta (`app/Filament/Pages/PuntoDeVenta.php` +
 `resources/views/filament/pages/punto-de-venta.blade.php`) no usa componentes de Filament para su
 UI de venta: es HTML propio con clases `class="card"`, `class="btn btn-primary"`, `class="table"`,
 `class="badge badge-success"`, etc. `resources/design-system/pos.css` es la ÚNICA fuente de esas
 clases (las versiones sin scope que existían en `buttons.css`/`tables.css`/etc. se eliminaron por
-huérfanas — ver Paso 6 del rediseño): mismas reglas, mismos tokens, con el selector `.pos-screen`
-por delante para no afectar nada fuera de esta página.
+huérfanas): mismas reglas, mismos tokens (incluidas las capas de superficie de la sección 2:
+`.pos-screen .card` usa `--surface`/`--border`/`--shadow-card`, igual que una `.fi-section` del
+panel), con el selector `.pos-screen` por delante para no afectar nada fuera de esta página. El
+fondo detrás de las tarjetas del POS no necesita una regla aparte: la página vive dentro de
+`.fi-body`, así que ya hereda `--surface-app` de la sección 2.
 
 **Para cambiar los estilos del POS**: `resources/design-system/pos.css`. Si el cambio es de un
 token (color, espaciado, radio), tócalo en `variables.css`/`spacing.css`/etc., no lo hardcodees
 en `pos.css`.
 
-## 8. Navegación
+## 11. Navegación
 
 Los grupos del menú (`Ventas`, `Maestros`, `Inventario`, `Compras`, `Fiscal`, `Reportes`,
 `Configuración`, `Super Admin`) se registran explícitamente en
@@ -144,7 +221,7 @@ sidebar. Cada Resource/Page fija su grupo (`$navigationGroup`) y su posición de
 (`$navigationSort`, valores por decenas: 1x Ventas, 1x Maestros con prefijo distinto, etc. — ver
 cualquier Resource para el patrón).
 
-## 9. Modo claro/oscuro
+## 12. Modo claro/oscuro
 
 Sigue como estaba: **solo claro** (`->darkMode(false)` en `AdminPanelProvider.php`). El
 design-system del proyecto (`variables.css` → `pos.css`) es 100% modo-claro — cero `.dark`, cero
@@ -152,21 +229,27 @@ media queries. Si en el futuro se necesita modo oscuro real, hay que escribir es
 cada archivo del design-system antes de activar el switch, o el panel (que sí sabe oscurecerse
 solo, vía el slot `gray`) y el POS (que no) quedarían inconsistentes.
 
-## 10. Cheat-sheet: "quiero cambiar X"
+## 13. Cheat-sheet: "quiero cambiar X"
 
+- **El contraste de capas** (fondo de app vs. tarjetas) → `--surface-app`/`--border` en
+  `colors.css`, `--shadow-card` en `shadows.css` (sección 2).
 - **El color primario/de acento de todo el sistema** → `--primary` (+ su escala) en
   `variables.css` **y** el hex en `->colors(['primary' => ...])` de `AdminPanelProvider.php`
-  (sección 2 — dos lugares, uno es CSS y el otro PHP, no se puede evitar).
-- **El gris/fondo de TODO el panel** (sidebar, topbar, tablas de Filament) → `--neutral` en
-  `variables.css` + el slot `gray` en `AdminPanelProvider.php`.
+  (sección 4 — dos lugares, uno es CSS y el otro PHP, no se puede evitar).
+- **El gris de detalle del panel** (bordes de tabla, texto secundario de Filament) → `--neutral`
+  en `variables.css` + el slot `gray` en `AdminPanelProvider.php`. El fondo general de la app NO
+  sale de aquí desde el Paso 1 de este rediseño: sale de `--surface-app` (sección 2).
 - **Los radios** (botones, inputs, tarjetas) → `--radius`/`--radius-lg` en `variables.css`
-  únicamente (sección 3).
-- **La tipografía** → `--font-headline`/`--font-body` en `typography.css` (sección 4).
-- **Los estilos del POS** → `resources/design-system/pos.css` (sección 7).
+  únicamente (sección 5).
+- **La tipografía** → `--font-headline`/`--font-body` en `typography.css` (sección 6).
+- **El color del ícono de un stat card (KPI)** → el `->color()` del `Stat` en
+  `ReporteStatsOverviewWidget`; el tinte sale solo de `--{color}-100`/`-600` en `variables.css`
+  (sección 3).
+- **Los estilos del POS** → `resources/design-system/pos.css` (sección 10).
 - **Qué se ve en cada grupo del menú y en qué orden** → `navigationGroups([...])` en
   `AdminPanelProvider.php` (orden de grupos) + `$navigationGroup`/`$navigationSort` en cada
-  Resource/Page (sección 8).
+  Resource/Page (sección 11).
 - **Paginación por defecto o formato de moneda de las tablas** → `AppServiceProvider::boot()`
-  (sección 6), no cada Resource.
+  (sección 9), no cada Resource.
 - Cualquier cambio a `theme.css` o a `resources/design-system/` no se ve en el navegador hasta
   correr `./vendor/bin/sail npm run build` (o `npm run dev` para hot-reload mientras se trabaja).
