@@ -5,6 +5,31 @@ Este documento mapea de dónde sale cada parte de la identidad visual del panel/
 tipografía y radios viven en **un solo archivo** (`resources/design-system/variables.css`);
 todo lo demás (Filament, POS, botones) lee de ahí, directa o indirectamente.
 
+## Guía rápida: "cómo cambio…"
+
+Todos los tokens de esta guía viven en `resources/design-system/variables.css`, sección
+`SUPERFICIES / FONDOS DEL PANEL` (buscar ese título dentro del archivo). Después de editar
+cualquiera, siempre: `./vendor/bin/sail npm run build`.
+
+- **Cambiar el FONDO DE LA PÁGINA** (el gris detrás de todo): edita `--fondo-pagina` en
+  `resources/design-system/variables.css` y corre `npm run build`. No hay que tocar el slot
+  `gray` de `AdminPanelProvider.php` — el fondo de página lee directo de este token, no del slot
+  (ver la sección "Capas de superficie" más abajo para el detalle de por qué).
+- **Cambiar el FONDO DE LAS TARJETAS** (las cajas blancas: Sections, stat cards, modales, tablas,
+  tarjetas del POS): edita `--fondo-tarjeta` en `resources/design-system/variables.css` y
+  `npm run build`.
+- **Cambiar el FONDO DEL MENÚ lateral**: edita `--fondo-sidebar` en
+  `resources/design-system/variables.css` y `npm run build`.
+- **Cambiar el COLOR PRIMARIO** (botones/acentos/ítem activo del sidebar): dos lugares —
+  `--primary` en `resources/design-system/variables.css` **y** el slot `primary` en
+  `->colors([...])` de `app/Providers/Filament/AdminPanelProvider.php` (mismo hex en los dos; ver
+  sección 4 más abajo del porqué).
+- **Cambiar el BORDE de las tarjetas**: edita `--borde-tarjeta` en
+  `resources/design-system/variables.css` y `npm run build`. (Este mismo token también pinta el
+  borde del sidebar y de los paneles flotantes como el menú de usuario — mismo valor en todos.)
+- **Cambiar la SOMBRA de las tarjetas**: edita `--sombra-tarjeta` en
+  `resources/design-system/variables.css` y `npm run build`.
+
 ## 1. Entry point de Vite
 
 Uno solo: `resources/css/filament/admin/theme.css` (`->viteTheme(...)` en
@@ -18,8 +43,8 @@ Uno solo: `resources/css/filament/admin/theme.css` (`->viteTheme(...)` en
 @import url('https://fonts.bunny.net/css?family=manrope:...');   /* Manrope, para titulares */
 @import '.../vendor/filament/filament/resources/css/theme.css';   /* base de Filament */
 
-@import '../../../design-system/variables.css';   /* PALETA, RADIOS — fuente única */
-@import '../../../design-system/colors.css';       /* alias semánticos (--text, --border...) */
+@import '../../../design-system/variables.css';   /* PALETA, RADIOS, SUPERFICIES — fuente única */
+@import '../../../design-system/colors.css';       /* alias semánticos (--text, --link...) */
 @import '../../../design-system/typography.css';   /* --font-headline, --font-body, --fs-* */
 @import '../../../design-system/spacing.css';
 @import '../../../design-system/shadows.css';
@@ -32,15 +57,20 @@ radios de Filament, stat cards, tipografía, sidebar) — ver el resto de este d
 
 ## 2. Capas de superficie: fondo de app vs. tarjeta vs. borde/sombra
 
-Esto es lo que corrige el bug de "fondo blanco y cuadros raritos": tres capas con tres tokens
-distintos, cada uno con un único trabajo.
+Esto es lo que corrige el bug de "fondo blanco y cuadros raritos": tres capas con tokens propios,
+cada uno con un único trabajo. Los 5 tokens viven TODOS juntos en
+`resources/design-system/variables.css`, sección "SUPERFICIES / FONDOS DEL PANEL" (antes estaban
+repartidos entre `variables.css`, `colors.css` y `shadows.css` bajo nombres que no decían qué
+eran — `--surface-app`, `--surface`, `--border`, `--shadow-card` — de ahí que no quedara claro
+dónde cambiar cada fondo; ahora el nombre del token ES la explicación).
 
 | Capa | Token | Valor | Dónde se aplica |
 |---|---|---|---|
-| Fondo de la app (la más atrás, detrás de todo) | `--surface-app` | `#F4F6FA` (gris azulado muy suave) | `.fi-body` en `theme.css` |
-| Tarjeta / superficie | `--surface` | `#FFFFFF` (blanco puro) | `.fi-section`, stat cards, modales, `.fi-ta-ctn`, `.pos-screen .card` |
-| Borde de la tarjeta | `--border` | `#E5E7EB` | Junto con `--surface` en el mismo selector |
-| Sombra de la tarjeta | `--shadow-card` | `0 1px 3px rgb(16 24 40 / .06), 0 1px 2px rgb(16 24 40 / .04)` | Idem |
+| Fondo de la página (la más atrás, detrás de todo) | `--fondo-pagina` | `#F4F6FA` (gris azulado muy suave) | `.fi-body` en `theme.css` |
+| Fondo de tarjeta | `--fondo-tarjeta` | `#FFFFFF` (blanco puro) | `.fi-section`, stat cards, modales, `.fi-ta-ctn`, `.pos-screen .card` |
+| Fondo del sidebar | `--fondo-sidebar` | `#F7F7F8` (casi blanco, distinto del blanco de tarjeta) | `.fi-sidebar` |
+| Borde de la tarjeta | `--borde-tarjeta` | `#E5E7EB` | Junto con `--fondo-tarjeta`; también el borde del sidebar y de los paneles flotantes (`.fi-dropdown-panel`) |
+| Sombra de la tarjeta | `--sombra-tarjeta` | `0 1px 3px rgb(16 24 40 / .06), 0 1px 2px rgb(16 24 40 / .04)` | Junto con `--fondo-tarjeta`; también los paneles flotantes |
 
 **El error que esto reemplaza:** una versión anterior pintaba de gris
 `.fi-section-content-ctn` — que no es la tarjeta (`.fi-section`) sino su contenedor INTERNO de
@@ -52,10 +82,15 @@ selectores que Filament usa de verdad para pintar cada tarjeta — confirmado le
 `vendor/filament/widgets/resources/css/stats-overview-widget.css` y
 `vendor/filament/tables/resources/css/container.css`), no en su contenedor interno.
 
-**Para cambiar el contraste de capas**: `--surface-app`/`--border` en
-`resources/design-system/colors.css`, `--shadow-card` en `shadows.css`. El bloque que los aplica
-está en `theme.css`, sección "CAPAS DE SUPERFICIE" — no hace falta tocarlo salvo que cambie qué
-elementos de Filament deban considerarse "tarjeta".
+**Excepción que hay que tener presente**: el fondo de página NO pasa por el slot `gray` de
+Filament (aunque ese slot también existe y controla otras cosas — texto secundario, bordes finos
+de tabla). `.fi-body` lee `--fondo-pagina` directo por una regla explícita en `theme.css`, así que
+cambiar el token alcanza; no hace falta tocar `AdminPanelProvider.php` para este caso.
+
+**Para cambiar el contraste de capas**: los 5 tokens en
+`resources/design-system/variables.css` (ver la guía rápida al principio de este documento). El
+bloque que los aplica está en `theme.css`, sección "CAPAS DE SUPERFICIE" — no hace falta tocarlo
+salvo que cambie qué elementos de Filament deban considerarse "tarjeta".
 
 ## 3. Stat cards (KPIs): ícono con fondo de color
 
@@ -86,7 +121,8 @@ del chip de ícono: los tokens en `variables.css` (el chip ya lee `--{color}-100
 
 `resources/design-system/variables.css` define 6 colores base (`--primary`, `--secondary`,
 `--tertiary`, `--neutral`, `--warning`, `--danger`), cada uno con su escala completa `-50` a
-`-950`, más los radios (`--radius-sm`, `--radius`, `--radius-lg`).
+`-950`, más los radios (`--radius-sm`, `--radius`, `--radius-lg`) y los tokens de superficie de la
+sección 2.
 
 **Para cambiar un color de identidad (p. ej. `--primary`) hay que tocarlo en DOS lugares:**
 
@@ -106,7 +142,7 @@ Mapeo de slots de Filament ↔ tokens:
 | `success` | `--tertiary` / `--success` (`#13DEB9`) | Estados de éxito |
 | `warning` | `--warning` (`#F59E0B`) | Estados de alerta |
 | `danger` | `--danger` (`#EF4444`) | Estados de error/peligro |
-| `gray` | `--neutral` (`#7C808D`) | Ya no controla el fondo del panel (eso lo hace `--surface-app`, sección 2); sigue controlando grises puntuales de Filament (bordes de tabla, texto secundario por defecto, etc.) |
+| `gray` | `--neutral` (`#7C808D`) | Grises puntuales de Filament (bordes de tabla, texto secundario por defecto). NO controla el fondo del panel — eso lo hace `--fondo-pagina` (sección 2), directo, sin pasar por este slot |
 | `dark` (slot extra, no nativo) | `--neutral-900`/`950` | Variante "Inverted" de botones (ver sección 7) |
 
 ## 5. Radios: el truco de la variable compartida
@@ -164,15 +200,16 @@ de `variables.css` — si esos tokens cambian, hay que actualizar también el ar
 ## 8. Sidebar y remate
 
 - **Fondo**: Filament deja el sidebar transparente en escritorio (`lg:bg-transparent`), así que
-  por default hereda el fondo de `.fi-body`. Se fuerza `background-color:var(--neutral-50)` (casi
-  blanco, un pelín distinto del blanco puro de las tarjetas) + un borde derecho
-  (`border-inline-end:1px solid var(--border)`), para que quede claramente separado del contenido.
+  por default hereda el fondo de `.fi-body`. Se fuerza `background-color:var(--fondo-sidebar)`
+  (casi blanco, un pelín distinto del blanco puro de las tarjetas) + un borde derecho
+  (`border-inline-end:1px solid var(--borde-tarjeta)`), para que quede claramente separado del
+  contenido.
 - **Ítem activo**: Filament ya lo pinta con texto/ícono `primary-700` por defecto; solo hacía
   falta que el fondo detrás fuera un tinte de `primary` (`--primary-100`) en vez del gris genérico
   que trae Filament (`bg-gray-100`).
 - **Paneles flotantes** (menú de usuario, notificaciones, cualquier `.fi-dropdown-panel`): mismo
-  radio/borde/sombra que el resto de las tarjetas (`--radius`/`--border`/`--shadow-card`), para
-  que se sientan del mismo sistema visual.
+  radio/borde/sombra que el resto de las tarjetas (`--radius`/`--borde-tarjeta`/`--sombra-tarjeta`),
+  para que se sientan del mismo sistema visual.
 - **Widget de bienvenida de Filament** (el bloque de Documentación/GitHub que trae por defecto):
   quitado de `AdminPanelProvider.php::widgets([...])` — es material promocional del framework, no
   algo que un usuario del ERP necesite ver en su dashboard.
@@ -202,10 +239,10 @@ UI de venta: es HTML propio con clases `class="card"`, `class="btn btn-primary"`
 `class="badge badge-success"`, etc. `resources/design-system/pos.css` es la ÚNICA fuente de esas
 clases (las versiones sin scope que existían en `buttons.css`/`tables.css`/etc. se eliminaron por
 huérfanas): mismas reglas, mismos tokens (incluidas las capas de superficie de la sección 2:
-`.pos-screen .card` usa `--surface`/`--border`/`--shadow-card`, igual que una `.fi-section` del
-panel), con el selector `.pos-screen` por delante para no afectar nada fuera de esta página. El
-fondo detrás de las tarjetas del POS no necesita una regla aparte: la página vive dentro de
-`.fi-body`, así que ya hereda `--surface-app` de la sección 2.
+`.pos-screen .card` usa `--fondo-tarjeta`/`--borde-tarjeta`/`--sombra-tarjeta`, igual que una
+`.fi-section` del panel), con el selector `.pos-screen` por delante para no afectar nada fuera de
+esta página. El fondo detrás de las tarjetas del POS no necesita una regla aparte: la página vive
+dentro de `.fi-body`, así que ya hereda `--fondo-pagina` de la sección 2.
 
 **Para cambiar los estilos del POS**: `resources/design-system/pos.css`. Si el cambio es de un
 token (color, espaciado, radio), tócalo en `variables.css`/`spacing.css`/etc., no lo hardcodees
@@ -231,14 +268,15 @@ solo, vía el slot `gray`) y el POS (que no) quedarían inconsistentes.
 
 ## 13. Cheat-sheet: "quiero cambiar X"
 
-- **El contraste de capas** (fondo de app vs. tarjetas) → `--surface-app`/`--border` en
-  `colors.css`, `--shadow-card` en `shadows.css` (sección 2).
+- **El contraste de capas** (fondo de página, tarjetas, sidebar, borde, sombra) → los 5 tokens en
+  `variables.css`, sección "SUPERFICIES / FONDOS DEL PANEL" (sección 2 — y la guía rápida al
+  principio de este documento).
 - **El color primario/de acento de todo el sistema** → `--primary` (+ su escala) en
   `variables.css` **y** el hex en `->colors(['primary' => ...])` de `AdminPanelProvider.php`
   (sección 4 — dos lugares, uno es CSS y el otro PHP, no se puede evitar).
 - **El gris de detalle del panel** (bordes de tabla, texto secundario de Filament) → `--neutral`
-  en `variables.css` + el slot `gray` en `AdminPanelProvider.php`. El fondo general de la app NO
-  sale de aquí desde el Paso 1 de este rediseño: sale de `--surface-app` (sección 2).
+  en `variables.css` + el slot `gray` en `AdminPanelProvider.php`. El fondo general de la página NO
+  sale de aquí: sale de `--fondo-pagina` (sección 2).
 - **Los radios** (botones, inputs, tarjetas) → `--radius`/`--radius-lg` en `variables.css`
   únicamente (sección 5).
 - **La tipografía** → `--font-headline`/`--font-body` en `typography.css` (sección 6).
