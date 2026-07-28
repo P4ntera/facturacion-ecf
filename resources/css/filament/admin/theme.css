@@ -106,6 +106,23 @@
     font-weight:700;
 }
 
+/* Título de página: Filament ya lo pone en negrita, pero a un tamaño (text-2xl/3xl) que se
+   pierde contra las tarjetas blancas del Paso 1. Un solo tamaño fijo (en vez del text-2xl móvil /
+   text-3xl escritorio de Filament) para que el título pese lo mismo en cualquier pantalla. */
+.fi-header-heading{
+    font-size:1.875rem;
+    line-height:2.25rem;
+    letter-spacing:-0.015em;
+}
+
+/* Texto secundario: gris claro y consistente en toda la jerarquía (usa --text-muted, que ya sale
+   de --neutral — la misma escala que el resto del panel, no el gris genérico de Filament). */
+.fi-header-subheading,
+.fi-section-header-description,
+.fi-wi-stats-overview-stat-label{
+    color:var(--text-muted);
+}
+
 /* Ejemplo (a): escalar todo el panel cambiando el font-size base.
    :root { font-size: 15px; } */
 
