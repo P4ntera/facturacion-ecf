@@ -11,6 +11,7 @@ use App\Models\DetalleCompra;
 use App\Models\DetalleDevolucionCompra;
 use App\Models\DevolucionCompra;
 use App\Models\Producto;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -27,7 +28,7 @@ class DevolucionCompraService
      *
      * @param  array{
      *   compra_id: int,
-     *   fecha:     \Carbon\Carbon,
+     *   fecha:     Carbon,
      *   motivo:    string,
      *   lineas: array<int, array{
      *     detalle_compra_id: int,
@@ -75,43 +76,47 @@ class DevolucionCompraService
                     );
                 }
 
-                $subtotal   = round((float) $detalleCompra->costo_unitario * $cantidad, 2);
+                $subtotal = round((float) $detalleCompra->costo_unitario * $cantidad, 2);
                 $porcentaje = $detalleCompra->tasa_itbis->porcentaje();
                 $itbisMonto = round($subtotal * $porcentaje / 100, 2);
 
                 $lineasCalc[] = [
                     'detalle_compra_id' => $detalleCompra->id,
-                    'producto_id'       => $detalleCompra->producto_id,
-                    'cantidad'          => $cantidad,
-                    'costo_unitario'    => $detalleCompra->costo_unitario,
-                    'tasa_itbis'        => $detalleCompra->tasa_itbis,
-                    'subtotal'          => $subtotal,
-                    'itbis_monto'       => $itbisMonto,
+                    'producto_id' => $detalleCompra->producto_id,
+                    'cantidad' => $cantidad,
+                    'costo_unitario' => $detalleCompra->costo_unitario,
+                    'tasa_itbis' => $detalleCompra->tasa_itbis,
+                    'subtotal' => $subtotal,
+                    'itbis_monto' => $itbisMonto,
                 ];
             }
 
             $totales = $this->calcularTotales($lineasCalc);
 
             $devolucion = DevolucionCompra::create([
-                'compra_id'    => $compra->id,
+                // Se deriva de la compra (su cabecera) en vez de depender de que Filament haya
+                // asociado el tenant automáticamente: este service puede invocarse fuera del
+                // ciclo de vida de una request de panel (colas, comandos, tests).
+                'empresa_id' => $compra->empresa_id,
+                'compra_id' => $compra->id,
                 'proveedor_id' => $compra->proveedor_id,
-                'user_id'      => $userId,
-                'fecha'        => $datos['fecha'],
-                'motivo'       => $datos['motivo'],
-                'estado'       => EstadoDevolucion::REGISTRADA,
+                'user_id' => $userId,
+                'fecha' => $datos['fecha'],
+                'motivo' => $datos['motivo'],
+                'estado' => EstadoDevolucion::REGISTRADA,
                 ...$totales,
             ]);
 
             foreach ($lineasCalc as $linea) {
                 DetalleDevolucionCompra::create([
                     'devolucion_compra_id' => $devolucion->id,
-                    'detalle_compra_id'    => $linea['detalle_compra_id'],
-                    'producto_id'          => $linea['producto_id'],
-                    'cantidad'             => $linea['cantidad'],
-                    'costo_unitario'       => $linea['costo_unitario'],
-                    'tasa_itbis'           => $linea['tasa_itbis'],
-                    'itbis_monto'          => $linea['itbis_monto'],
-                    'subtotal'             => $linea['subtotal'],
+                    'detalle_compra_id' => $linea['detalle_compra_id'],
+                    'producto_id' => $linea['producto_id'],
+                    'cantidad' => $linea['cantidad'],
+                    'costo_unitario' => $linea['costo_unitario'],
+                    'tasa_itbis' => $linea['tasa_itbis'],
+                    'itbis_monto' => $linea['itbis_monto'],
+                    'subtotal' => $linea['subtotal'],
                 ]);
 
                 $producto = Producto::find($linea['producto_id']);
@@ -160,9 +165,9 @@ class DevolucionCompraService
             }
 
             $devolucion->update([
-                'estado'           => EstadoDevolucion::ANULADA,
+                'estado' => EstadoDevolucion::ANULADA,
                 'motivo_anulacion' => $motivo,
-                'anulada_en'       => now(),
+                'anulada_en' => now(),
             ]);
 
             return $devolucion->refresh();
@@ -174,30 +179,30 @@ class DevolucionCompraService
     {
         $montoGravado18 = 0.0;
         $montoGravado16 = 0.0;
-        $montoGravado0  = 0.0;
+        $montoGravado0 = 0.0;
 
         foreach ($lineas as $l) {
             match ($l['tasa_itbis']) {
                 TasaItbis::DIECIOCHO => $montoGravado18 += $l['subtotal'],
                 TasaItbis::DIECISEIS => $montoGravado16 += $l['subtotal'],
-                TasaItbis::CERO      => $montoGravado0  += $l['subtotal'],
+                TasaItbis::CERO => $montoGravado0 += $l['subtotal'],
             };
         }
 
-        $subtotal   = round(array_sum(array_column($lineas, 'subtotal')), 2);
-        $itbis18    = round($montoGravado18 * 0.18, 2);
-        $itbis16    = round($montoGravado16 * 0.16, 2);
+        $subtotal = round(array_sum(array_column($lineas, 'subtotal')), 2);
+        $itbis18 = round($montoGravado18 * 0.18, 2);
+        $itbis16 = round($montoGravado16 * 0.16, 2);
         $totalItbis = round($itbis18 + $itbis16, 2);
 
         return [
-            'subtotal'         => $subtotal,
+            'subtotal' => $subtotal,
             'monto_gravado_18' => round($montoGravado18, 2),
             'monto_gravado_16' => round($montoGravado16, 2),
-            'monto_gravado_0'  => round($montoGravado0, 2),
-            'itbis_18'         => $itbis18,
-            'itbis_16'         => $itbis16,
-            'itbis'            => $totalItbis,
-            'total'            => round($subtotal + $totalItbis, 2),
+            'monto_gravado_0' => round($montoGravado0, 2),
+            'itbis_18' => $itbis18,
+            'itbis_16' => $itbis16,
+            'itbis' => $totalItbis,
+            'total' => round($subtotal + $totalItbis, 2),
         ];
     }
 }

@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Enums\TipoDocumentoCliente;
+use App\Models\Empresa;
 use App\Services\Dgii\ConsultaContribuyenteService;
 use App\Services\Dgii\DgiiGatewayInterface;
 use Tests\Support\GatewayStub;
@@ -20,7 +21,7 @@ class ConsultaContribuyenteServiceTest extends TestCase
             }
         });
 
-        $resultado = app(ConsultaContribuyenteService::class)->buscar('130123456');
+        $resultado = app(ConsultaContribuyenteService::class)->buscar('130123456', new Empresa);
 
         $this->assertSame('130123456', $resultado['documento']);
         $this->assertSame('Comercial Prueba SRL', $resultado['nombre']);
@@ -37,7 +38,7 @@ class ConsultaContribuyenteServiceTest extends TestCase
             }
         });
 
-        $resultado = app(ConsultaContribuyenteService::class)->buscar('00112345678');
+        $resultado = app(ConsultaContribuyenteService::class)->buscar('00112345678', new Empresa);
 
         $this->assertSame('00112345678', $resultado['documento']);
         $this->assertSame('Juan Pérez', $resultado['nombre']);
@@ -54,7 +55,7 @@ class ConsultaContribuyenteServiceTest extends TestCase
             }
         });
 
-        $resultado = app(ConsultaContribuyenteService::class)->buscar('1-30123456');
+        $resultado = app(ConsultaContribuyenteService::class)->buscar('1-30123456', new Empresa);
 
         $this->assertSame('130123456', $resultado['documento']);
     }
@@ -64,7 +65,7 @@ class ConsultaContribuyenteServiceTest extends TestCase
         // Ningún método del gateway debería llamarse: GatewayStub lanza si se invoca alguno.
         $this->app->bind(DgiiGatewayInterface::class, fn () => new class extends GatewayStub {});
 
-        $resultado = app(ConsultaContribuyenteService::class)->buscar('12345');
+        $resultado = app(ConsultaContribuyenteService::class)->buscar('12345', new Empresa);
 
         $this->assertNull($resultado);
     }
@@ -79,7 +80,7 @@ class ConsultaContribuyenteServiceTest extends TestCase
             }
         });
 
-        $this->assertNull(app(ConsultaContribuyenteService::class)->buscar('130123456'));
+        $this->assertNull(app(ConsultaContribuyenteService::class)->buscar('130123456', new Empresa));
     }
 
     public function test_null_si_el_resultado_no_trae_nombre(): void
@@ -92,6 +93,6 @@ class ConsultaContribuyenteServiceTest extends TestCase
             }
         });
 
-        $this->assertNull(app(ConsultaContribuyenteService::class)->buscar('130123456'));
+        $this->assertNull(app(ConsultaContribuyenteService::class)->buscar('130123456', new Empresa));
     }
 }

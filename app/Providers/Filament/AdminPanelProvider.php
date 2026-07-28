@@ -3,17 +3,19 @@
 namespace App\Providers\Filament;
 
 use App\Filament\Pages\Auth\EditProfile;
+use App\Http\Middleware\EstablecerEmpresaPermisos;
+use App\Models\Empresa;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
+use Filament\Navigation\NavigationGroup;
 use Filament\Pages\Dashboard;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
 use Filament\Support\Enums\Width;
 use Filament\Widgets\AccountWidget;
-use Filament\Widgets\FilamentInfoWidget;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
@@ -32,21 +34,87 @@ class AdminPanelProvider extends PanelProvider
             ->viteTheme('resources/css/filament/admin/theme.css')
             ->login()
             ->profile(EditProfile::class)
+            // Multi-tenant nativo de Filament: cada empresa es un tenant, identificado en la URL
+            // por su slug (/admin/{empresa-slug}/...). ownershipRelationship es explícito aunque
+            // coincide con el default (camelCase del modelo) para que quede documentado aquí.
+            ->tenant(Empresa::class, slugAttribute: 'slug', ownershipRelationship: 'empresa')
+            // No hay auto-registro: las empresas las da de alta el super-admin (EmpresaResource).
+            ->tenantRegistration(null)
+            // Solo tiene efecto visual real para el super-admin (varias empresas); un usuario
+            // normal con una sola empresa entra directo (getDefaultTenant) y no lo necesita, pero
+            // no le estorba dejarlo visible.
+            ->tenantMenu()
+            // Orden = orden en el sidebar (ver NavigationManager::get()); por eso Ventas va
+            // primero (el diario del negocio) y Super Admin al final (solo lo ve el super-admin,
+            // ver EmpresaResource). Todos colapsados por defecto salvo Ventas: menos ruido visual
+            // al entrar, sin esconder lo que se usa a diario.
+            ->navigationGroups([
+                NavigationGroup::make('Ventas')
+                    ->icon('heroicon-o-shopping-bag')
+                    ->collapsed(false),
+                NavigationGroup::make('Maestros')
+                    ->icon('heroicon-o-rectangle-stack')
+                    ->collapsed(),
+                NavigationGroup::make('Inventario')
+                    ->icon('heroicon-o-archive-box')
+                    ->collapsed(),
+                NavigationGroup::make('Compras')
+                    ->icon('heroicon-o-shopping-cart')
+                    ->collapsed(),
+                NavigationGroup::make('Fiscal')
+                    ->icon('heroicon-o-document-text')
+                    ->collapsed(),
+                NavigationGroup::make('Reportes')
+                    ->icon('heroicon-o-chart-bar')
+                    ->collapsed(),
+                NavigationGroup::make('Configuración')
+                    ->icon('heroicon-o-cog-6-tooth')
+                    ->collapsed(),
+                NavigationGroup::make('Super Admin')
+                    ->icon('heroicon-o-building-office-2')
+                    ->collapsed(),
+            ])
             ->colors([
-                'primary' => Color::hex('#2563EB'), // --primary
-                'success' => Color::hex('#10B981'), // --secondary
-                'info' => Color::hex('#06B6D4'), // --info
+                'primary' => Color::hex('#5D87FF'), // --primary
+                'info' => Color::hex('#49BEFF'), // --secondary (rol "informativo" de Filament)
+                'success' => Color::hex('#13DEB9'), // --tertiary / --success
                 'warning' => Color::hex('#F59E0B'), // --warning
                 'danger' => Color::hex('#EF4444'), // --danger
-                'gray' => Color::Gray,
+                'gray' => Color::hex('#7C808D'), // --neutral: gris de marca Stitch, no el gris
+                // genérico de Filament — de aquí salen fondos, bordes y superficies del panel.
+                // Slot extra (no es uno de los 6 nativos de Filament) para la variante "Inverted"
+                // (oscuro sólido) de Stitch: se usa con ->color('dark') en una Action. Filament
+                // pinta el fondo sólido de un botón con el shade 600 de su color, así que ese
+                // shade tiene que ser YA el oscuro que queremos, no un tono medio autogenerado a
+                // partir de un solo hex — de ahí la escala explícita en vez de Color::hex().
+                // Los shades 700-950 son los mismos pasos de --neutral-900/--neutral-950 en
+                // variables.css; si esos tokens cambian, actualizar también aquí (docs/estilos.md).
+                'dark' => [
+                    50 => '#F7F7F8',
+                    100 => '#ECEDEE',
+                    200 => '#D9DADD',
+                    300 => '#BEC0C5',
+                    400 => '#9DA0AA',
+                    500 => '#6B6F7B',
+                    600 => '#303136',
+                    700 => '#1D1E20',
+                    800 => '#141517',
+                    900 => '#0D0E0F',
+                    950 => '#08090A',
+                ],
             ])
-            // El fondo/superficies del panel salen del slot 'gray' + el modo de color,
-            // no de 'primary'. El design-system del proyecto es claro (--background #F9FAFB),
-            // así que forzamos modo claro. Si en el futuro se quiere soportar oscuro, revertir.
+            // El fondo/superficies del panel salen del slot 'gray' + el modo de color, no de
+            // 'primary'. El design-system del proyecto (resources/design-system/) es enteramente
+            // claro: ningún archivo define variantes .dark. Estrategia documentada en
+            // docs/estilos.md (sección 6): mantener el panel y el POS solo en claro hasta que
+            // exista una necesidad real de modo oscuro (que implicaría escribir esas variantes).
             ->darkMode(false)
             ->databaseNotifications()
             ->maxContentWidth(Width::Full)
             ->sidebarCollapsibleOnDesktop()
+            // Cuerpo de texto (--font-body). Filament no permite una segunda familia solo para
+            // titulares vía este método: Manrope (--font-headline) se aplica en theme.css sobre
+            // las hook classes de heading de Filament (fi-header-heading y similares).
             ->font('Inter')
             ->brandName('Facturación e-CF')
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')
@@ -55,9 +123,11 @@ class AdminPanelProvider extends PanelProvider
                 Dashboard::class,
             ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\Filament\Widgets')
+            // FilamentInfoWidget (el bloque de Documentación/GitHub que Filament muestra por
+            // defecto en el dashboard) se deja fuera a propósito: es material promocional del
+            // framework, no algo que un usuario del ERP necesite ver.
             ->widgets([
                 AccountWidget::class,
-                FilamentInfoWidget::class,
             ])
             ->middleware([
                 EncryptCookies::class,
@@ -70,6 +140,28 @@ class AdminPanelProvider extends PanelProvider
                 DisableBladeIconComponents::class,
                 DispatchServingFilamentEvent::class,
             ])
+            // ANTES de SubstituteBindings a propósito (ver bootstrap/app.php, que lo ancla antes
+            // de AuthenticatesRequests con prioridad): spatie/laravel-permission con
+            // 'teams' => true necesita un contexto de empresa activo para CUALQUIER consulta de
+            // roles/permisos (incluida canAccessPanel(), que corre más adelante en
+            // ->authMiddleware()). Si quedara después, esas consultas se resolverían sin contexto
+            // (ven todo vacío) y el binding de rutas fallaría en 404 en vez del 403 que
+            // corresponde a un problema de autorización.
+            //
+            // isPersistent: true es OBLIGATORIO además de la prioridad: sin esto, el middleware
+            // solo corre en la carga de página completa. Filament navega DENTRO del panel (tablas,
+            // paginación, wire:navigate, cualquier interacción de un componente Livewire ya
+            // montado) vía peticiones a /livewire/update, que Livewire enruta por SU PROPIO
+            // mecanismo (Livewire\Mechanisms\PersistentMiddleware) — este solo reaplica el
+            // middleware de la ruta original que esté en la lista persistente (la de Filament
+            // mismo: Authenticate, IdentifyTenant, SetUpPanel... registrada en
+            // FilamentServiceProvider::boot()), no la pipeline completa de la request inicial. Sin
+            // marcarlo persistente, setPermissionsTeamId() nunca se ejecuta en esas peticiones: el
+            // usuario entra bien (la carga inicial sí pasa por la pipeline completa), pero cualquier
+            // interacción posterior ve permisos vacíos, como si no tuviera ningún rol.
+            ->middleware([
+                EstablecerEmpresaPermisos::class,
+            ], isPersistent: true)
             ->authMiddleware([
                 Authenticate::class,
             ]);

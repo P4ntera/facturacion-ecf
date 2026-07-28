@@ -25,9 +25,9 @@ class PuntoDeVentaImpresionTest extends TestCase
 
     private function vendedor(): User
     {
-        Permission::firstOrCreate(['name' => 'registrar_ventas', 'guard_name' => 'web']);
+        Permission::firstOrCreate(['name' => 'pos.acceder', 'guard_name' => 'web']);
         $rol = Role::firstOrCreate(['name' => 'Vendedor', 'guard_name' => 'web']);
-        $rol->syncPermissions(['registrar_ventas']);
+        $rol->syncPermissions(['pos.acceder']);
 
         $usuario = User::factory()->create();
         $usuario->assignRole('Vendedor');

@@ -1,3 +1,8 @@
+/* Manrope para titulares (ver sección "Tipografía de titulares" más abajo). Bunny Fonts: mismo
+   proveedor sin API key que usa Filament por defecto en ->font(), sin necesidad de un segundo
+   FontProvider solo para esta fuente. */
+@import url('https://fonts.bunny.net/css?family=manrope:500,600,700,800');
+
 @import '../../../../vendor/filament/filament/resources/css/theme.css';
 
 @source '../../../../app/Filament/**/*';
@@ -16,6 +21,135 @@
    design-system. pos.css los trae scopeados bajo `.pos-screen` para no afectar el resto
    del panel. */
 @import '../../../design-system/pos.css';
+
+/*======== FORMAS: radio grande en botones, inputs y tarjetas ========
+   Tailwind v4 expone su propia escala de radios como variables CSS (--radius-lg, --radius-xl...)
+   y las utilidades compiladas de Filament las consumen directamente (rounded-lg en botones/
+   inputs vía .fi-btn/input wrapper, rounded-xl en el contenedor exterior de cada Section/
+   tarjeta). variables.css ya define --radius-lg con el mismo nombre a propósito: alcanza para
+   agrandar botones e inputs sin tocar Filament. Solo falta igualar --radius-xl (borde exterior
+   de la tarjeta) para que no quede más chico que su contenido. Cambiar el radio de TODO el panel
+   es, entonces, editar --radius/--radius-lg en variables.css — no este archivo. */
+:root{
+    --radius-xl:var(--radius-lg);
+}
+
+/*======== CAPAS DE SUPERFICIE: fondo de app gris-azulado vs. tarjetas blancas ========
+   El bug visual que corrige este bloque ("fondo blanco y cuadros raritos"): una versión anterior
+   pintaba de gris `.fi-section-content-ctn`, que NO es la tarjeta en sí sino su contenedor
+   interno de contenido — el resultado era un rectángulo gris flotando DENTRO de una tarjeta que
+   seguía blanca por default de Filament (`.fi-section`). Corregido así: el gris va en el fondo de
+   la app (`.fi-body`, detrás de todo) vía --fondo-pagina; las tarjetas (`.fi-section`, stat
+   cards, modales, tablas) se dejan en --fondo-tarjeta (blanco, que es como las trae Filament por
+   defecto) y se les agrega borde + sombra EXPLÍCITOS con nuestros tokens para que se distingan
+   del fondo sin depender del ring por defecto de Filament (que es casi invisible sobre un fondo
+   ya claro). Los 5 tokens de esta sección (--fondo-pagina/-tarjeta/-sidebar, --borde-tarjeta,
+   --sombra-tarjeta) están definidos juntos en variables.css — ver docs/estilos.md. */
+
+.fi-body{
+    background-color:var(--fondo-pagina);
+}
+
+.fi-section:not(.fi-section-not-contained):not(.fi-aside),
+.fi-section.fi-aside > .fi-section-content-ctn,
+.fi-wi-stats-overview-stat,
+.fi-modal-window,
+.fi-ta-ctn{
+    background-color:var(--fondo-tarjeta);
+    border:1px solid var(--borde-tarjeta);
+    box-shadow:var(--sombra-tarjeta);
+}
+
+/*======== STAT CARDS (KPIs): ícono con fondo de color suave ========
+   Filament no colorea el ícono de un Stat por defecto (solo la descripción y el mini-gráfico vía
+   ->color()); el chip de acá viene del override de vista en
+   resources/views/vendor/filament-widgets/stats-overview-widget/stat.blade.php, que envuelve el
+   ícono en `.stat-icon-chip-{color}`. Los colores salen directo de los tokens del proyecto
+   (--primary-100, --tertiary-100...), no de la paleta OKLCH interna de Filament, para no tener
+   que reimplementar el mapeo de "shade 100/600" que Filament ya hace distinto para cada
+   componente (ver docs/estilos.md). */
+
+.stat-icon-chip{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    width:2.75rem;
+    height:2.75rem;
+    border-radius:var(--radius);
+    flex-shrink:0;
+}
+
+.stat-icon-chip .fi-icon{
+    height:1.5rem;
+    width:1.5rem;
+    color:inherit;
+}
+
+.stat-icon-chip-primary{ background-color:var(--primary-100); color:var(--primary-600); }
+.stat-icon-chip-success{ background-color:var(--tertiary-100); color:var(--tertiary-700); }
+.stat-icon-chip-info{ background-color:var(--secondary-100); color:var(--secondary-700); }
+.stat-icon-chip-warning{ background-color:var(--warning-100); color:var(--warning-700); }
+.stat-icon-chip-danger{ background-color:var(--danger-100); color:var(--danger-600); }
+.stat-icon-chip-gray{ background-color:var(--neutral-100); color:var(--neutral-600); }
+
+.fi-wi-stats-overview-stat-label-ctn{
+    align-items:center;
+    gap:0.75rem;
+}
+
+/*======== TIPOGRAFÍA DE TITULARES: Manrope en headings, Inter en el resto (->font()) ========*/
+
+.fi-header-heading,
+.fi-simple-header-heading,
+.fi-section-header-heading,
+.fi-modal-heading,
+.fi-ta-header-heading{
+    font-family:var(--font-headline);
+    font-weight:700;
+}
+
+/* Título de página: Filament ya lo pone en negrita, pero a un tamaño (text-2xl/3xl) que se
+   pierde contra las tarjetas blancas del Paso 1. Un solo tamaño fijo (en vez del text-2xl móvil /
+   text-3xl escritorio de Filament) para que el título pese lo mismo en cualquier pantalla. */
+.fi-header-heading{
+    font-size:1.875rem;
+    line-height:2.25rem;
+    letter-spacing:-0.015em;
+}
+
+/* Texto secundario: gris claro y consistente en toda la jerarquía (usa --text-muted, que ya sale
+   de --neutral — la misma escala que el resto del panel, no el gris genérico de Filament). */
+.fi-header-subheading,
+.fi-section-header-description,
+.fi-wi-stats-overview-stat-label{
+    color:var(--text-muted);
+}
+
+/*======== SIDEBAR: separado del contenido, ítem activo con tinte primary ========
+   Filament deja el sidebar transparente en escritorio (`lg:bg-transparent`), así que hoy hereda
+   el fondo de `.fi-body` (--fondo-pagina) sin querer — se ve "pegado" al contenido. Se fuerza un
+   fondo casi blanco (--fondo-sidebar, un pelín distinto del blanco puro de las tarjetas) y un
+   borde derecho para separarlo. El ítem activo ya sale con texto/ícono primary por defecto de
+   Filament (ring-primary-700): solo hacía falta que el fondo detrás fuera un tinte de primary en
+   vez del gris genérico (bg-gray-100) que trae por defecto. */
+
+.fi-sidebar{
+    background-color:var(--fondo-sidebar);
+    border-inline-end:1px solid var(--borde-tarjeta);
+}
+
+.fi-sidebar-item.fi-active > .fi-sidebar-item-btn{
+    background-color:var(--primary-100);
+}
+
+/*======== REMATE: paneles flotantes (menú de usuario, notificaciones...) con el mismo
+   radio/borde/sombra que el resto de las tarjetas, para que se sientan del mismo sistema. ========*/
+
+.fi-dropdown-panel{
+    border-radius:var(--radius);
+    border:1px solid var(--borde-tarjeta);
+    box-shadow:var(--sombra-tarjeta);
+}
 
 /* Ejemplo (a): escalar todo el panel cambiando el font-size base.
    :root { font-size: 15px; } */

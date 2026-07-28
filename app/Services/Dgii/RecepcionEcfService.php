@@ -5,47 +5,54 @@ namespace App\Services\Dgii;
 use App\Enums\CanalRecepcionEcf;
 use App\Enums\EstadoReenvioPac;
 use App\Models\DocumentoRecibido;
-use App\Settings\EmpresaSettings;
+use App\Models\Empresa;
 
 /**
  * Procesa lo que llega a nuestros endpoints públicos de recepción/aprobación comercial (los que
- * se registran en la DGII): valida, reenvía el XML tal cual al PAC y deja constancia de todo
- * (incluidas las recepciones rechazadas) en documentos_recibidos. Nunca lanza: el controller
- * decide la respuesta HTTP según el estado_reenvio resultante.
+ * se registran en la DGII): valida, reenvía el XML tal cual al PAC (con la api key de LA EMPRESA
+ * dueña del documento, no una global) y deja constancia de todo (incluidas las recepciones
+ * rechazadas) en documentos_recibidos. Nunca lanza: el controller decide la respuesta HTTP según
+ * el estado_reenvio resultante.
+ *
+ * Con la configuración fiscal por empresa (T3) ya no hay un solo "nuestro RNC" global: la DGII
+ * llama este endpoint sin indicar a qué empresa va dirigido, así que hay que deducirlo del propio
+ * XML, comparando RNCComprador/RNCEmisor contra el RNC de cada empresa con usa_ecf activo.
  */
 class RecepcionEcfService
 {
     /** DGII no publica un límite oficial; un e-CF real no se acerca a esto. */
     private const TAMANO_MAXIMO_BYTES = 5 * 1024 * 1024;
 
-    public function __construct(
-        private readonly DgiiGatewayInterface $gateway,
-        private readonly EmpresaSettings $settings,
-    ) {}
+    public function __construct(private readonly DgiiGatewayFactory $gatewayFactory) {}
 
     public function procesar(CanalRecepcionEcf $canal, string $xml, ?string $ipOrigen): DocumentoRecibido
     {
         $metadatos = $this->extraerMetadatos($xml);
 
         if (strlen($xml) > self::TAMANO_MAXIMO_BYTES) {
-            return $this->registrar($canal, $xml, $metadatos, $ipOrigen, EstadoReenvioPac::RECHAZADO_VALIDACION,
+            return $this->registrar($canal, $xml, $metadatos, $ipOrigen, null, EstadoReenvioPac::RECHAZADO_VALIDACION,
                 error: 'El XML supera el tamaño máximo permitido ('.self::TAMANO_MAXIMO_BYTES.' bytes).');
         }
 
-        if (! $this->rncCoincide($metadatos)) {
-            return $this->registrar($canal, $xml, $metadatos, $ipOrigen, EstadoReenvioPac::RECHAZADO_VALIDACION,
-                error: 'El RNC del documento no corresponde a esta empresa.');
+        $empresa = $this->resolverEmpresa($metadatos);
+
+        if ($empresa === null) {
+            return $this->registrar($canal, $xml, $metadatos, $ipOrigen, null, EstadoReenvioPac::RECHAZADO_VALIDACION,
+                error: 'El RNC del documento no corresponde a ninguna empresa registrada en este sistema.');
         }
 
+        $gateway = $this->gatewayFactory->make($empresa);
+
         $respuesta = $canal === CanalRecepcionEcf::RECEPCION
-            ? $this->gateway->reenviarRecepcion($xml)
-            : $this->gateway->reenviarAprobacionComercial($xml);
+            ? $gateway->reenviarRecepcion($xml)
+            : $gateway->reenviarAprobacionComercial($xml);
 
         return $this->registrar(
             $canal,
             $xml,
             $metadatos,
             $ipOrigen,
+            $empresa,
             $respuesta->exito ? EstadoReenvioPac::REENVIADO : EstadoReenvioPac::ERROR_REENVIO,
             error: $respuesta->exito ? null : $respuesta->errorMessage,
             respuestaPac: $respuesta->responseJson,
@@ -97,16 +104,21 @@ class RecepcionEcfService
     }
 
     /**
-     * El documento debe involucrarnos como comprador o como emisor original; si no se pudo leer
-     * ninguno de los dos (XML irreconocible) se rechaza por precaución.
+     * El documento debe involucrarnos como comprador o como emisor original: se busca una
+     * empresa (con e-CF activo) cuyo RNC coincida con cualquiera de los dos. Si ninguno se pudo
+     * leer, o ninguna empresa coincide, se rechaza por precaución.
      *
      * @param  array<string, ?string>  $metadatos
      */
-    private function rncCoincide(array $metadatos): bool
+    private function resolverEmpresa(array $metadatos): ?Empresa
     {
-        $rnc = $this->settings->rnc;
+        $rncs = array_values(array_filter([$metadatos['rnc_comprador'], $metadatos['rnc_emisor']]));
 
-        return $metadatos['rnc_comprador'] === $rnc || $metadatos['rnc_emisor'] === $rnc;
+        if ($rncs === []) {
+            return null;
+        }
+
+        return Empresa::where('usa_ecf', true)->whereIn('rnc', $rncs)->first();
     }
 
     /**
@@ -118,13 +130,17 @@ class RecepcionEcfService
         string $xml,
         array $metadatos,
         ?string $ipOrigen,
+        ?Empresa $empresa,
         EstadoReenvioPac $estado,
         ?string $error = null,
         array $respuestaPac = [],
     ): DocumentoRecibido {
         return DocumentoRecibido::create([
+            'empresa_id' => $empresa?->id,
             'canal' => $canal,
-            'rnc_destino' => $this->settings->rnc,
+            // Sin empresa resuelta (rechazado antes de identificarla) se deja constancia de
+            // cuál de los dos RNC del XML se intentó usar, para poder investigar el rechazo.
+            'rnc_destino' => $empresa?->rnc ?? $metadatos['rnc_comprador'] ?? $metadatos['rnc_emisor'] ?? '',
             'rnc_emisor' => $metadatos['rnc_emisor'],
             'razon_social_emisor' => $metadatos['razon_social_emisor'],
             'encf' => $metadatos['encf'],

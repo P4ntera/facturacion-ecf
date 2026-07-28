@@ -11,22 +11,22 @@ class ImpresoraPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->can('administrar_configuracion');
+        return $user->can('impresoras.administrar');
     }
 
     public function view(User $user, Impresora $impresora): bool
     {
-        return $user->can('administrar_configuracion');
+        return $user->can('impresoras.administrar');
     }
 
     public function create(User $user): bool
     {
-        return $user->can('administrar_configuracion');
+        return $user->can('impresoras.administrar');
     }
 
     public function update(User $user, Impresora $impresora): bool
     {
-        return $user->can('administrar_configuracion');
+        return $user->can('impresoras.administrar');
     }
 
     // Sin borrado físico: se desactiva con `activa`, coherente con SecuenciaNcf y el resto del

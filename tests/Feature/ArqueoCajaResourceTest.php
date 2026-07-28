@@ -44,7 +44,7 @@ class ArqueoCajaResourceTest extends TestCase
     public function test_la_pagina_de_ver_un_arqueo_carga_sin_errores(): void
     {
         $usuario = $this->usuarioConPermiso();
-        $arqueo = app(ArqueoCajaService::class)->abrir('500.00', $usuario->id);
+        $arqueo = app(ArqueoCajaService::class)->abrir('500.00', $usuario->id, $this->empresaDefault);
 
         $this->actingAs($usuario)
             ->get(ArqueoCajaResource::getUrl('view', ['record' => $arqueo]))
@@ -55,7 +55,7 @@ class ArqueoCajaResourceTest extends TestCase
     {
         $usuario = $this->usuarioConPermiso();
         $service = app(ArqueoCajaService::class);
-        $arqueo = $service->abrir('500.00', $usuario->id);
+        $arqueo = $service->abrir('500.00', $usuario->id, $this->empresaDefault);
         $arqueo = $service->cerrar($arqueo, '500.00', null, $usuario->id);
 
         $this->actingAs($usuario)
@@ -69,7 +69,7 @@ class ArqueoCajaResourceTest extends TestCase
         $usuario = User::factory()->create();
         $cajero = $this->usuarioConPermiso();
         $service = app(ArqueoCajaService::class);
-        $arqueo = $service->abrir('500.00', $cajero->id);
+        $arqueo = $service->abrir('500.00', $cajero->id, $this->empresaDefault);
         $arqueo = $service->cerrar($arqueo, '500.00', null, $cajero->id);
 
         $this->actingAs($usuario)

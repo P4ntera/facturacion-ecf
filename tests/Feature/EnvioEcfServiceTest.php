@@ -64,7 +64,7 @@ class EnvioEcfServiceTest extends TestCase
             'cliente_id' => $cliente->id,
             'tipo_comprobante' => $tipo->value,
             'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
-        ])->refresh();
+        ], $this->empresaDefault)->refresh();
     }
 
     /** Sustituye el gateway por uno que devuelve siempre la misma RespuestaEcf dada. */

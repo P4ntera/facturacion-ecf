@@ -15,7 +15,7 @@ class ReporteTopProductosPdfController extends ReportePdfController
         $desde = $this->rangoDesde($request);
         $hasta = $this->rangoHasta($request);
 
-        $productos = $servicio->productosVendidosQuery($desde, $hasta)
+        $productos = $servicio->productosVendidosQuery($desde, $hasta, $this->empresaId($request))
             ->orderByDesc('ingresos')
             ->get();
 
@@ -33,6 +33,7 @@ class ReporteTopProductosPdfController extends ReportePdfController
         ];
 
         return $this->responder(
+            request: $request,
             titulo: 'Top de productos',
             columnas: [
                 ['key' => 'codigo', 'label' => 'Código'],

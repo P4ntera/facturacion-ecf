@@ -11,12 +11,12 @@ class DocumentoRecibidoPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->can('gestionar_ecf');
+        return $user->can('ecf.gestionar');
     }
 
     public function view(User $user, DocumentoRecibido $documentoRecibido): bool
     {
-        return $user->can('gestionar_ecf');
+        return $user->can('ecf.gestionar');
     }
 
     public function create(User $user): bool

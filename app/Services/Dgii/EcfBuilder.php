@@ -9,7 +9,6 @@ use App\Enums\TipoProducto;
 use App\Exceptions\EcfInvalidoException;
 use App\Models\DetalleVenta;
 use App\Models\Venta;
-use App\Settings\FacturacionSettings;
 
 /**
  * Arma el JSON del e-CF que se envía al PAC a partir de una Venta ya registrada (montos y
@@ -60,7 +59,7 @@ class EcfBuilder
             'eNCF' => $venta->ncf,
         ];
 
-        if (app(FacturacionSettings::class)->precio_incluye_itbis) {
+        if ($venta->empresa->config()->precio_incluye_itbis) {
             $idDoc['IndicadorServicioTodoIncluido'] = '1';
         }
 

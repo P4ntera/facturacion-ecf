@@ -24,7 +24,7 @@ abstract class ReportePage extends Page implements HasTable
 
     public static function canAccess(): bool
     {
-        return auth()->user()?->can('ver_reportes') ?? false;
+        return auth()->user()?->can('reportes.ver') ?? false;
     }
 
     public function content(Schema $schema): Schema
@@ -56,15 +56,21 @@ abstract class ReportePage extends Page implements HasTable
 
     protected function getHeaderActions(): array
     {
+        // Ver el reporte (reportes.ver, en canAccess()) y exportarlo (reportes.exportar) son
+        // permisos distintos: un usuario puede ver la pantalla sin poder sacar el archivo.
+        $puedeExportar = auth()->user()?->can('reportes.exportar') ?? false;
+
         return [
             ExportAction::make()
                 ->label('Exportar Excel/CSV')
-                ->exporter($this->exporterClass()),
+                ->exporter($this->exporterClass())
+                ->visible($puedeExportar),
 
             Action::make('exportarPdf')
                 ->label('Exportar PDF')
                 ->icon(Heroicon::OutlinedDocumentArrowDown)
                 ->color('gray')
+                ->visible($puedeExportar)
                 ->url(fn (): string => route($this->pdfRouteName(), $this->pdfRouteParams()), shouldOpenInNewTab: true),
         ];
     }

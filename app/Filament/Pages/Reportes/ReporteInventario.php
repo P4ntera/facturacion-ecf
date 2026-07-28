@@ -24,6 +24,8 @@ class ReporteInventario extends ReportePage
 
     protected static ?string $navigationLabel = 'Inventario';
 
+    protected static ?int $navigationSort = 54;
+
     protected static ?string $title = 'Reporte de inventario';
 
     protected static ?string $slug = 'reportes/inventario';

@@ -1,6 +1,9 @@
 :root{
 
-    --font-family:'Inter',sans-serif;
+    --font-headline:'Manrope',sans-serif;
+    --font-body:'Inter',sans-serif;
+    --font-family:var(--font-body); /* alias: el resto del design-system (botones, tablas,
+       formularios, POS) referencia --font-family para el texto de cuerpo */
 
     --fs-title:32px;
     --fs-subtitle:24px;

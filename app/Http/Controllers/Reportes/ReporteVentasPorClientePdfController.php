@@ -15,7 +15,9 @@ class ReporteVentasPorClientePdfController extends ReportePdfController
         $desde = $this->rangoDesde($request);
         $hasta = $this->rangoHasta($request);
 
-        $clientes = $servicio->ventasPorCliente($desde, $hasta);
+        $clientes = $servicio->ventasPorClienteQuery($desde, $hasta, $this->empresaId($request))
+            ->orderByDesc('total_vendido')
+            ->get();
 
         $filas = $clientes->map(fn (object $fila) => [
             'cliente' => $fila->cliente_nombre,
@@ -30,6 +32,7 @@ class ReporteVentasPorClientePdfController extends ReportePdfController
         ];
 
         return $this->responder(
+            request: $request,
             titulo: 'Ventas por cliente',
             columnas: [
                 ['key' => 'cliente', 'label' => 'Cliente'],

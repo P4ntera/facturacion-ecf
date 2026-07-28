@@ -14,7 +14,7 @@ class Compra extends Model
     use HasFactory;
 
     protected $fillable = [
-        'proveedor_id', 'user_id', 'tipo_comprobante', 'ncf', 'fecha',
+        'empresa_id', 'proveedor_id', 'user_id', 'tipo_comprobante', 'ncf', 'fecha',
         'itbis_incluido', 'monto_total_factura',
         'subtotal', 'monto_gravado_18', 'monto_gravado_16', 'monto_gravado_0', 'monto_exento',
         'itbis_18', 'itbis_16', 'itbis', 'total',
@@ -22,22 +22,27 @@ class Compra extends Model
     ];
 
     protected $casts = [
-        'tipo_comprobante'     => TipoComprobante::class,
-        'estado'               => EstadoCompra::class,
-        'itbis_incluido'       => 'boolean',
-        'fecha'                => 'datetime',
-        'anulada_en'           => 'datetime',
-        'monto_total_factura'  => 'decimal:2',
-        'subtotal'             => 'decimal:2',
-        'monto_gravado_18'     => 'decimal:2',
-        'monto_gravado_16'     => 'decimal:2',
-        'monto_gravado_0'      => 'decimal:2',
-        'monto_exento'         => 'decimal:2',
-        'itbis_18'             => 'decimal:2',
-        'itbis_16'             => 'decimal:2',
-        'itbis'                => 'decimal:2',
-        'total'                => 'decimal:2',
+        'tipo_comprobante' => TipoComprobante::class,
+        'estado' => EstadoCompra::class,
+        'itbis_incluido' => 'boolean',
+        'fecha' => 'datetime',
+        'anulada_en' => 'datetime',
+        'monto_total_factura' => 'decimal:2',
+        'subtotal' => 'decimal:2',
+        'monto_gravado_18' => 'decimal:2',
+        'monto_gravado_16' => 'decimal:2',
+        'monto_gravado_0' => 'decimal:2',
+        'monto_exento' => 'decimal:2',
+        'itbis_18' => 'decimal:2',
+        'itbis_16' => 'decimal:2',
+        'itbis' => 'decimal:2',
+        'total' => 'decimal:2',
     ];
+
+    public function empresa(): BelongsTo
+    {
+        return $this->belongsTo(Empresa::class);
+    }
 
     public function proveedor(): BelongsTo
     {

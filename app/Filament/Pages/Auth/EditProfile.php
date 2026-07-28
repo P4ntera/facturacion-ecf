@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Builder;
 
 /**
  * Extiende la página de perfil nativa de Filament (self-service, sin permiso especial) para
- * que cualquier usuario —incluido un cajero sin `gestionar_usuarios`— pueda fijar su propia
+ * que cualquier usuario —incluido un cajero sin `usuarios.gestionar`— pueda fijar su propia
  * impresora de facturación. UserResource expone el mismo campo para que un administrador
  * también pueda asignarla desde la gestión de usuarios.
  */

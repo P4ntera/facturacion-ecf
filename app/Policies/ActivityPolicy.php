@@ -11,12 +11,12 @@ class ActivityPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->can('ver_auditoria');
+        return $user->can('auditoria.ver');
     }
 
     public function view(User $user, Activity $activity): bool
     {
-        return $user->can('ver_auditoria');
+        return $user->can('auditoria.ver');
     }
 
     public function create(User $user): bool

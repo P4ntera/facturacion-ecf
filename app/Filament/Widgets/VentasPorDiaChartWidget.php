@@ -18,7 +18,7 @@ class VentasPorDiaChartWidget extends ChartWidget
 
     public static function canView(): bool
     {
-        return auth()->user()?->can('ver_reportes') ?? false;
+        return auth()->user()?->can('reportes.ver') ?? false;
     }
 
     protected function getType(): string

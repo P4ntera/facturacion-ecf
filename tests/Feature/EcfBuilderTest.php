@@ -64,7 +64,7 @@ class EcfBuilderTest extends TestCase
                 ['producto_id' => $productoDieciocho->id, 'cantidad' => 1],
                 ['producto_id' => $productoCero->id, 'cantidad' => 1],
             ],
-        ])->refresh();
+        ], $this->empresaDefault)->refresh();
 
         $ecf = app(EcfBuilder::class)->construir($venta);
         $totales = $ecf['ECF']['Encabezado']['Totales'];
@@ -97,7 +97,7 @@ class EcfBuilderTest extends TestCase
             'lineas' => [
                 ['producto_id' => $producto->id, 'cantidad' => 1, 'descuento' => '10.00'],
             ],
-        ])->refresh();
+        ], $this->empresaDefault)->refresh();
 
         $item = app(EcfBuilder::class)->construir($venta)['ECF']['DetallesItems']['Item'][0];
 
@@ -120,7 +120,7 @@ class EcfBuilderTest extends TestCase
                 ['producto_id' => $bien->id, 'cantidad' => 1],
                 ['producto_id' => $servicio->id, 'cantidad' => 1],
             ],
-        ])->refresh();
+        ], $this->empresaDefault)->refresh();
 
         $items = app(EcfBuilder::class)->construir($venta)['ECF']['DetallesItems']['Item'];
 
@@ -140,7 +140,7 @@ class EcfBuilderTest extends TestCase
         $venta = app(VentaService::class)->registrar([
             'cliente_id' => $cliente->id,
             'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
-        ])->refresh();
+        ], $this->empresaDefault)->refresh();
 
         $idDoc = app(EcfBuilder::class)->construir($venta)['ECF']['Encabezado']['IdDoc'];
 
@@ -160,7 +160,7 @@ class EcfBuilderTest extends TestCase
         $venta = app(VentaService::class)->registrar([
             'cliente_id' => $cliente->id,
             'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
-        ])->refresh();
+        ], $this->empresaDefault)->refresh();
 
         $venta->update(['tipo_pago' => TipoPago::CREDITO, 'fecha_limite_pago' => '2026-08-01']);
 
@@ -184,7 +184,7 @@ class EcfBuilderTest extends TestCase
             'cliente_id' => $cliente->id,
             'tipo_comprobante' => TipoComprobante::FACTURA_CREDITO_FISCAL->value,
             'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
-        ])->refresh();
+        ], $this->empresaDefault)->refresh();
 
         $venta->cliente->update(['documento' => null]);
 
@@ -204,7 +204,7 @@ class EcfBuilderTest extends TestCase
             'cliente_id' => $cliente->id,
             'tipo_comprobante' => TipoComprobante::FACTURA_CREDITO_FISCAL->value,
             'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
-        ])->refresh();
+        ], $this->empresaDefault)->refresh();
 
         $comprador = app(EcfBuilder::class)->construir($venta)['ECF']['Encabezado']['Comprador'];
 
@@ -222,7 +222,7 @@ class EcfBuilderTest extends TestCase
         $venta = app(VentaService::class)->registrar([
             'cliente_id' => $cliente->id,
             'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
-        ])->refresh();
+        ], $this->empresaDefault)->refresh();
 
         $encabezado = app(EcfBuilder::class)->construir($venta)['ECF']['Encabezado'];
 
@@ -239,7 +239,7 @@ class EcfBuilderTest extends TestCase
         $venta = app(VentaService::class)->registrar([
             'cliente_id' => $cliente->id,
             'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
-        ])->refresh();
+        ], $this->empresaDefault)->refresh();
 
         $this->assertTrue(bccomp((string) $venta->total, Venta::UMBRAL_CONSUMO, 2) < 0);
 
@@ -260,7 +260,7 @@ class EcfBuilderTest extends TestCase
         $venta = app(VentaService::class)->registrar([
             'cliente_id' => $cliente->id,
             'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
-        ])->refresh();
+        ], $this->empresaDefault)->refresh();
 
         $this->assertTrue(bccomp((string) $venta->total, Venta::UMBRAL_CONSUMO, 2) >= 0);
 
@@ -281,7 +281,7 @@ class EcfBuilderTest extends TestCase
         $venta = app(VentaService::class)->registrar([
             'cliente_id' => $cliente->id,
             'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
-        ])->refresh();
+        ], $this->empresaDefault)->refresh();
 
         $this->assertTrue(bccomp((string) $venta->total, Venta::UMBRAL_CONSUMO, 2) >= 0);
 

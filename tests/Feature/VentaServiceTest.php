@@ -62,7 +62,7 @@ class VentaServiceTest extends TestCase
         app(VentaService::class)->registrar([
             'cliente_id' => $cliente->id,
             'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
-        ]);
+        ], $this->empresaDefault);
     }
 
     public function test_permite_consumo_igual_o_mayor_al_umbral_con_cliente_con_rnc(): void
@@ -75,7 +75,7 @@ class VentaServiceTest extends TestCase
         $venta = app(VentaService::class)->registrar([
             'cliente_id' => $cliente->id,
             'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
-        ]);
+        ], $this->empresaDefault);
 
         $this->assertNotNull($venta->id);
     }
@@ -90,7 +90,7 @@ class VentaServiceTest extends TestCase
         $venta = app(VentaService::class)->registrar([
             'cliente_id' => $cliente->id,
             'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
-        ]);
+        ], $this->empresaDefault);
 
         $this->assertNotNull($venta->id);
     }
@@ -109,7 +109,7 @@ class VentaServiceTest extends TestCase
             'cliente_id' => $cliente->id,
             'tipo_comprobante' => TipoComprobante::FACTURA_CREDITO_FISCAL->value,
             'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
-        ]);
+        ], $this->empresaDefault);
     }
 
     public function test_no_consume_el_ncf_cuando_bloquea_por_falta_de_rnc(): void
@@ -123,7 +123,7 @@ class VentaServiceTest extends TestCase
             app(VentaService::class)->registrar([
                 'cliente_id' => $cliente->id,
                 'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
-            ]);
+            ], $this->empresaDefault);
         } catch (VentaInvalidaException) {
             // esperado
         }
@@ -144,7 +144,7 @@ class VentaServiceTest extends TestCase
             'cliente_id' => $cliente->id,
             'tipo_comprobante' => TipoComprobante::FACTURA_CREDITO_FISCAL->value,
             'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
-        ]);
+        ], $this->empresaDefault);
     }
 
     public function test_forma_pago_y_arqueo_caja_id_por_defecto_si_se_omiten(): void
@@ -157,7 +157,7 @@ class VentaServiceTest extends TestCase
         $venta = app(VentaService::class)->registrar([
             'cliente_id' => $cliente->id,
             'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
-        ]);
+        ], $this->empresaDefault);
 
         $this->assertSame(FormaPago::EFECTIVO, $venta->forma_pago);
         $this->assertNull($venta->arqueo_caja_id);
@@ -170,14 +170,14 @@ class VentaServiceTest extends TestCase
         $producto = $this->producto('VS-FP-EXPLICITO');
         $cliente = Cliente::create(['nombre' => 'Consumidor Final', 'activo' => true]);
         $cajero = User::factory()->create();
-        $arqueo = app(ArqueoCajaService::class)->abrir('500.00', $cajero->id);
+        $arqueo = app(ArqueoCajaService::class)->abrir('500.00', $cajero->id, $this->empresaDefault);
 
         $venta = app(VentaService::class)->registrar([
             'cliente_id' => $cliente->id,
             'forma_pago' => FormaPago::TARJETA,
             'arqueo_caja_id' => $arqueo->id,
             'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
-        ]);
+        ], $this->empresaDefault);
 
         $this->assertSame(FormaPago::TARJETA, $venta->forma_pago);
         $this->assertSame($arqueo->id, $venta->arqueo_caja_id);

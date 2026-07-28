@@ -19,9 +19,10 @@ class ClienteResourceTest extends TestCase
 
     private function usuarioAutorizado(): User
     {
-        Permission::firstOrCreate(['name' => 'gestionar_maestros', 'guard_name' => 'web']);
+        Permission::firstOrCreate(['name' => 'clientes.ver', 'guard_name' => 'web']);
+        Permission::firstOrCreate(['name' => 'clientes.crear', 'guard_name' => 'web']);
         $rol = Role::firstOrCreate(['name' => 'Rol-cliente-dgii', 'guard_name' => 'web']);
-        $rol->syncPermissions(['gestionar_maestros']);
+        $rol->syncPermissions(['clientes.ver', 'clientes.crear']);
 
         $usuario = User::factory()->create();
         $usuario->assignRole($rol);

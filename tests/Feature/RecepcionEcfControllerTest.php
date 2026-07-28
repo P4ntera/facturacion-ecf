@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Models\DocumentoRecibido;
-use App\Settings\EmpresaSettings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\UploadedFile;
@@ -20,11 +19,11 @@ class RecepcionEcfControllerTest extends TestCase
     {
         parent::setUp();
 
-        $settings = app(EmpresaSettings::class);
-        $settings->rnc = self::RNC_EMPRESA;
-        $settings->dgii_api_key = 'clave-de-prueba';
-        $settings->dgii_base_url = 'https://pac.test';
-        $settings->save();
+        $this->empresaDefault->update(['rnc' => self::RNC_EMPRESA]);
+        $this->empresaDefault->config()->update([
+            'dgii_api_key' => 'clave-de-prueba',
+            'dgii_base_url' => 'https://pac.test',
+        ]);
 
         // FakeGateway se usa en 'local'/'testing' salvo que se fuerce lo contrario; aquí queremos
         // ejercitar EcfPlatformGateway real para probar el reenvío HTTP tal cual.

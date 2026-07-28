@@ -3,6 +3,7 @@
 namespace App\Services\Dgii;
 
 use App\Enums\TipoDocumentoCliente;
+use App\Models\Empresa;
 
 /**
  * Busca un documento en la DGII (RNC, 9 dígitos) o la JCE (Cédula, 11 dígitos) a través del PAC,
@@ -11,16 +12,22 @@ use App\Enums\TipoDocumentoCliente;
  */
 class ConsultaContribuyenteService
 {
-    public function __construct(private readonly DgiiGatewayInterface $gateway) {}
+    public function __construct(private readonly DgiiGatewayFactory $gatewayFactory) {}
 
-    /** @return array{documento: string, nombre: string, tipo: TipoDocumentoCliente}|null */
-    public function buscar(string $documento): ?array
+    /**
+     * $empresa la resuelve el llamador (Filament::getTenant() en el panel): este service no
+     * asume ningún contexto ambiente, para poder usarse igual desde un job o un comando.
+     *
+     * @return array{documento: string, nombre: string, tipo: TipoDocumentoCliente}|null
+     */
+    public function buscar(string $documento, Empresa $empresa): ?array
     {
         $documento = preg_replace('/[^0-9]/', '', $documento) ?? '';
+        $gateway = $this->gatewayFactory->make($empresa);
 
         return match (strlen($documento)) {
-            9 => $this->normalizar($this->gateway->buscarContribuyente($documento), $documento, 'rnc', TipoDocumentoCliente::RNC),
-            11 => $this->normalizar($this->gateway->buscarCedulaJce($documento), $documento, 'cedula', TipoDocumentoCliente::CEDULA),
+            9 => $this->normalizar($gateway->buscarContribuyente($documento), $documento, 'rnc', TipoDocumentoCliente::RNC),
+            11 => $this->normalizar($gateway->buscarCedulaJce($documento), $documento, 'cedula', TipoDocumentoCliente::CEDULA),
             default => null,
         };
     }

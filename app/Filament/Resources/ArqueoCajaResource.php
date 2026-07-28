@@ -3,10 +3,13 @@
 namespace App\Filament\Resources;
 
 use App\Enums\EstadoArqueoCaja;
+use App\Enums\Modulo;
+use App\Filament\Concerns\RestringidoPorModulo;
 use App\Filament\Resources\ArqueoCajaResource\Pages;
 use App\Models\ArqueoCaja;
 use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
+use Filament\Facades\Filament;
 use Filament\Forms\Components\DatePicker;
 use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Infolists\Components\RepeatableEntry\TableColumn as InfolistTableColumn;
@@ -22,7 +25,14 @@ use Illuminate\Database\Eloquent\Builder;
 
 class ArqueoCajaResource extends Resource
 {
+    use RestringidoPorModulo;
+
     protected static ?string $model = ArqueoCaja::class;
+
+    public static function modulo(): Modulo
+    {
+        return Modulo::VENTAS_ARQUEO_CAJA;
+    }
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-banknotes';
 
@@ -35,6 +45,8 @@ class ArqueoCajaResource extends Resource
     protected static ?string $slug = 'arqueos-caja';
 
     protected static string|\UnitEnum|null $navigationGroup = 'Ventas';
+
+    protected static ?int $navigationSort = 3;
 
     // Solo lectura: la apertura/cierre se hace desde el Punto de Venta.
     public static function canCreate(): bool
@@ -106,21 +118,28 @@ class ArqueoCajaResource extends Resource
 
                 TextColumn::make('fondo_inicial')
                     ->label('Fondo inicial')
-                    ->money('DOP'),
+                    ->money('DOP')
+                    ->alignEnd()
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('efectivo_esperado')
                     ->label('Efectivo esperado')
                     ->money('DOP')
-                    ->placeholder('—'),
+                    ->alignEnd()
+                    ->placeholder('—')
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('efectivo_contado')
                     ->label('Efectivo contado')
                     ->money('DOP')
-                    ->placeholder('—'),
+                    ->alignEnd()
+                    ->placeholder('—')
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('diferencia')
                     ->label('Diferencia')
                     ->money('DOP')
+                    ->alignEnd()
                     ->placeholder('—')
                     ->color(fn (?string $state) => $state === null ? null : (bccomp($state, '0', 2) < 0 ? 'danger' : 'success')),
 
@@ -133,7 +152,10 @@ class ArqueoCajaResource extends Resource
             ->filters([
                 SelectFilter::make('user_id')
                     ->label('Cajero')
-                    ->relationship('user', 'name')
+                    // ->relationship() no hereda el scoping automático de Filament (solo aplica a
+                    // lo que arma el propio framework en la query del Resource, no a relaciones
+                    // resueltas aparte): sin esto, se ven cajeros de otras empresas en el filtro.
+                    ->relationship('user', 'name', modifyQueryUsing: fn (Builder $query) => $query->where('empresa_id', Filament::getTenant()->id))
                     ->searchable()
                     ->preload(),
 
@@ -172,7 +194,7 @@ class ArqueoCajaResource extends Resource
     {
         return [
             'index' => Pages\ListArqueosCaja::route('/'),
-            'view'  => Pages\ViewArqueoCaja::route('/{record}'),
+            'view' => Pages\ViewArqueoCaja::route('/{record}'),
         ];
     }
 }

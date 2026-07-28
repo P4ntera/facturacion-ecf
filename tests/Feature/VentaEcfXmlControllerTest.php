@@ -22,9 +22,9 @@ class VentaEcfXmlControllerTest extends TestCase
 
     private function usuarioAutorizado(): User
     {
-        Permission::firstOrCreate(['name' => 'registrar_ventas', 'guard_name' => 'web']);
+        Permission::firstOrCreate(['name' => 'ventas.ver', 'guard_name' => 'web']);
         $rol = Role::firstOrCreate(['name' => 'Vendedor-xml', 'guard_name' => 'web']);
-        $rol->syncPermissions(['registrar_ventas']);
+        $rol->syncPermissions(['ventas.ver']);
 
         $usuario = User::factory()->create();
         $usuario->assignRole($rol);
@@ -63,7 +63,7 @@ class VentaEcfXmlControllerTest extends TestCase
         return app(VentaService::class)->registrar([
             'cliente_id' => $cliente->id,
             'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
-        ])->refresh();
+        ], $this->empresaDefault)->refresh();
     }
 
     public function test_redirige_a_xml_url_si_ya_esta_disponible(): void

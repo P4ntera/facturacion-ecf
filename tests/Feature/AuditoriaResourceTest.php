@@ -25,11 +25,11 @@ class AuditoriaResourceTest extends TestCase
 
     public function test_usuario_con_permiso_ve_el_visor_y_el_detalle_con_antes_despues(): void
     {
-        Permission::firstOrCreate(['name' => 'ver_auditoria', 'guard_name' => 'web']);
-        Permission::firstOrCreate(['name' => 'gestionar_maestros', 'guard_name' => 'web']);
+        Permission::firstOrCreate(['name' => 'auditoria.ver', 'guard_name' => 'web']);
+        Permission::firstOrCreate(['name' => 'productos.ver', 'guard_name' => 'web']);
 
         $usuario = User::factory()->create();
-        $usuario->givePermissionTo(['ver_auditoria', 'gestionar_maestros']);
+        $usuario->givePermissionTo(['auditoria.ver', 'productos.ver']);
 
         $this->actingAs($usuario);
 

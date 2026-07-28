@@ -4,10 +4,12 @@ namespace App\Filament\Resources;
 
 use App\Enums\EstadoCompra;
 use App\Enums\EstadoDevolucion;
+use App\Enums\Modulo;
 use App\Enums\TasaItbis;
 use App\Enums\TipoComprobante;
 use App\Enums\TipoProducto;
 use App\Enums\TipoProveedor;
+use App\Filament\Concerns\RestringidoPorModulo;
 use App\Filament\Resources\CompraResource\Pages;
 use App\Models\Compra;
 use App\Models\DetalleCompra;
@@ -45,7 +47,14 @@ use RuntimeException;
 
 class CompraResource extends Resource
 {
+    use RestringidoPorModulo;
+
     protected static ?string $model = Compra::class;
+
+    public static function modulo(): Modulo
+    {
+        return Modulo::COMPRAS;
+    }
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-shopping-cart';
 
@@ -56,6 +65,8 @@ class CompraResource extends Resource
     protected static ?string $pluralModelLabel = 'Compras';
 
     protected static string|\UnitEnum|null $navigationGroup = 'Compras';
+
+    protected static ?int $navigationSort = 30;
 
     public static function form(Schema $schema): Schema
     {
@@ -122,7 +133,7 @@ class CompraResource extends Resource
                             Select::make('tipo')
                                 ->label('Tipo de proveedor')
                                 ->options([
-                                    TipoProveedor::FORMAL->value   => TipoProveedor::FORMAL->etiqueta(),
+                                    TipoProveedor::FORMAL->value => TipoProveedor::FORMAL->etiqueta(),
                                     TipoProveedor::INFORMAL->value => TipoProveedor::INFORMAL->etiqueta(),
                                 ])
                                 ->default(TipoProveedor::FORMAL->value)
@@ -150,7 +161,7 @@ class CompraResource extends Resource
                     Select::make('tipo_comprobante')
                         ->label('Tipo de comprobante')
                         ->options([
-                            TipoComprobante::COMPRAS->value        => TipoComprobante::COMPRAS->etiqueta(),
+                            TipoComprobante::COMPRAS->value => TipoComprobante::COMPRAS->etiqueta(),
                             TipoComprobante::GASTOS_MENORES->value => TipoComprobante::GASTOS_MENORES->etiqueta(),
                         ])
                         ->default(TipoComprobante::COMPRAS->value)
@@ -212,7 +223,7 @@ class CompraResource extends Resource
                             }
 
                             $service = app(CompraService::class);
-                            $calc    = $service->calcularLineas($lineas, (bool) $get('itbis_incluido'));
+                            $calc = $service->calcularLineas($lineas, (bool) $get('itbis_incluido'));
                             $totales = $service->calcularTotales($calc);
 
                             $diferencia = round((float) $montoFactura - $totales['total'], 2);
@@ -239,6 +250,11 @@ class CompraResource extends Resource
                         ->hiddenLabel()
                         ->placeholder('Selecciona un producto…')
                         ->actionSchemaModel(Producto::class)
+                        // Producto::query() ya sale filtrado a la empresa actual: Filament
+                        // registra un global scope sobre el modelo en cuanto ProductoResource
+                        // existe (BelongsToTenant::registerTenancyModelGlobalScope), así que
+                        // aplica sin importar si la consulta viene de un ->relationship() o,
+                        // como aquí, de un ->options() manual.
                         ->options(fn () => Producto::query()->activos()->pluck('nombre', 'id'))
                         ->searchable()
                         ->preload()
@@ -284,7 +300,7 @@ class CompraResource extends Resource
                                 ->options([
                                     TasaItbis::DIECIOCHO->value => '18 %',
                                     TasaItbis::DIECISEIS->value => '16 %',
-                                    TasaItbis::CERO->value      => '0 %',
+                                    TasaItbis::CERO->value => '0 %',
                                 ])
                                 ->default(TasaItbis::DIECIOCHO->value)
                                 ->required(),
@@ -353,7 +369,7 @@ class CompraResource extends Resource
                         ->state(function (Get $get) {
                             $producto = Producto::find($get('producto_id'));
 
-                            return $producto ? $producto->tasa_itbis->porcentaje() . ' %' : '—';
+                            return $producto ? $producto->tasa_itbis->porcentaje().' %' : '—';
                         }),
                 ])
                 ->addable(false)
@@ -378,9 +394,9 @@ class CompraResource extends Resource
                                 return 'Agrega al menos una línea con producto, cantidad y costo.';
                             }
 
-                            $service  = app(CompraService::class);
-                            $calc     = $service->calcularLineas($lineas, (bool) $get('itbis_incluido'));
-                            $totales  = $service->calcularTotales($calc);
+                            $service = app(CompraService::class);
+                            $calc = $service->calcularLineas($lineas, (bool) $get('itbis_incluido'));
+                            $totales = $service->calcularTotales($calc);
 
                             return sprintf(
                                 'Subtotal: RD$%s   |   ITBIS: RD$%s   |   Total: RD$%s',
@@ -406,7 +422,7 @@ class CompraResource extends Resource
                     TextEntry::make('estado')->label('Estado')->badge()
                         ->formatStateUsing(fn (EstadoCompra $state) => match ($state) {
                             EstadoCompra::REGISTRADA => 'Registrada',
-                            EstadoCompra::ANULADA    => 'Anulada',
+                            EstadoCompra::ANULADA => 'Anulada',
                         })
                         ->color(fn (EstadoCompra $state) => $state === EstadoCompra::ANULADA ? 'danger' : 'success'),
                     TextEntry::make('subtotal')->label('Subtotal')->money('DOP'),
@@ -471,7 +487,7 @@ class CompraResource extends Resource
                             TextEntry::make('estado')->hiddenLabel()->badge()
                                 ->formatStateUsing(fn (EstadoDevolucion $state) => match ($state) {
                                     EstadoDevolucion::REGISTRADA => 'Registrada',
-                                    EstadoDevolucion::ANULADA    => 'Anulada',
+                                    EstadoDevolucion::ANULADA => 'Anulada',
                                 })
                                 ->color(fn (EstadoDevolucion $state) => $state === EstadoDevolucion::ANULADA ? 'danger' : 'success'),
                         ]),
@@ -496,7 +512,8 @@ class CompraResource extends Resource
                 TextColumn::make('tipo_comprobante')
                     ->label('Tipo')
                     ->badge()
-                    ->formatStateUsing(fn (TipoComprobante $state) => $state->etiqueta()),
+                    ->formatStateUsing(fn (TipoComprobante $state) => $state->etiqueta())
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('fecha')
                     ->label('Fecha')
@@ -506,6 +523,7 @@ class CompraResource extends Resource
                 TextColumn::make('total')
                     ->label('Total')
                     ->money('DOP')
+                    ->alignEnd()
                     ->sortable(),
 
                 TextColumn::make('estado')
@@ -513,7 +531,7 @@ class CompraResource extends Resource
                     ->badge()
                     ->formatStateUsing(fn (EstadoCompra $state) => match ($state) {
                         EstadoCompra::REGISTRADA => 'Registrada',
-                        EstadoCompra::ANULADA    => 'Anulada',
+                        EstadoCompra::ANULADA => 'Anulada',
                     })
                     ->color(fn (EstadoCompra $state) => $state === EstadoCompra::ANULADA ? 'danger' : 'success'),
 
@@ -533,7 +551,7 @@ class CompraResource extends Resource
                     ->label('Estado')
                     ->options([
                         EstadoCompra::REGISTRADA->value => 'Registrada',
-                        EstadoCompra::ANULADA->value    => 'Anulada',
+                        EstadoCompra::ANULADA->value => 'Anulada',
                     ]),
 
                 Filter::make('fecha')
@@ -555,7 +573,7 @@ class CompraResource extends Resource
                     ->icon('heroicon-o-x-circle')
                     ->color('danger')
                     ->requiresConfirmation()
-                    ->visible(fn (Compra $record): bool => ! $record->estaAnulada() && (auth()->user()?->can('anular_compras') ?? false))
+                    ->visible(fn (Compra $record): bool => ! $record->estaAnulada() && (auth()->user()?->can('compras.anular') ?? false))
                     ->schema([
                         Textarea::make('motivo')
                             ->label('Motivo de anulación')
@@ -588,9 +606,9 @@ class CompraResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index'  => Pages\CreateCompra::route('/'),
+            'index' => Pages\CreateCompra::route('/'),
             'create' => Pages\CreateCompra::route('/create'),
-            'view'   => Pages\ViewCompra::route('/{record}'),
+            'view' => Pages\ViewCompra::route('/{record}'),
         ];
     }
 }

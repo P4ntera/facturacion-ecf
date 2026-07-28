@@ -27,14 +27,14 @@ class ImpresoraPreferenciaUsuarioTest extends TestCase
         ]);
     }
 
-    public function test_un_cajero_sin_gestionar_usuarios_puede_fijar_su_impresora_desde_el_perfil(): void
+    public function test_un_cajero_sin_usuarios_gestionar_puede_fijar_su_impresora_desde_el_perfil(): void
     {
         $this->seed(RolePermissionSeeder::class);
         $impresora = $this->crearImpresora('Caja 1');
 
         $cajero = User::factory()->create();
         $cajero->assignRole('Vendedor');
-        $this->assertFalse($cajero->can('gestionar_usuarios'));
+        $this->assertFalse($cajero->can('usuarios.gestionar'));
 
         Livewire::actingAs($cajero)
             ->test(EditProfile::class)

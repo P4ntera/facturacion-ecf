@@ -2,7 +2,9 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\Modulo;
 use App\Enums\TipoProveedor;
+use App\Filament\Concerns\RestringidoPorModulo;
 use App\Filament\Resources\ProveedorResource\Pages;
 use App\Filament\Resources\ProveedorResource\RelationManagers;
 use App\Models\Proveedor;
@@ -26,7 +28,14 @@ use Filament\Tables\Table;
 
 class ProveedorResource extends Resource
 {
+    use RestringidoPorModulo;
+
     protected static ?string $model = Proveedor::class;
+
+    public static function modulo(): Modulo
+    {
+        return Modulo::MAESTROS_PROVEEDORES;
+    }
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-truck';
 
@@ -39,6 +48,8 @@ class ProveedorResource extends Resource
     protected static ?string $slug = 'proveedores';
 
     protected static string|\UnitEnum|null $navigationGroup = 'Maestros';
+
+    protected static ?int $navigationSort = 13;
 
     public static function form(Schema $schema): Schema
     {
@@ -109,7 +120,7 @@ class ProveedorResource extends Resource
                     Select::make('tipo')
                         ->label('Tipo de proveedor')
                         ->options([
-                            TipoProveedor::FORMAL->value   => TipoProveedor::FORMAL->etiqueta(),
+                            TipoProveedor::FORMAL->value => TipoProveedor::FORMAL->etiqueta(),
                             TipoProveedor::INFORMAL->value => TipoProveedor::INFORMAL->etiqueta(),
                         ])
                         ->default(TipoProveedor::FORMAL->value)
@@ -204,7 +215,7 @@ class ProveedorResource extends Resource
                     ->label('Tipo')
                     ->badge()
                     ->formatStateUsing(fn (TipoProveedor $state) => match ($state) {
-                        TipoProveedor::FORMAL   => 'Formal',
+                        TipoProveedor::FORMAL => 'Formal',
                         TipoProveedor::INFORMAL => 'Informal',
                     })
                     ->color(fn (TipoProveedor $state) => $state === TipoProveedor::INFORMAL ? 'warning' : 'gray'),
@@ -221,7 +232,7 @@ class ProveedorResource extends Resource
 
                 ToggleColumn::make('activo')
                     ->label('Activo')
-                    ->disabled(fn (): bool => ! auth()->user()?->can('gestionar_maestros'))
+                    ->disabled(fn (): bool => ! auth()->user()?->can('proveedores.desactivar'))
                     ->sortable(),
 
                 TextColumn::make('created_at')
@@ -243,7 +254,7 @@ class ProveedorResource extends Resource
                 SelectFilter::make('tipo')
                     ->label('Tipo')
                     ->options([
-                        TipoProveedor::FORMAL->value   => 'Formal',
+                        TipoProveedor::FORMAL->value => 'Formal',
                         TipoProveedor::INFORMAL->value => 'Informal',
                     ]),
 

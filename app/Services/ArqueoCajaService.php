@@ -8,19 +8,25 @@ use App\Enums\EstadoArqueoCaja;
 use App\Enums\EstadoVenta;
 use App\Enums\FormaPago;
 use App\Models\ArqueoCaja;
+use App\Models\Empresa;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
 class ArqueoCajaService
 {
-    /** Abre un turno de caja nuevo para el usuario. Un usuario solo puede tener uno abierto a la vez. */
-    public function abrir(string $fondoInicial, int $userId): ArqueoCaja
+    /**
+     * Abre un turno de caja nuevo para el usuario. Un usuario solo puede tener uno abierto a la
+     * vez. $empresa la resuelve el llamador explícitamente (Filament::getTenant() en el panel) —
+     * este service no asume ningún tenant ambiente, igual que VentaService/CompraService.
+     */
+    public function abrir(string $fondoInicial, int $userId, Empresa $empresa): ArqueoCaja
     {
-        if ($this->arqueoAbiertoDe($userId) !== null) {
+        if ($this->arqueoAbiertoDe($userId, $empresa) !== null) {
             throw new RuntimeException('Ya tienes un arqueo de caja abierto.');
         }
 
         return DB::transaction(fn () => ArqueoCaja::create([
+            'empresa_id' => $empresa->id,
             'user_id' => $userId,
             'fondo_inicial' => $this->aMoneda($fondoInicial),
             'abierto_en' => now(),
@@ -74,9 +80,10 @@ class ArqueoCajaService
         });
     }
 
-    public function arqueoAbiertoDe(int $userId): ?ArqueoCaja
+    public function arqueoAbiertoDe(int $userId, Empresa $empresa): ?ArqueoCaja
     {
         return ArqueoCaja::query()
+            ->where('empresa_id', $empresa->id)
             ->where('user_id', $userId)
             ->where('estado', EstadoArqueoCaja::ABIERTO)
             ->first();

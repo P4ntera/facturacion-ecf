@@ -11,22 +11,22 @@ class ProductoPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->can('gestionar_maestros');
+        return $user->can('productos.ver');
     }
 
     public function view(User $user, Producto $producto): bool
     {
-        return $user->can('gestionar_maestros');
+        return $user->can('productos.ver');
     }
 
     public function create(User $user): bool
     {
-        return $user->can('gestionar_maestros');
+        return $user->can('productos.crear');
     }
 
     public function update(User $user, Producto $producto): bool
     {
-        return $user->can('gestionar_maestros');
+        return $user->can('productos.editar');
     }
 
     // Los maestros con historial no se borran físicamente: se desactivan (campo 'activo').

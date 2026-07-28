@@ -4,6 +4,8 @@ namespace App\Filament\Resources;
 
 use App\Enums\EstadoCompra;
 use App\Enums\EstadoDevolucion;
+use App\Enums\Modulo;
+use App\Filament\Concerns\RestringidoPorModulo;
 use App\Filament\Resources\DevolucionCompraResource\Pages;
 use App\Models\Compra;
 use App\Models\DetalleCompra;
@@ -37,7 +39,14 @@ use RuntimeException;
 
 class DevolucionCompraResource extends Resource
 {
+    use RestringidoPorModulo;
+
     protected static ?string $model = DevolucionCompra::class;
+
+    public static function modulo(): Modulo
+    {
+        return Modulo::DEVOLUCIONES;
+    }
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-arrow-uturn-left';
 
@@ -50,6 +59,8 @@ class DevolucionCompraResource extends Resource
     protected static ?string $slug = 'devoluciones-compra';
 
     protected static string|\UnitEnum|null $navigationGroup = 'Compras';
+
+    protected static ?int $navigationSort = 33;
 
     public static function form(Schema $schema): Schema
     {
@@ -124,7 +135,7 @@ class DevolucionCompraResource extends Resource
                         ->state(function (Get $get) {
                             $detalle = DetalleCompra::find($get('nueva_linea_detalle_compra_id'));
 
-                            return $detalle ? 'Costo unitario: RD$' . number_format((float) $detalle->costo_unitario, 2) : '—';
+                            return $detalle ? 'Costo unitario: RD$'.number_format((float) $detalle->costo_unitario, 2) : '—';
                         }),
 
                     TextInput::make('nueva_linea_cantidad')
@@ -183,14 +194,14 @@ class DevolucionCompraResource extends Resource
                             }
 
                             $calc = $lineas->map(function ($l) {
-                                $detalle    = DetalleCompra::find($l['detalle_compra_id']);
-                                $cantidad   = (float) $l['cantidad'];
-                                $subtotal   = round((float) $detalle->costo_unitario * $cantidad, 2);
+                                $detalle = DetalleCompra::find($l['detalle_compra_id']);
+                                $cantidad = (float) $l['cantidad'];
+                                $subtotal = round((float) $detalle->costo_unitario * $cantidad, 2);
                                 $porcentaje = $detalle->tasa_itbis->porcentaje();
 
                                 return [
-                                    'tasa_itbis'  => $detalle->tasa_itbis,
-                                    'subtotal'    => $subtotal,
+                                    'tasa_itbis' => $detalle->tasa_itbis,
+                                    'subtotal' => $subtotal,
                                     'itbis_monto' => round($subtotal * $porcentaje / 100, 2),
                                 ];
                             })->all();
@@ -221,7 +232,7 @@ class DevolucionCompraResource extends Resource
                     TextEntry::make('estado')->label('Estado')->badge()
                         ->formatStateUsing(fn (EstadoDevolucion $state) => match ($state) {
                             EstadoDevolucion::REGISTRADA => 'Registrada',
-                            EstadoDevolucion::ANULADA    => 'Anulada',
+                            EstadoDevolucion::ANULADA => 'Anulada',
                         })
                         ->color(fn (EstadoDevolucion $state) => $state === EstadoDevolucion::ANULADA ? 'danger' : 'success'),
                     TextEntry::make('motivo')->label('Motivo')->columnSpanFull(),
@@ -263,11 +274,13 @@ class DevolucionCompraResource extends Resource
 
                 TextColumn::make('compra.ncf')
                     ->label('NCF de la compra')
-                    ->placeholder('—'),
+                    ->placeholder('—')
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('motivo')
                     ->label('Motivo')
-                    ->limit(40),
+                    ->limit(40)
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('fecha')
                     ->label('Fecha')
@@ -277,6 +290,7 @@ class DevolucionCompraResource extends Resource
                 TextColumn::make('total')
                     ->label('Total')
                     ->money('DOP')
+                    ->alignEnd()
                     ->sortable(),
 
                 TextColumn::make('estado')
@@ -284,7 +298,7 @@ class DevolucionCompraResource extends Resource
                     ->badge()
                     ->formatStateUsing(fn (EstadoDevolucion $state) => match ($state) {
                         EstadoDevolucion::REGISTRADA => 'Registrada',
-                        EstadoDevolucion::ANULADA    => 'Anulada',
+                        EstadoDevolucion::ANULADA => 'Anulada',
                     })
                     ->color(fn (EstadoDevolucion $state) => $state === EstadoDevolucion::ANULADA ? 'danger' : 'success'),
 
@@ -298,7 +312,7 @@ class DevolucionCompraResource extends Resource
                     ->label('Estado')
                     ->options([
                         EstadoDevolucion::REGISTRADA->value => 'Registrada',
-                        EstadoDevolucion::ANULADA->value    => 'Anulada',
+                        EstadoDevolucion::ANULADA->value => 'Anulada',
                     ]),
 
                 Filter::make('fecha')
@@ -320,7 +334,7 @@ class DevolucionCompraResource extends Resource
                     ->icon('heroicon-o-x-circle')
                     ->color('danger')
                     ->requiresConfirmation()
-                    ->visible(fn (DevolucionCompra $record): bool => ! $record->estaAnulada() && (auth()->user()?->can('anular_compras') ?? false))
+                    ->visible(fn (DevolucionCompra $record): bool => ! $record->estaAnulada() && (auth()->user()?->can('compras.anular') ?? false))
                     ->schema([
                         Textarea::make('motivo')
                             ->label('Motivo de anulación')
@@ -345,9 +359,9 @@ class DevolucionCompraResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index'  => Pages\ListDevolucionesCompra::route('/'),
+            'index' => Pages\ListDevolucionesCompra::route('/'),
             'create' => Pages\CreateDevolucionCompra::route('/create'),
-            'view'   => Pages\ViewDevolucionCompra::route('/{record}'),
+            'view' => Pages\ViewDevolucionCompra::route('/{record}'),
         ];
     }
 }

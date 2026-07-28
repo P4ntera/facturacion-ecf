@@ -25,16 +25,16 @@ class PedidoCompraResourceTest extends TestCase
     private function crearProducto(array $overrides = []): Producto
     {
         return Producto::create(array_merge([
-            'codigo'         => 'P-' . fake()->unique()->numerify('###'),
-            'nombre'         => 'Producto Test',
-            'tipo'           => TipoProducto::PRODUCTO->value,
-            'costo'          => 50,
-            'precio'         => 100,
-            'tasa_itbis'     => TasaItbis::DIECIOCHO->value,
+            'codigo' => 'P-'.fake()->unique()->numerify('###'),
+            'nombre' => 'Producto Test',
+            'tipo' => TipoProducto::PRODUCTO->value,
+            'costo' => 50,
+            'precio' => 100,
+            'tasa_itbis' => TasaItbis::DIECIOCHO->value,
             'controla_stock' => true,
-            'stock'          => 2,
-            'stock_minimo'   => 10,
-            'activo'         => true,
+            'stock' => 2,
+            'stock_minimo' => 10,
+            'activo' => true,
         ], $overrides));
     }
 
@@ -77,9 +77,9 @@ class PedidoCompraResourceTest extends TestCase
 
     public function test_crear_pedido_prefill_desde_query_params_del_dashboard(): void
     {
-        $usuario   = $this->usuarioConPermiso();
+        $usuario = $this->usuarioConPermiso();
         $proveedor = Proveedor::factory()->create();
-        $producto  = $this->crearProducto();
+        $producto = $this->crearProducto();
 
         $producto->proveedores()->attach($proveedor->id, ['es_principal' => true]);
 
@@ -97,18 +97,18 @@ class PedidoCompraResourceTest extends TestCase
     {
         Mail::fake();
 
-        $usuario   = $this->usuarioConPermiso();
+        $usuario = $this->usuarioConPermiso();
         $proveedor = Proveedor::factory()->create(['email' => 'proveedor@test.com']);
-        $producto  = $this->crearProducto();
+        $producto = $this->crearProducto();
 
         $pedido = app(PedidoCompraService::class)->crear([
             'proveedor_id' => $proveedor->id,
-            'fecha'        => now(),
-            'notas'        => null,
+            'fecha' => now(),
+            'notas' => null,
             'lineas' => [
                 ['producto_id' => $producto->id, 'cantidad' => 8, 'costo_unitario' => 60],
             ],
-        ], $usuario->id);
+        ], $usuario->id, $this->empresaDefault);
 
         Livewire::actingAs($usuario)
             ->test(ListPedidosCompra::class)
@@ -127,21 +127,21 @@ class PedidoCompraResourceTest extends TestCase
 
     public function test_cancelar_solo_lo_puede_un_administrador(): void
     {
-        $admin       = $this->usuarioConPermiso('Administrador');
+        $admin = $this->usuarioConPermiso('Administrador');
         $almacenista = User::factory()->create();
         $almacenista->assignRole('Almacenista');
 
         $proveedor = Proveedor::factory()->create();
-        $producto  = $this->crearProducto();
+        $producto = $this->crearProducto();
 
         $pedido = app(PedidoCompraService::class)->crear([
             'proveedor_id' => $proveedor->id,
-            'fecha'        => now(),
-            'notas'        => null,
+            'fecha' => now(),
+            'notas' => null,
             'lineas' => [
                 ['producto_id' => $producto->id, 'cantidad' => 1, 'costo_unitario' => 10],
             ],
-        ], $admin->id);
+        ], $admin->id, $this->empresaDefault);
 
         Livewire::actingAs($almacenista)
             ->test(ListPedidosCompra::class)

@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Enums\ModuloImpresion;
 use App\Filament\Resources\UserResource\Pages;
 use App\Models\User;
+use Filament\Facades\Filament;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
@@ -29,6 +30,8 @@ class UserResource extends Resource
     protected static ?string $slug = 'usuarios';
 
     protected static string|\UnitEnum|null $navigationGroup = 'Configuración';
+
+    protected static ?int $navigationSort = 62;
 
     public static function form(Schema $schema): Schema
     {
@@ -55,10 +58,25 @@ class UserResource extends Resource
 
             Select::make('roles')
                 ->label('Roles')
-                ->relationship('roles', 'name')
+                // El Select no se scopea solo: relationship() arma sus opciones consultando
+                // Role directamente, sin el team_id de spatie (eso solo lo aplica la relación
+                // roles() del propio modelo, en la dirección usuario -> roles, no aquí).
+                ->relationship(
+                    'roles',
+                    'name',
+                    // Sin calificar la tabla: model_has_roles TAMBIÉN tiene empresa_id (columna
+                    // del team de spatie) y esta consulta hace join con esa tabla, así que
+                    // "empresa_id" a secas es ambiguo para Postgres.
+                    modifyQueryUsing: fn (Builder $query) => $query->where('roles.empresa_id', Filament::getTenant()?->id),
+                )
+                // Necesario: el sync que hace este Select al guardar es un
+                // BelongsToMany::sync() plano, que no rellena solo la columna extra del pivot
+                // (empresa_id, NOT NULL en model_has_roles) — sin esto, asignar un rol revienta
+                // el guardado con una violación de NOT NULL.
+                ->pivotData(fn (): array => ['empresa_id' => Filament::getTenant()?->id])
                 ->multiple()
                 ->preload()
-                ->visible(fn (): bool => auth()->user()?->can('gestionar_usuarios') ?? false),
+                ->visible(fn (): bool => auth()->user()?->can('usuarios.gestionar') ?? false),
 
             Select::make('impresora_facturacion_id')
                 ->label('Impresora de facturación')
@@ -66,7 +84,7 @@ class UserResource extends Resource
                 ->relationship('impresoraFacturacion', 'nombre', fn (Builder $query) => $query->activas()->porModulo(ModuloImpresion::FACTURACION))
                 ->preload()
                 ->native(false)
-                ->visible(fn (): bool => auth()->user()?->can('gestionar_usuarios') ?? false),
+                ->visible(fn (): bool => auth()->user()?->can('usuarios.gestionar') ?? false),
         ]);
     }
 
@@ -91,7 +109,8 @@ class UserResource extends Resource
             TextColumn::make('created_at')
                 ->label('Creado')
                 ->dateTime('d/m/Y H:i')
-                ->sortable(),
+                ->sortable()
+                ->toggleable(isToggledHiddenByDefault: true),
         ]);
     }
 

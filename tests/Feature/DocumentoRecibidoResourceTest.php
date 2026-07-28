@@ -23,13 +23,13 @@ class DocumentoRecibidoResourceTest extends TestCase
     {
         parent::setUp();
 
-        Permission::firstOrCreate(['name' => 'gestionar_ecf', 'guard_name' => 'web']);
+        Permission::firstOrCreate(['name' => 'ecf.gestionar', 'guard_name' => 'web']);
     }
 
     private function usuarioConPermiso(): User
     {
         $rol = Role::firstOrCreate(['name' => 'Rol-gestionar-ecf', 'guard_name' => 'web']);
-        $rol->syncPermissions(['gestionar_ecf']);
+        $rol->syncPermissions(['ecf.gestionar']);
 
         $usuario = User::factory()->create();
         $usuario->assignRole($rol);

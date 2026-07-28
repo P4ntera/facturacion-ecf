@@ -12,6 +12,7 @@ use App\Models\DetalleCompra;
 use App\Models\Producto;
 use App\Models\ProductoProveedor;
 use App\Models\Proveedor;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -27,9 +28,9 @@ class CompraService
      *
      * @param  array{
      *   proveedor_id:      int,
-     *   tipo_comprobante:  \App\Enums\TipoComprobante|null,
+     *   tipo_comprobante:  TipoComprobante|null,
      *   ncf:               string|null,
-     *   fecha:             \Carbon\Carbon,
+     *   fecha:             Carbon,
      *   itbis_incluido:    bool,
      *   lineas: array<int, array{
      *     producto_id:    int,
@@ -52,44 +53,49 @@ class CompraService
         }
 
         return DB::transaction(function () use ($datos, $userId) {
-            $proveedor     = Proveedor::findOrFail($datos['proveedor_id']);
+            $proveedor = Proveedor::findOrFail($datos['proveedor_id']);
             $itbisIncluido = (bool) ($datos['itbis_incluido'] ?? false);
 
             $detallesCalc = $this->calcularLineas($datos['lineas'], $itbisIncluido);
-            $totales      = $this->calcularTotales($detallesCalc);
+            $totales = $this->calcularTotales($detallesCalc);
 
             // Proveedor informal: no emite comprobante fiscal propio, el sistema le genera
             // uno con la secuencia de "Comprobantes de Compras" (tipo 41). Proveedor formal:
             // se registra el comprobante que el proveedor entregó, tal cual lo digitó el usuario.
             if ($proveedor->esInformal()) {
                 $tipoComprobante = TipoComprobante::COMPRAS;
-                $ncf             = $this->ncfService->siguiente(TipoComprobante::COMPRAS);
+                $ncf = $this->ncfService->siguiente(TipoComprobante::COMPRAS);
             } else {
                 $tipoComprobante = $datos['tipo_comprobante'] ?? TipoComprobante::COMPRAS;
-                $ncf             = $datos['ncf'] ?? null;
+                $ncf = $datos['ncf'] ?? null;
             }
 
             $compra = Compra::create([
-                'proveedor_id'         => $proveedor->id,
-                'user_id'              => $userId,
-                'tipo_comprobante'     => $tipoComprobante,
-                'ncf'                  => $ncf,
-                'fecha'                => $datos['fecha'],
-                'itbis_incluido'       => $itbisIncluido,
-                'monto_total_factura'  => $datos['monto_total_factura'] ?? null,
-                'estado'               => EstadoCompra::REGISTRADA,
+                // Se deriva del proveedor (ya cargado arriba) en vez de depender de que
+                // Filament haya asociado el tenant automáticamente: este service puede
+                // invocarse fuera del ciclo de vida de una request de panel (colas, comandos,
+                // tests).
+                'empresa_id' => $proveedor->empresa_id,
+                'proveedor_id' => $proveedor->id,
+                'user_id' => $userId,
+                'tipo_comprobante' => $tipoComprobante,
+                'ncf' => $ncf,
+                'fecha' => $datos['fecha'],
+                'itbis_incluido' => $itbisIncluido,
+                'monto_total_factura' => $datos['monto_total_factura'] ?? null,
+                'estado' => EstadoCompra::REGISTRADA,
                 ...$totales,
             ]);
 
             foreach ($detallesCalc as $linea) {
                 DetalleCompra::create([
-                    'compra_id'      => $compra->id,
-                    'producto_id'    => $linea['producto_id'],
-                    'cantidad'       => $linea['cantidad'],
+                    'compra_id' => $compra->id,
+                    'producto_id' => $linea['producto_id'],
+                    'cantidad' => $linea['cantidad'],
                     'costo_unitario' => $linea['costo_unitario'],
-                    'tasa_itbis'     => $linea['tasa_itbis'],
-                    'itbis_monto'    => $linea['itbis_monto'],
-                    'subtotal'       => $linea['subtotal'],
+                    'tasa_itbis' => $linea['tasa_itbis'],
+                    'itbis_monto' => $linea['itbis_monto'],
+                    'subtotal' => $linea['subtotal'],
                 ]);
 
                 $producto = Producto::find($linea['producto_id']);
@@ -151,9 +157,9 @@ class CompraService
             }
 
             $compra->update([
-                'estado'           => EstadoCompra::ANULADA,
+                'estado' => EstadoCompra::ANULADA,
                 'motivo_anulacion' => $motivo,
-                'anulada_en'       => now(),
+                'anulada_en' => now(),
             ]);
 
             return $compra->refresh();
@@ -174,26 +180,26 @@ class CompraService
     public function calcularLineas(array $lineas, bool $itbisIncluido): array
     {
         return array_map(function (array $l) use ($itbisIncluido) {
-            $producto   = Producto::findOrFail($l['producto_id']);
-            $tasa       = $producto->tasa_itbis;
+            $producto = Producto::findOrFail($l['producto_id']);
+            $tasa = $producto->tasa_itbis;
             $porcentaje = $tasa->porcentaje();
-            $cantidad   = (float) $l['cantidad'];
-            $digitado   = (float) $l['costo_unitario'];
+            $cantidad = (float) $l['cantidad'];
+            $digitado = (float) $l['costo_unitario'];
 
             $costoBase = ($itbisIncluido && $porcentaje > 0)
                 ? round($digitado / (1 + $porcentaje / 100), 4)
                 : $digitado;
 
-            $subtotal   = round($costoBase * $cantidad, 2);
+            $subtotal = round($costoBase * $cantidad, 2);
             $itbisMonto = round($subtotal * $porcentaje / 100, 2);
 
             return [
-                'producto_id'    => $l['producto_id'],
-                'cantidad'       => $cantidad,
+                'producto_id' => $l['producto_id'],
+                'cantidad' => $cantidad,
                 'costo_unitario' => round($costoBase, 2),
-                'tasa_itbis'     => $tasa,
-                'subtotal'       => $subtotal,
-                'itbis_monto'    => $itbisMonto,
+                'tasa_itbis' => $tasa,
+                'subtotal' => $subtotal,
+                'itbis_monto' => $itbisMonto,
             ];
         }, $lineas);
     }
@@ -203,31 +209,31 @@ class CompraService
     {
         $montoGravado18 = 0.0;
         $montoGravado16 = 0.0;
-        $montoGravado0  = 0.0;
+        $montoGravado0 = 0.0;
 
         foreach ($lineas as $l) {
             match ($l['tasa_itbis']) {
                 TasaItbis::DIECIOCHO => $montoGravado18 += $l['subtotal'],
                 TasaItbis::DIECISEIS => $montoGravado16 += $l['subtotal'],
-                TasaItbis::CERO      => $montoGravado0  += $l['subtotal'],
+                TasaItbis::CERO => $montoGravado0 += $l['subtotal'],
             };
         }
 
-        $subtotal   = round(array_sum(array_column($lineas, 'subtotal')), 2);
-        $itbis18    = round($montoGravado18 * 0.18, 2);
-        $itbis16    = round($montoGravado16 * 0.16, 2);
+        $subtotal = round(array_sum(array_column($lineas, 'subtotal')), 2);
+        $itbis18 = round($montoGravado18 * 0.18, 2);
+        $itbis16 = round($montoGravado16 * 0.16, 2);
         $totalItbis = round($itbis18 + $itbis16, 2);
 
         return [
-            'subtotal'         => $subtotal,
+            'subtotal' => $subtotal,
             'monto_gravado_18' => round($montoGravado18, 2),
             'monto_gravado_16' => round($montoGravado16, 2),
-            'monto_gravado_0'  => round($montoGravado0, 2),
-            'monto_exento'     => 0.00,
-            'itbis_18'         => $itbis18,
-            'itbis_16'         => $itbis16,
-            'itbis'            => $totalItbis,
-            'total'            => round($subtotal + $totalItbis, 2),
+            'monto_gravado_0' => round($montoGravado0, 2),
+            'monto_exento' => 0.00,
+            'itbis_18' => $itbis18,
+            'itbis_16' => $itbis16,
+            'itbis' => $totalItbis,
+            'total' => round($subtotal + $totalItbis, 2),
         ];
     }
 }

@@ -6,8 +6,6 @@ use App\Enums\AmbienteEcf;
 use App\Filament\Pages\ManageEmpresa;
 use App\Filament\Pages\ManageFacturacion;
 use App\Models\User;
-use App\Settings\EmpresaSettings;
-use App\Settings\FacturacionSettings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
@@ -21,11 +19,12 @@ class ConfiguracionSettingsTest extends TestCase
 
     private function usuarioAutorizado(): User
     {
-        Permission::firstOrCreate(['name' => 'administrar_configuracion', 'guard_name' => 'web']);
+        Permission::firstOrCreate(['name' => 'empresa.administrar', 'guard_name' => 'web']);
+        Permission::firstOrCreate(['name' => 'facturacion.administrar', 'guard_name' => 'web']);
         $rol = Role::firstOrCreate(['name' => 'Administrador', 'guard_name' => 'web']);
-        $rol->syncPermissions(['administrar_configuracion']);
+        $rol->syncPermissions(['empresa.administrar', 'facturacion.administrar']);
 
-        $usuario = User::factory()->create();
+        $usuario = User::factory()->create(['empresa_id' => $this->empresaDefault->id]);
         $usuario->assignRole('Administrador');
 
         return $usuario;
@@ -46,9 +45,8 @@ class ConfiguracionSettingsTest extends TestCase
             ->call('save')
             ->assertHasNoFormErrors();
 
-        $settings = app(EmpresaSettings::class);
-        $this->assertSame('Comercial Prueba SRL', $settings->razon_social);
-        $this->assertSame('130123456', $settings->rnc);
+        $this->assertSame('Comercial Prueba SRL', $this->empresaDefault->fresh()->razon_social);
+        $this->assertSame('130123456', $this->empresaDefault->fresh()->rnc);
     }
 
     public function test_rechaza_un_rnc_con_formato_invalido(): void
@@ -79,14 +77,13 @@ class ConfiguracionSettingsTest extends TestCase
             ->call('save')
             ->assertHasNoFormErrors();
 
-        $settings = app(EmpresaSettings::class);
-        $this->assertSame('clave-secreta-del-pac', $settings->dgii_api_key);
-        $this->assertSame(AmbienteEcf::CERTECF->value, $settings->dgii_ambiente);
+        $config = $this->empresaDefault->config()->fresh();
+        $this->assertSame('clave-secreta-del-pac', $config->dgii_api_key);
+        $this->assertSame(AmbienteEcf::CERTECF, $config->dgii_ambiente);
 
-        $payload = DB::table('settings')
-            ->where('group', 'empresa')
-            ->where('name', 'dgii_api_key')
-            ->value('payload');
+        $payload = DB::table('empresa_configuracion')
+            ->where('empresa_id', $this->empresaDefault->id)
+            ->value('dgii_api_key');
 
         $this->assertStringNotContainsString('clave-secreta-del-pac', $payload);
     }
@@ -105,15 +102,15 @@ class ConfiguracionSettingsTest extends TestCase
             ->call('save')
             ->assertHasNoFormErrors();
 
-        $settings = app(FacturacionSettings::class);
-        $this->assertTrue($settings->precio_incluye_itbis);
-        $this->assertSame('16', $settings->tasa_itbis_defecto);
-        $this->assertSame('USD', $settings->moneda);
+        $config = $this->empresaDefault->config()->fresh();
+        $this->assertTrue($config->precio_incluye_itbis);
+        $this->assertSame('16', $config->tasa_itbis_defecto);
+        $this->assertSame('USD', $config->moneda);
     }
 
     public function test_un_usuario_sin_permiso_no_puede_acceder(): void
     {
-        $usuario = User::factory()->create();
+        $usuario = User::factory()->create(['empresa_id' => $this->empresaDefault->id]);
         $rol = Role::firstOrCreate(['name' => 'Vendedor', 'guard_name' => 'web']);
         $usuario->assignRole($rol);
 

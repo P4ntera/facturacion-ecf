@@ -9,15 +9,16 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Orquesta el envío de un e-CF ya registrado: construye el JSON (EcfBuilder), lo manda al PAC
- * (DgiiGatewayInterface) y persiste el resultado en la Venta. Nunca lanza: los problemas de datos
- * (RNC faltante, etc.) quedan como RECHAZADO y los de red dejan la venta en PENDIENTE para que
+ * (DgiiGatewayInterface, resuelto vía DgiiGatewayFactory para LA EMPRESA DE LA VENTA — nunca la
+ * de otra) y persiste el resultado en la Venta. Nunca lanza: los problemas de datos (RNC
+ * faltante, etc.) quedan como RECHAZADO y los de red dejan la venta en PENDIENTE para que
  * EnviarEcfJob reintente.
  */
 class EnvioEcfService
 {
     public function __construct(
         private readonly EcfBuilder $builder,
-        private readonly DgiiGatewayInterface $gateway,
+        private readonly DgiiGatewayFactory $gatewayFactory,
     ) {}
 
     public function enviar(Venta $venta): RespuestaEcf
@@ -28,7 +29,7 @@ class EnvioEcfService
             return $this->rechazarPorDatosInvalidos($venta, $e);
         }
 
-        $respuesta = $this->gateway->enviar($ecf);
+        $respuesta = $this->gateway($venta)->enviar($ecf);
         $this->guardar($venta, $respuesta);
 
         return $respuesta;
@@ -44,10 +45,19 @@ class EnvioEcfService
             return new RespuestaEcf(exito: false, errorMessage: 'Esta venta todavía no se ha enviado al PAC.');
         }
 
-        $respuesta = $this->gateway->consultarTrack($venta->pac_id);
+        $respuesta = $this->gateway($venta)->consultarTrack($venta->pac_id);
         $this->guardar($venta, $respuesta);
 
         return $respuesta;
+    }
+
+    /**
+     * Se deriva de $venta->empresa (cargada de la BD, nunca de Filament::getTenant()): este
+     * service lo invoca EnviarEcfJob desde una cola, fuera de cualquier request de panel.
+     */
+    private function gateway(Venta $venta): DgiiGatewayInterface
+    {
+        return $this->gatewayFactory->make($venta->empresa);
     }
 
     private function guardar(Venta $venta, RespuestaEcf $respuesta): void

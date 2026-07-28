@@ -2,9 +2,12 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\Modulo;
+use App\Filament\Concerns\RestringidoPorModulo;
 use App\Filament\Resources\AuditoriaResource\Pages;
 use App\Models\User;
 use Filament\Actions\ViewAction;
+use Filament\Facades\Filament;
 use Filament\Forms\Components\DatePicker;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Resource;
@@ -19,7 +22,20 @@ use Spatie\Activitylog\Models\Activity;
 
 class AuditoriaResource extends Resource
 {
+    use RestringidoPorModulo;
+
     protected static ?string $model = Activity::class;
+
+    public static function modulo(): Modulo
+    {
+        return Modulo::AUDITORIA;
+    }
+
+    // Activity (spatie/activitylog) es una tabla compartida por todo tipo de modelos (algunos
+    // con empresa_id, otros no: Role, la propia Empresa...); no tiene relación "empresa" directa,
+    // así que el scoping automático por tenant no aplica. Se filtra manualmente abajo (por el
+    // causante) para que una empresa no vea la auditoría de otra.
+    protected static bool $isScopedToTenant = false;
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-clock';
 
@@ -33,10 +49,27 @@ class AuditoriaResource extends Resource
 
     protected static string|\UnitEnum|null $navigationGroup = 'Configuración';
 
+    protected static ?int $navigationSort = 65;
+
     // Auditoría de solo lectura: append-only, igual que el Kardex.
     public static function canCreate(): bool
     {
         return false;
+    }
+
+    /**
+     * Solo actividad causada por usuarios de la empresa actual: evita que una empresa vea el
+     * historial de otra (Activity no tiene empresa_id propio, ver nota junto a $isScopedToTenant).
+     * Deja fuera la actividad "del sistema" (causer_id null, p. ej. jobs) para cualquier empresa:
+     * es preferible no mostrarla a mostrarla cruzada.
+     */
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()->whereHasMorph(
+            'causer',
+            [User::class],
+            fn (Builder $query) => $query->where('empresa_id', Filament::getTenant()?->id),
+        );
     }
 
     public static function infolist(Schema $schema): Schema
@@ -96,7 +129,11 @@ class AuditoriaResource extends Resource
             ->filters([
                 SelectFilter::make('causer_id')
                     ->label('Usuario')
-                    ->options(fn (): array => User::query()->orderBy('name')->pluck('name', 'id')->all())
+                    ->options(fn (): array => User::query()
+                        ->where('empresa_id', Filament::getTenant()?->id)
+                        ->orderBy('name')
+                        ->pluck('name', 'id')
+                        ->all())
                     ->query(function (Builder $query, array $data): Builder {
                         return $query->when(
                             $data['value'] ?? null,

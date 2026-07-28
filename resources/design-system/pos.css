@@ -2,11 +2,11 @@
  * Design-system del Punto de Venta.
  *
  * El tema del panel Filament (resources/css/filament/admin/theme.css) solo importa tokens
- * (variables/colors/typography/shadows): no importa buttons/tables/forms/badges/components,
- * porque Filament ya trae sus propios componentes y no queremos que choquen en el resto del
- * panel. Por eso, para que el POS se vea con el design-system del proyecto, este archivo
- * "porta" esas mismas reglas (mismos tokens, mismos valores) pero con el selector `.pos-screen`
- * por delante, así quedan scopeadas exclusivamente a esta pantalla.
+ * (variables/colors/typography/shadows): Filament ya trae sus propios componentes y no queremos
+ * que choquen con los del resto del panel. El Punto de Venta (app/Filament/Pages/PuntoDeVenta.php)
+ * es la única pantalla que necesita una pequeña librería propia de componentes (.card/.table/
+ * .btn/.badge/.form-input), así que vive aquí, scopeada bajo `.pos-screen` para no afectar nada
+ * fuera de esta página.
  */
 
 .pos-screen{
@@ -46,7 +46,7 @@
     }
 }
 
-/*======== BOTONES (ver buttons.css) ========*/
+/*======== BOTONES ========*/
 
 .pos-screen .btn{
     display:inline-flex;
@@ -54,7 +54,7 @@
     justify-content:center;
     gap:var(--space-xs);
     padding:var(--space-xs) var(--space-sm);
-    border-radius:var(--radius-md);
+    border-radius:var(--radius);
     border:1px solid transparent;
     font-family:var(--font-family);
     font-size:var(--fs-small);
@@ -78,12 +78,28 @@
 }
 
 .pos-screen .btn-secondary{
-    background-color:var(--white);
-    border-color:var(--gray-300);
+    background-color:var(--gray-100);
     color:var(--gray-700);
 }
 .pos-screen .btn-secondary:hover:not(:disabled){
-    background-color:var(--gray-100);
+    background-color:var(--gray-200);
+}
+
+.pos-screen .btn-inverted{
+    background-color:var(--neutral-900);
+    color:var(--white);
+}
+.pos-screen .btn-inverted:hover:not(:disabled){
+    background-color:var(--neutral-800);
+}
+
+.pos-screen .btn-outlined{
+    background-color:transparent;
+    border-color:var(--primary);
+    color:var(--primary);
+}
+.pos-screen .btn-outlined:hover:not(:disabled){
+    background-color:var(--primary-50);
 }
 
 .pos-screen .btn-danger{
@@ -100,7 +116,7 @@
     font-size:var(--fs-body);
 }
 
-/*======== TABLAS (ver tables.css) ========*/
+/*======== TABLAS ========*/
 
 .pos-screen .table{
     width:100%;
@@ -140,7 +156,7 @@
     text-align:right;
 }
 
-/*======== FORMULARIOS (ver forms.css) ========*/
+/*======== FORMULARIOS ========*/
 
 .pos-screen .form-label{
     display:block;
@@ -158,7 +174,7 @@
     width:100%;
     padding:var(--space-xs) var(--space-sm);
     border:1px solid var(--gray-300);
-    border-radius:var(--radius-md);
+    border-radius:var(--radius);
     font-family:var(--font-family);
     font-size:var(--fs-small);
     color:var(--gray-900);
@@ -178,7 +194,7 @@
     color:var(--text-muted);
 }
 
-/*======== BADGES (ver badges.css) ========*/
+/*======== BADGES ========*/
 
 .pos-screen .badge{
     display:inline-flex;
@@ -193,18 +209,18 @@
     color:var(--gray-700);
 }
 
-.pos-screen .badge-success{ background-color:var(--secondary-dark); color:var(--white); }
+.pos-screen .badge-success{ background-color:var(--success-dark); color:var(--white); }
 .pos-screen .badge-warning{ background-color:var(--warning-dark); color:var(--white); }
 .pos-screen .badge-danger{ background-color:var(--danger-dark); color:var(--white); }
 
-/*======== TARJETAS (ver components.css) ========*/
+/*======== TARJETAS ========*/
 
 .pos-screen .card{
     padding:var(--space-md);
-    background-color:var(--white);
-    border:1px solid var(--gray-200);
+    background-color:var(--fondo-tarjeta);
+    border:1px solid var(--borde-tarjeta);
     border-radius:var(--radius-lg);
-    box-shadow:var(--shadow-card);
+    box-shadow:var(--sombra-tarjeta);
 }
 
 .pos-screen .card-title{
@@ -218,14 +234,14 @@
 
 .pos-screen .pos-resultados{
     margin-top:var(--space-xs);
-    border:1px solid var(--border);
-    border-radius:var(--radius-md);
+    border:1px solid var(--borde-tarjeta);
+    border-radius:var(--radius);
     max-height:14rem;
     overflow-y:auto;
 }
 
 .pos-screen .pos-resultados li + li{
-    border-top:1px solid var(--border);
+    border-top:1px solid var(--borde-tarjeta);
 }
 
 .pos-screen .pos-resultados button{
@@ -269,7 +285,7 @@
     justify-content:space-between;
     margin-top:var(--space-sm);
     padding-top:var(--space-sm);
-    border-top:1px solid var(--border);
+    border-top:1px solid var(--borde-tarjeta);
 }
 
 .pos-screen .pos-total-final .pos-total-label{

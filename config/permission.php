@@ -1,8 +1,8 @@
 <?php
 
+use App\Models\Role;
 use Spatie\Permission\DefaultTeamResolver;
 use Spatie\Permission\Models\Permission;
-use Spatie\Permission\Models\Role;
 
 return [
 
@@ -110,7 +110,9 @@ return [
          * foreign key is other than `team_id`.
          */
 
-        'team_foreign_key' => 'team_id',
+        // 'empresa_id' en vez del 'team_id' por defecto: consistente con la columna que ya usan
+        // las tablas de negocio para el tenant (Empresa) desde el multi-tenancy nativo de Filament.
+        'team_foreign_key' => 'empresa_id',
     ],
 
     /*
@@ -148,7 +150,11 @@ return [
      * (view the latest version of this package's migration file)
      */
 
-    'teams' => false,
+    // Cada empresa (tenant) define sus propios roles: Administrador, Vendedor, etc. no son
+    // globales, existen una vez por empresa. La migración de este paquete ya es condicional a
+    // este flag (ver database/migrations/2026_06_23_013334_create_permission_tables.php), así
+    // que activarlo aquí basta para que produzca el esquema con equipos al migrar en limpio.
+    'teams' => true,
 
     /*
      * The class to use to resolve the permissions team id

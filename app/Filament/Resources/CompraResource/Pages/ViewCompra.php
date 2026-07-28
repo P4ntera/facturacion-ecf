@@ -19,7 +19,7 @@ class ViewCompra extends ViewRecord
                 ->label('Registrar devolución')
                 ->icon('heroicon-o-arrow-uturn-left')
                 ->color('gray')
-                ->visible(fn (Compra $record): bool => ! $record->estaAnulada() && (auth()->user()?->can('gestionar_compras') ?? false))
+                ->visible(fn (Compra $record): bool => ! $record->estaAnulada() && (auth()->user()?->can('devoluciones.crear') ?? false))
                 ->url(fn (Compra $record): string => DevolucionCompraResource::getUrl('create', ['compra_id' => $record->id])),
         ];
     }

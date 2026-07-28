@@ -18,9 +18,10 @@ class ProductoResourceTest extends TestCase
 
     public function test_crea_un_producto_desde_el_formulario_de_filament(): void
     {
-        Permission::firstOrCreate(['name' => 'gestionar_maestros', 'guard_name' => 'web']);
+        Permission::firstOrCreate(['name' => 'productos.ver', 'guard_name' => 'web']);
+        Permission::firstOrCreate(['name' => 'productos.crear', 'guard_name' => 'web']);
         $rol = Role::firstOrCreate(['name' => 'Vendedor', 'guard_name' => 'web']);
-        $rol->syncPermissions(['gestionar_maestros']);
+        $rol->syncPermissions(['productos.ver', 'productos.crear']);
 
         $usuario = User::factory()->create();
         $usuario->assignRole('Vendedor');

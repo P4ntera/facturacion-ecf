@@ -5,6 +5,7 @@ namespace App\Filament\Resources\PedidoCompraResource\Pages;
 use App\Filament\Resources\PedidoCompraResource;
 use App\Models\Producto;
 use App\Services\PedidoCompraService;
+use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Support\Exceptions\Halt;
@@ -37,13 +38,15 @@ class CreatePedidoCompra extends CreateRecord
         if (filled($productoIds)) {
             $ids = array_filter(explode(',', (string) $productoIds));
 
-            foreach (Producto::whereIn('id', $ids)->get() as $producto) {
+            // Consulta directa a Producto: no hereda el scoping automático de Filament (solo
+            // aplica a las consultas que arma el propio framework), así que se filtra a mano.
+            foreach (Producto::where('empresa_id', Filament::getTenant()->id)->whereIn('id', $ids)->get() as $producto) {
                 $pivot = $producto->proveedores()->where('proveedores.id', $proveedorId)->first()?->pivot;
                 $sugerida = max(1, (float) $producto->stock_minimo - (float) $producto->stock);
 
                 $lineas[(string) Str::uuid()] = [
-                    'producto_id'    => $producto->id,
-                    'cantidad'       => $sugerida,
+                    'producto_id' => $producto->id,
+                    'cantidad' => $sugerida,
                     'costo_unitario' => $pivot?->costo_referencia ?? $producto->costo,
                 ];
             }
@@ -54,7 +57,7 @@ class CreatePedidoCompra extends CreateRecord
         // punto de mount(), eso aborta el prellenado con un error de validación. Se asigna
         // directo a $this->data, igual que hace agregarLinea() al agregar una línea.
         $this->data['proveedor_id'] = (int) $proveedorId;
-        $this->data['lineas']       = $lineas;
+        $this->data['lineas'] = $lineas;
     }
 
     protected function getRedirectUrl(): string
@@ -73,8 +76,8 @@ class CreatePedidoCompra extends CreateRecord
      */
     public function agregarLinea(): void
     {
-        $productoId    = $this->data['nueva_linea_producto_id'] ?? null;
-        $cantidad      = $this->data['nueva_linea_cantidad'] ?? null;
+        $productoId = $this->data['nueva_linea_producto_id'] ?? null;
+        $cantidad = $this->data['nueva_linea_cantidad'] ?? null;
         $costoUnitario = $this->data['nueva_linea_costo_unitario'] ?? null;
 
         if (! $productoId || ! $cantidad || $costoUnitario === null || $costoUnitario === '') {
@@ -85,14 +88,14 @@ class CreatePedidoCompra extends CreateRecord
 
         $lineas = $this->data['lineas'] ?? [];
         $lineas[(string) Str::uuid()] = [
-            'producto_id'    => $productoId,
-            'cantidad'       => $cantidad,
+            'producto_id' => $productoId,
+            'cantidad' => $cantidad,
             'costo_unitario' => $costoUnitario,
         ];
 
         $this->data['lineas'] = $lineas;
-        $this->data['nueva_linea_producto_id']    = null;
-        $this->data['nueva_linea_cantidad']       = 1;
+        $this->data['nueva_linea_producto_id'] = null;
+        $this->data['nueva_linea_cantidad'] = 1;
         $this->data['nueva_linea_costo_unitario'] = null;
     }
 
@@ -101,14 +104,14 @@ class CreatePedidoCompra extends CreateRecord
         try {
             return app(PedidoCompraService::class)->crear([
                 'proveedor_id' => $data['proveedor_id'],
-                'fecha'        => $data['fecha'],
-                'notas'        => $data['notas'] ?? null,
-                'lineas'       => $data['lineas'],
-            ], auth()->id());
+                'fecha' => $data['fecha'],
+                'notas' => $data['notas'] ?? null,
+                'lineas' => $data['lineas'],
+            ], auth()->id(), Filament::getTenant());
         } catch (RuntimeException $e) {
             Notification::make()->title($e->getMessage())->danger()->send();
 
-            throw new Halt();
+            throw new Halt;
         }
     }
 }

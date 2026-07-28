@@ -243,7 +243,7 @@ class SecuenciaNcfService
     private function alertarPorAgotarse(SecuenciaNcf $secuencia): void
     {
         try {
-            $destinatarios = User::permission('administrar_secuencias')->get();
+            $destinatarios = User::permission('secuencias.administrar')->get();
 
             if ($destinatarios->isEmpty()) {
                 return;

@@ -2,11 +2,14 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\Modulo;
 use App\Enums\TipoDocumentoCliente;
+use App\Filament\Concerns\RestringidoPorModulo;
 use App\Filament\Resources\ClienteResource\Pages;
 use App\Models\Cliente;
 use App\Services\Dgii\ConsultaContribuyenteService;
 use Filament\Actions\Action;
+use Filament\Facades\Filament;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -23,7 +26,14 @@ use Filament\Tables\Table;
 
 class ClienteResource extends Resource
 {
+    use RestringidoPorModulo;
+
     protected static ?string $model = Cliente::class;
+
+    public static function modulo(): Modulo
+    {
+        return Modulo::MAESTROS_CLIENTES;
+    }
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-users';
 
@@ -34,6 +44,8 @@ class ClienteResource extends Resource
     protected static ?string $pluralModelLabel = 'Clientes';
 
     protected static string|\UnitEnum|null $navigationGroup = 'Maestros';
+
+    protected static ?int $navigationSort = 11;
 
     public static function form(Schema $schema): Schema
     {
@@ -59,7 +71,10 @@ class ClienteResource extends Resource
                             ->label('Buscar en DGII')
                             ->icon('heroicon-o-magnifying-glass')
                             ->action(function (Get $get, Set $set): void {
-                                $resultado = app(ConsultaContribuyenteService::class)->buscar((string) ($get('documento') ?? ''));
+                                $resultado = app(ConsultaContribuyenteService::class)->buscar(
+                                    (string) ($get('documento') ?? ''),
+                                    Filament::getTenant(),
+                                );
 
                                 if ($resultado === null) {
                                     Notification::make()
@@ -122,7 +137,8 @@ class ClienteResource extends Resource
                         TipoDocumentoCliente::CEDULA => 'Cédula',
                         TipoDocumentoCliente::SIN_DOCUMENTO => '—',
                         default => $state,
-                    }),
+                    })
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('documento')
                     ->label('Documento')
@@ -131,16 +147,17 @@ class ClienteResource extends Resource
 
                 TextColumn::make('telefono')
                     ->label('Teléfono')
-                    ->placeholder('—'),
+                    ->placeholder('—')
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('email')
                     ->label('Correo')
                     ->placeholder('—')
-                    ->toggleable(),
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 ToggleColumn::make('activo')
                     ->label('Activo')
-                    ->disabled(fn (): bool => ! auth()->user()?->can('gestionar_maestros'))
+                    ->disabled(fn (): bool => ! auth()->user()?->can('clientes.desactivar'))
                     ->sortable(),
             ])
             ->filters([

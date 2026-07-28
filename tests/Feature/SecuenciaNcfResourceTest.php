@@ -18,9 +18,9 @@ class SecuenciaNcfResourceTest extends TestCase
 
     private function usuarioAutorizado(): User
     {
-        Permission::firstOrCreate(['name' => 'administrar_secuencias', 'guard_name' => 'web']);
+        Permission::firstOrCreate(['name' => 'secuencias.administrar', 'guard_name' => 'web']);
         $rol = Role::firstOrCreate(['name' => 'Administrador', 'guard_name' => 'web']);
-        $rol->syncPermissions(['administrar_secuencias']);
+        $rol->syncPermissions(['secuencias.administrar']);
 
         $usuario = User::factory()->create();
         $usuario->assignRole('Administrador');

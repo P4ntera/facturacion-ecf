@@ -3,8 +3,10 @@
 namespace App\Filament\Resources;
 
 use App\Enums\AnchoPapel;
+use App\Enums\Modulo;
 use App\Enums\ModuloImpresion;
 use App\Enums\TipoConexionImpresora;
+use App\Filament\Concerns\RestringidoPorModulo;
 use App\Filament\Resources\ImpresoraResource\Pages;
 use App\Models\Impresora;
 use Filament\Actions\Action;
@@ -28,7 +30,14 @@ use Mike42\Escpos\Printer;
 
 class ImpresoraResource extends Resource
 {
+    use RestringidoPorModulo;
+
     protected static ?string $model = Impresora::class;
+
+    public static function modulo(): Modulo
+    {
+        return Modulo::IMPRESORAS;
+    }
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedPrinter;
 
@@ -41,6 +50,8 @@ class ImpresoraResource extends Resource
     protected static ?string $slug = 'impresoras';
 
     protected static string|\UnitEnum|null $navigationGroup = 'Configuración';
+
+    protected static ?int $navigationSort = 64;
 
     public static function form(Schema $schema): Schema
     {
@@ -124,11 +135,13 @@ class ImpresoraResource extends Resource
 
                 TextColumn::make('destino')
                     ->label('Destino')
-                    ->getStateUsing(fn (Impresora $record) => $record->esDeRed() ? "{$record->ip}:{$record->puerto}" : 'Navegador'),
+                    ->getStateUsing(fn (Impresora $record) => $record->esDeRed() ? "{$record->ip}:{$record->puerto}" : 'Navegador')
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('ancho_papel')
                     ->label('Ancho')
-                    ->formatStateUsing(fn (AnchoPapel $state) => $state->etiqueta()),
+                    ->formatStateUsing(fn (AnchoPapel $state) => $state->etiqueta())
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('modulo')
                     ->label('Módulo')

@@ -5,7 +5,8 @@ namespace App\Services\Dgii;
 use App\Enums\AmbienteEcf;
 use App\Enums\CanalRecepcionEcf;
 use App\Exceptions\DgiiGatewayException;
-use App\Settings\EmpresaSettings;
+use App\Models\Empresa;
+use App\Models\EmpresaConfiguracion;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
@@ -13,15 +14,24 @@ use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
- * Implementación real: habla con el PAC configurado en EmpresaSettings (dgii_api_key/dgii_base_url).
- * Los errores de red NO se lanzan aquí para enviar/consultarEstado/consultarTrack: se devuelven como
- * RespuestaEcf con exito=false para que el job que orquesta el envío decida si reintenta. descargarXml
- * y buscarContribuyente no tienen un "exito" tipado en su contrato, así que ahí sí se propaga un
- * error (DgiiGatewayException) o se devuelve null, respectivamente.
+ * Implementación real: habla con el PAC configurado en la EmpresaConfiguracion de UNA empresa
+ * concreta (dgii_api_key/dgii_base_url) — nunca se resuelve como singleton del contenedor, la
+ * construye DgiiGatewayFactory::make() para la empresa correcta en cada caso. Recibe la Empresa
+ * completa (no solo su EmpresaConfiguracion) porque reenviarXml() necesita el RNC, que vive en
+ * Empresa, no en su configuración fiscal. Los errores de red NO se lanzan aquí para enviar/
+ * consultarEstado/consultarTrack: se devuelven como RespuestaEcf con exito=false para que el job
+ * que orquesta el envío decida si reintenta. descargarXml y buscarContribuyente no tienen un
+ * "exito" tipado en su contrato, así que ahí sí se propaga un error (DgiiGatewayException) o se
+ * devuelve null, respectivamente.
  */
 final class EcfPlatformGateway implements DgiiGatewayInterface
 {
-    public function __construct(private readonly EmpresaSettings $settings) {}
+    private readonly EmpresaConfiguracion $configuracion;
+
+    public function __construct(private readonly Empresa $empresa)
+    {
+        $this->configuracion = $empresa->config();
+    }
 
     public function enviar(array $ecf): RespuestaEcf
     {
@@ -101,7 +111,7 @@ final class EcfPlatformGateway implements DgiiGatewayInterface
     {
         return $this->peticion(fn (PendingRequest $cliente) => $cliente
             ->withBody($xml, 'application/xml')
-            ->post("/{$this->settings->rnc}/fe/{$canal->segmentoPac()}/api/ecf"));
+            ->post("/{$this->empresa->rnc}/fe/{$canal->segmentoPac()}/api/ecf"));
     }
 
     private function peticion(\Closure $llamada): RespuestaEcf
@@ -113,7 +123,7 @@ final class EcfPlatformGateway implements DgiiGatewayInterface
 
             return new RespuestaEcf(
                 exito: false,
-                ambiente: AmbienteEcf::tryFrom($this->settings->dgii_ambiente),
+                ambiente: $this->configuracion->dgii_ambiente,
                 errorMessage: 'No se pudo conectar con el PAC de DGII. Se reintentará automáticamente.',
             );
         }
@@ -121,8 +131,8 @@ final class EcfPlatformGateway implements DgiiGatewayInterface
 
     private function cliente(): PendingRequest
     {
-        return Http::withHeaders(['X-API-Key' => $this->settings->dgii_api_key])
-            ->baseUrl($this->settings->dgii_base_url)
+        return Http::withHeaders(['X-API-Key' => $this->configuracion->dgii_api_key])
+            ->baseUrl((string) $this->configuracion->dgii_base_url)
             ->acceptJson()
             ->timeout(30);
     }
@@ -140,7 +150,7 @@ final class EcfPlatformGateway implements DgiiGatewayInterface
             codigoSeguridad: $json['codigoSeguridad'] ?? null,
             dgiiUrl: $json['dgiiUrl'] ?? null,
             xmlUrl: $json['xmlUrl'] ?? null,
-            ambiente: AmbienteEcf::tryFrom($json['ambiente'] ?? $this->settings->dgii_ambiente),
+            ambiente: isset($json['ambiente']) ? AmbienteEcf::tryFrom($json['ambiente']) : $this->configuracion->dgii_ambiente,
             errorMessage: $response->successful() ? null : ($json['error'] ?? 'El PAC de DGII rechazó la solicitud.'),
             responseJson: $json,
         );

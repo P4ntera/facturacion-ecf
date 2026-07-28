@@ -3,6 +3,8 @@
 namespace App\Filament\Resources;
 
 use App\Enums\EstadoPedidoCompra;
+use App\Enums\Modulo;
+use App\Filament\Concerns\RestringidoPorModulo;
 use App\Filament\Resources\PedidoCompraResource\Pages;
 use App\Mail\PedidoCompraEnviado;
 use App\Models\PedidoCompra;
@@ -10,6 +12,7 @@ use App\Models\Producto;
 use App\Services\PedidoCompraService;
 use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
+use Filament\Facades\Filament;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Hidden;
@@ -38,7 +41,14 @@ use RuntimeException;
 
 class PedidoCompraResource extends Resource
 {
+    use RestringidoPorModulo;
+
     protected static ?string $model = PedidoCompra::class;
+
+    public static function modulo(): Modulo
+    {
+        return Modulo::COMPRAS_PEDIDOS;
+    }
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-clipboard-document-list';
 
@@ -52,6 +62,8 @@ class PedidoCompraResource extends Resource
 
     protected static string|\UnitEnum|null $navigationGroup = 'Compras';
 
+    protected static ?int $navigationSort = 31;
+
     public static function form(Schema $schema): Schema
     {
         return $schema->columns(1)->components([
@@ -61,7 +73,10 @@ class PedidoCompraResource extends Resource
                 ->schema([
                     Select::make('proveedor_id')
                         ->label('Proveedor')
-                        ->relationship('proveedor', 'nombre')
+                        // ->relationship() no hereda el scoping automático de Filament: sin
+                        // modifyQueryUsing, se ven (y se pueden elegir) proveedores de otras
+                        // empresas.
+                        ->relationship('proveedor', 'nombre', modifyQueryUsing: fn (Builder $query) => $query->where('empresa_id', Filament::getTenant()->id))
                         ->searchable()
                         ->preload()
                         ->live()
@@ -90,7 +105,9 @@ class PedidoCompraResource extends Resource
                         ->options(function (Get $get) {
                             $proveedorId = $get('proveedor_id');
 
-                            $query = Producto::query()->activos();
+                            // Consulta directa a Producto: no hereda el scoping automático de
+                            // Filament, así que se filtra a mano (ver nota en proveedor_id).
+                            $query = Producto::query()->where('empresa_id', Filament::getTenant()->id)->activos();
 
                             if ($proveedorId) {
                                 $query->whereHas('proveedores', fn (Builder $q) => $q->where('proveedores.id', $proveedorId));
@@ -102,7 +119,7 @@ class PedidoCompraResource extends Resource
                         ->preload()
                         ->live()
                         ->afterStateUpdated(function ($state, callable $set, Get $get) {
-                            $producto    = $state ? Producto::find($state) : null;
+                            $producto = $state ? Producto::find($state) : null;
                             $proveedorId = $get('proveedor_id');
 
                             $costoReferencia = ($producto && $proveedorId)
@@ -171,7 +188,7 @@ class PedidoCompraResource extends Resource
                         ->state(function (Get $get) {
                             $producto = Producto::find($get('producto_id'));
 
-                            return $producto ? $producto->tasa_itbis->porcentaje() . ' %' : '—';
+                            return $producto ? $producto->tasa_itbis->porcentaje().' %' : '—';
                         }),
                 ])
                 ->addable(false)
@@ -197,7 +214,7 @@ class PedidoCompraResource extends Resource
                             }
 
                             $service = app(PedidoCompraService::class);
-                            $calc    = $service->calcularLineas($lineas);
+                            $calc = $service->calcularLineas($lineas);
                             $totales = $service->calcularTotales($calc);
 
                             return sprintf(
@@ -275,6 +292,7 @@ class PedidoCompraResource extends Resource
                 TextColumn::make('total')
                     ->label('Total')
                     ->money('DOP')
+                    ->alignEnd()
                     ->sortable(),
 
                 TextColumn::make('estado')
@@ -299,7 +317,7 @@ class PedidoCompraResource extends Resource
             ->filters([
                 SelectFilter::make('proveedor_id')
                     ->label('Proveedor')
-                    ->relationship('proveedor', 'nombre')
+                    ->relationship('proveedor', 'nombre', modifyQueryUsing: fn (Builder $query) => $query->where('empresa_id', Filament::getTenant()->id))
                     ->searchable()
                     ->preload(),
 
@@ -334,7 +352,7 @@ class PedidoCompraResource extends Resource
                     ->label('Enviar por correo')
                     ->icon('heroicon-o-envelope')
                     ->color('gray')
-                    ->visible(fn (PedidoCompra $record): bool => ! $record->estaCancelado() && (auth()->user()?->can('gestionar_compras') ?? false))
+                    ->visible(fn (PedidoCompra $record): bool => ! $record->estaCancelado() && (auth()->user()?->can('compras.crear') ?? false))
                     ->schema([
                         TextInput::make('email')
                             ->label('Correo del proveedor')
@@ -360,7 +378,7 @@ class PedidoCompraResource extends Resource
                     ->icon('heroicon-o-x-circle')
                     ->color('danger')
                     ->requiresConfirmation()
-                    ->visible(fn (PedidoCompra $record): bool => ! $record->estaCancelado() && (auth()->user()?->can('anular_compras') ?? false))
+                    ->visible(fn (PedidoCompra $record): bool => ! $record->estaCancelado() && (auth()->user()?->can('compras.anular') ?? false))
                     ->schema([
                         Textarea::make('motivo')
                             ->label('Motivo de cancelación')
@@ -385,9 +403,9 @@ class PedidoCompraResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index'  => Pages\ListPedidosCompra::route('/'),
+            'index' => Pages\ListPedidosCompra::route('/'),
             'create' => Pages\CreatePedidoCompra::route('/create'),
-            'view'   => Pages\ViewPedidoCompra::route('/{record}'),
+            'view' => Pages\ViewPedidoCompra::route('/{record}'),
         ];
     }
 }

@@ -5,14 +5,17 @@ declare(strict_types=1);
 namespace App\Filament\Pages;
 
 use App\Enums\FormaPago;
+use App\Enums\Modulo;
 use App\Enums\ModuloImpresion;
 use App\Enums\TipoComprobante;
 use App\Enums\TipoDocumentoCliente;
 use App\Exceptions\SecuenciaNcfAgotadaException;
 use App\Exceptions\StockInsuficienteException;
 use App\Exceptions\VentaInvalidaException;
+use App\Filament\Concerns\RestringidoPorModulo;
 use App\Models\ArqueoCaja;
 use App\Models\Cliente;
+use App\Models\Empresa;
 use App\Models\Producto;
 use App\Models\Venta;
 use App\Services\ArqueoCajaService;
@@ -20,9 +23,9 @@ use App\Services\Dgii\ConsultaContribuyenteService;
 use App\Services\Impresion\ImpresionService;
 use App\Services\SecuenciaNcfService;
 use App\Services\VentaService;
-use App\Settings\FacturacionSettings;
 use BackedEnum;
 use Filament\Actions\Action;
+use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
@@ -33,11 +36,15 @@ use UnitEnum;
 
 class PuntoDeVenta extends Page
 {
+    use RestringidoPorModulo;
+
     protected string $view = 'filament.pages.punto-de-venta';
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedShoppingCart;
 
     protected static string|UnitEnum|null $navigationGroup = 'Ventas';
+
+    protected static ?int $navigationSort = 1;
 
     protected static ?string $navigationLabel = 'Punto de Venta';
 
@@ -61,14 +68,19 @@ class PuntoDeVenta extends Page
     /** @var array<string, string> */
     public array $totales = [];
 
-    public static function canAccess(): bool
+    public static function modulo(): Modulo
     {
-        return auth()->user()?->can('registrar_ventas') ?? false;
+        return Modulo::VENTAS_POS;
+    }
+
+    public static function puedeAccederPorPermiso(): bool
+    {
+        return auth()->user()?->can('pos.acceder') ?? false;
     }
 
     public function mount(): void
     {
-        $this->tipoComprobante = app(FacturacionSettings::class)->tipo_comprobante_defecto;
+        $this->tipoComprobante = $this->empresa()->config()->tipo_comprobante_defecto;
         $this->clienteId = $this->clienteConsumidorFinal()->id;
         $this->recalcularTotales();
     }
@@ -80,9 +92,34 @@ class PuntoDeVenta extends Page
         }
     }
 
+    /**
+     * El POS es una página propia (no un Resource ni un ->relationship() de Filament), así que
+     * sus consultas directas a Cliente/Producto no heredan el scoping automático por tenant:
+     * hay que filtrar por empresa_id explícitamente en cada una (ver docs/estilos.md... el
+     * comentario real: PASO 5 del prompt de tenancy — este es justo el punto que advertía que
+     * se filtran datos entre empresas si se olvida).
+     */
+    public function usaEcf(): bool
+    {
+        return $this->empresa()->usaEcf();
+    }
+
+    private function empresa(): Empresa
+    {
+        /** @var Empresa */
+        return Filament::getTenant();
+    }
+
+    private function empresaId(): int
+    {
+        return $this->empresa()->id;
+    }
+
     public function clienteSeleccionado(): ?Cliente
     {
-        return $this->clienteId ? Cliente::find($this->clienteId) : null;
+        return $this->clienteId
+            ? Cliente::query()->where('empresa_id', $this->empresaId())->find($this->clienteId)
+            : null;
     }
 
     /** @return Collection<int, Cliente> */
@@ -93,6 +130,7 @@ class PuntoDeVenta extends Page
         }
 
         return Cliente::query()
+            ->where('empresa_id', $this->empresaId())
             ->where('activo', true)
             ->where(fn (Builder $q) => $q
                 ->where('nombre', 'ilike', "%{$this->busquedaCliente}%")
@@ -125,7 +163,7 @@ class PuntoDeVenta extends Page
      */
     public function buscarClienteEnDgii(): void
     {
-        $resultado = app(ConsultaContribuyenteService::class)->buscar($this->busquedaCliente);
+        $resultado = app(ConsultaContribuyenteService::class)->buscar($this->busquedaCliente, $this->empresa());
 
         if ($resultado === null) {
             Notification::make()
@@ -137,8 +175,10 @@ class PuntoDeVenta extends Page
             return;
         }
 
+        // documento no es único entre empresas: sin empresa_id en la búsqueda, esto podría
+        // encontrar (y reutilizar) el cliente de OTRA empresa con el mismo documento.
         $cliente = Cliente::query()->firstOrCreate(
-            ['documento' => $resultado['documento']],
+            ['empresa_id' => $this->empresaId(), 'documento' => $resultado['documento']],
             ['nombre' => $resultado['nombre'], 'tipo_documento' => $resultado['tipo'], 'activo' => true],
         );
 
@@ -156,7 +196,7 @@ class PuntoDeVenta extends Page
      */
     public function requiereRncComprador(): bool
     {
-        if (blank($this->tipoComprobante)) {
+        if (blank($this->tipoComprobante) || ! $this->usaEcf()) {
             return false;
         }
 
@@ -191,6 +231,7 @@ class PuntoDeVenta extends Page
         }
 
         return Producto::query()
+            ->where('empresa_id', $this->empresaId())
             ->where('activo', true)
             ->where(fn (Builder $q) => $q
                 ->where('codigo', 'ilike', "%{$this->busquedaProducto}%")
@@ -200,9 +241,54 @@ class PuntoDeVenta extends Page
             ->get();
     }
 
+    /**
+     * Un lector de código de barras funciona como un teclado: "teclea" el código muy rápido y
+     * termina con Enter — no hace falta driver ni integración especial, basta con escuchar el
+     * mismo evento que dispararía un cajero al terminar de escribir a mano (wire:keydown.enter
+     * en el buscador). Si el texto coincide EXACTO con el código de barras o el código de un
+     * producto, se agrega directo al carrito y el campo queda listo para el siguiente escaneo.
+     * Si no hay coincidencia exacta, no se hace nada más: la búsqueda por nombre/código de abajo
+     * ya es reactiva sola (wire:model.live) y sigue mostrando resultados sin que esto interfiera.
+     */
+    public function escanearOBuscar(): void
+    {
+        $texto = trim($this->busquedaProducto);
+
+        if ($texto === '') {
+            return;
+        }
+
+        $producto = Producto::query()
+            ->where('empresa_id', $this->empresaId())
+            ->where(fn (Builder $q) => $q->where('codigo_barra', 'ilike', $texto)->orWhere('codigo', 'ilike', $texto))
+            ->first();
+
+        if ($producto === null) {
+            return;
+        }
+
+        if (! $producto->activo) {
+            Notification::make()->title("«{$producto->nombre}» está inactivo y no se puede vender")->danger()->send();
+
+            return;
+        }
+
+        if ($producto->controla_stock && (float) $producto->stock <= 0) {
+            Notification::make()->title("«{$producto->nombre}» no tiene stock disponible")->danger()->send();
+
+            return;
+        }
+
+        $this->agregarProducto($producto->id);
+        $this->dispatch('producto-escaneado');
+    }
+
     public function agregarProducto(int $productoId): void
     {
-        $producto = Producto::query()->where('activo', true)->find($productoId);
+        $producto = Producto::query()
+            ->where('empresa_id', $this->empresaId())
+            ->where('activo', true)
+            ->find($productoId);
 
         if ($producto === null) {
             return;
@@ -245,7 +331,7 @@ class PuntoDeVenta extends Page
             return null;
         }
 
-        return (float) (Producto::find($linea['producto_id'])?->stock ?? 0);
+        return (float) (Producto::query()->where('empresa_id', $this->empresaId())->find($linea['producto_id'])?->stock ?? 0);
     }
 
     public function lineaConStockInsuficiente(array $linea): bool
@@ -273,7 +359,7 @@ class PuntoDeVenta extends Page
 
     public function proximoNcf(): ?string
     {
-        if (blank($this->tipoComprobante)) {
+        if (blank($this->tipoComprobante) || ! $this->usaEcf()) {
             return null;
         }
 
@@ -299,7 +385,7 @@ class PuntoDeVenta extends Page
     /** Turno de caja abierto del usuario actual, si tiene uno. Lookup fresco, sin cachear. */
     public function arqueoAbierto(): ?ArqueoCaja
     {
-        return app(ArqueoCajaService::class)->arqueoAbiertoDe(auth()->id());
+        return app(ArqueoCajaService::class)->arqueoAbiertoDe(auth()->id(), $this->empresa());
     }
 
     public function puedeCobrar(): bool
@@ -315,7 +401,7 @@ class PuntoDeVenta extends Page
     public function abrirCaja(string $fondoInicial): void
     {
         try {
-            app(ArqueoCajaService::class)->abrir($fondoInicial, auth()->id());
+            app(ArqueoCajaService::class)->abrir($fondoInicial, auth()->id(), $this->empresa());
         } catch (RuntimeException $e) {
             Notification::make()->title($e->getMessage())->danger()->send();
 
@@ -369,7 +455,7 @@ class PuntoDeVenta extends Page
                 'forma_pago' => $this->formaPago,
                 'arqueo_caja_id' => $this->arqueoAbierto()?->id,
                 'lineas' => $this->lineasParaService(),
-            ]);
+            ], $this->empresa());
         } catch (VentaInvalidaException|StockInsuficienteException|SecuenciaNcfAgotadaException $e) {
             Notification::make()->title($e->getMessage())->danger()->send();
 
@@ -457,7 +543,7 @@ class PuntoDeVenta extends Page
             $this->totales = app(VentaService::class)->previsualizar([
                 'descuento_global' => $this->descuentoGlobal,
                 'lineas' => $this->lineasParaService(),
-            ]);
+            ], $this->empresa());
         } catch (VentaInvalidaException) {
             $this->totales = $this->totalesVacios();
         }
@@ -492,8 +578,10 @@ class PuntoDeVenta extends Page
 
     private function clienteConsumidorFinal(): Cliente
     {
+        // Sin empresa_id en la búsqueda, todas las empresas colisionarían en el mismo
+        // "Consumidor Final" (nombre no es único): cada una necesita el suyo propio.
         return Cliente::query()->firstOrCreate(
-            ['nombre' => 'Consumidor Final'],
+            ['empresa_id' => $this->empresaId(), 'nombre' => 'Consumidor Final'],
             ['tipo_documento' => TipoDocumentoCliente::SIN_DOCUMENTO, 'activo' => true],
         );
     }

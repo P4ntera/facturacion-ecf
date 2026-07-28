@@ -23,31 +23,31 @@ class CompraServiceTest extends TestCase
     private function crearProducto(array $overrides = []): Producto
     {
         return Producto::create(array_merge([
-            'codigo'         => 'P-' . fake()->unique()->numerify('###'),
-            'nombre'         => 'Producto Test',
-            'tipo'           => TipoProducto::PRODUCTO->value,
-            'costo'          => 50,
-            'precio'         => 100,
-            'tasa_itbis'     => TasaItbis::DIECIOCHO->value,
+            'codigo' => 'P-'.fake()->unique()->numerify('###'),
+            'nombre' => 'Producto Test',
+            'tipo' => TipoProducto::PRODUCTO->value,
+            'costo' => 50,
+            'precio' => 100,
+            'tasa_itbis' => TasaItbis::DIECIOCHO->value,
             'controla_stock' => true,
-            'stock'          => 10,
-            'stock_minimo'   => 0,
-            'activo'         => true,
+            'stock' => 10,
+            'stock_minimo' => 0,
+            'activo' => true,
         ], $overrides));
     }
 
     public function test_crear_compra_incrementa_stock_y_actualiza_costo_producto(): void
     {
         $proveedor = Proveedor::factory()->create();
-        $producto  = $this->crearProducto();
-        $user      = User::factory()->create();
+        $producto = $this->crearProducto();
+        $user = User::factory()->create();
 
         $compra = app(CompraService::class)->crear([
-            'proveedor_id'     => $proveedor->id,
+            'proveedor_id' => $proveedor->id,
             'tipo_comprobante' => TipoComprobante::COMPRAS,
-            'ncf'              => null,
-            'fecha'            => now(),
-            'itbis_incluido'   => false,
+            'ncf' => null,
+            'fecha' => now(),
+            'itbis_incluido' => false,
             'lineas' => [
                 ['producto_id' => $producto->id, 'cantidad' => 5, 'costo_unitario' => 60],
             ],
@@ -67,9 +67,9 @@ class CompraServiceTest extends TestCase
         $this->assertEquals(60.00, (float) $producto->costo); // costo actualizado
 
         $this->assertDatabaseHas('movimientos_inventario', [
-            'producto_id'   => $producto->id,
-            'tipo'          => 'entrada',
-            'origen'        => 'compra',
+            'producto_id' => $producto->id,
+            'tipo' => 'entrada',
+            'origen' => 'compra',
             'referencia_id' => $compra->id,
         ]);
     }
@@ -136,15 +136,15 @@ class CompraServiceTest extends TestCase
     public function test_crear_compra_con_itbis_incluido_extrae_base_correctamente(): void
     {
         $proveedor = Proveedor::factory()->create();
-        $producto  = $this->crearProducto(); // tasa 18%
-        $user      = User::factory()->create();
+        $producto = $this->crearProducto(); // tasa 18%
+        $user = User::factory()->create();
 
         $compra = app(CompraService::class)->crear([
-            'proveedor_id'     => $proveedor->id,
+            'proveedor_id' => $proveedor->id,
             'tipo_comprobante' => TipoComprobante::COMPRAS,
-            'ncf'              => null,
-            'fecha'            => now(),
-            'itbis_incluido'   => true,
+            'ncf' => null,
+            'fecha' => now(),
+            'itbis_incluido' => true,
             'lineas' => [
                 ['producto_id' => $producto->id, 'cantidad' => 1, 'costo_unitario' => 118],
             ],
@@ -161,15 +161,15 @@ class CompraServiceTest extends TestCase
     public function test_producto_sin_tasa_gravada_no_genera_itbis(): void
     {
         $proveedor = Proveedor::factory()->create();
-        $producto  = $this->crearProducto(['tasa_itbis' => TasaItbis::CERO->value]);
-        $user      = User::factory()->create();
+        $producto = $this->crearProducto(['tasa_itbis' => TasaItbis::CERO->value]);
+        $user = User::factory()->create();
 
         $compra = app(CompraService::class)->crear([
-            'proveedor_id'     => $proveedor->id,
+            'proveedor_id' => $proveedor->id,
             'tipo_comprobante' => TipoComprobante::COMPRAS,
-            'ncf'              => null,
-            'fecha'            => now(),
-            'itbis_incluido'   => true, // no debe afectar nada si la tasa es exenta
+            'ncf' => null,
+            'fecha' => now(),
+            'itbis_incluido' => true, // no debe afectar nada si la tasa es exenta
             'lineas' => [
                 ['producto_id' => $producto->id, 'cantidad' => 2, 'costo_unitario' => 40],
             ],
@@ -182,16 +182,16 @@ class CompraServiceTest extends TestCase
     public function test_anular_compra_revierte_stock(): void
     {
         $proveedor = Proveedor::factory()->create();
-        $producto  = $this->crearProducto();
-        $user      = User::factory()->create();
+        $producto = $this->crearProducto();
+        $user = User::factory()->create();
 
         $service = app(CompraService::class);
-        $compra  = $service->crear([
-            'proveedor_id'     => $proveedor->id,
+        $compra = $service->crear([
+            'proveedor_id' => $proveedor->id,
             'tipo_comprobante' => TipoComprobante::COMPRAS,
-            'ncf'              => null,
-            'fecha'            => now(),
-            'itbis_incluido'   => false,
+            'ncf' => null,
+            'fecha' => now(),
+            'itbis_incluido' => false,
             'lineas' => [
                 ['producto_id' => $producto->id, 'cantidad' => 5, 'costo_unitario' => 60],
             ],
@@ -208,24 +208,24 @@ class CompraServiceTest extends TestCase
 
         $this->assertDatabaseHas('movimientos_inventario', [
             'producto_id' => $producto->id,
-            'tipo'        => 'salida',
-            'origen'      => 'anulacion',
+            'tipo' => 'salida',
+            'origen' => 'anulacion',
         ]);
     }
 
     public function test_no_permite_anular_dos_veces(): void
     {
         $proveedor = Proveedor::factory()->create();
-        $producto  = $this->crearProducto();
-        $user      = User::factory()->create();
+        $producto = $this->crearProducto();
+        $user = User::factory()->create();
 
         $service = app(CompraService::class);
-        $compra  = $service->crear([
-            'proveedor_id'     => $proveedor->id,
+        $compra = $service->crear([
+            'proveedor_id' => $proveedor->id,
             'tipo_comprobante' => TipoComprobante::COMPRAS,
-            'ncf'              => null,
-            'fecha'            => now(),
-            'itbis_incluido'   => false,
+            'ncf' => null,
+            'fecha' => now(),
+            'itbis_incluido' => false,
             'lineas' => [
                 ['producto_id' => $producto->id, 'cantidad' => 1, 'costo_unitario' => 10],
             ],
@@ -240,15 +240,15 @@ class CompraServiceTest extends TestCase
     public function test_costo_ultima_linea_gana_si_mismo_producto_repetido(): void
     {
         $proveedor = Proveedor::factory()->create();
-        $producto  = $this->crearProducto();
-        $user      = User::factory()->create();
+        $producto = $this->crearProducto();
+        $user = User::factory()->create();
 
         app(CompraService::class)->crear([
-            'proveedor_id'     => $proveedor->id,
+            'proveedor_id' => $proveedor->id,
             'tipo_comprobante' => TipoComprobante::COMPRAS,
-            'ncf'              => null,
-            'fecha'            => now(),
-            'itbis_incluido'   => false,
+            'ncf' => null,
+            'fecha' => now(),
+            'itbis_incluido' => false,
             'lineas' => [
                 ['producto_id' => $producto->id, 'cantidad' => 1, 'costo_unitario' => 55],
                 ['producto_id' => $producto->id, 'cantidad' => 1, 'costo_unitario' => 70],
@@ -262,23 +262,23 @@ class CompraServiceTest extends TestCase
     {
         SecuenciaNcf::create([
             'tipo_comprobante' => TipoComprobante::COMPRAS->value,
-            'prefijo'          => 'B41',
+            'prefijo' => 'B41',
             'secuencia_actual' => 1,
-            'secuencia_hasta'  => 100,
-            'vencimiento'      => today()->addYear(),
-            'activa'           => true,
+            'secuencia_hasta' => 100,
+            'vencimiento' => today()->addYear(),
+            'activa' => true,
         ]);
 
         $proveedor = Proveedor::factory()->informal()->create();
-        $producto  = $this->crearProducto();
-        $user      = User::factory()->create();
+        $producto = $this->crearProducto();
+        $user = User::factory()->create();
 
         $compra = app(CompraService::class)->crear([
-            'proveedor_id'     => $proveedor->id,
+            'proveedor_id' => $proveedor->id,
             'tipo_comprobante' => TipoComprobante::FACTURA_CREDITO_FISCAL, // debe ignorarse
-            'ncf'              => 'LOQUESEA0001',                          // debe ignorarse
-            'fecha'            => now(),
-            'itbis_incluido'   => false,
+            'ncf' => 'LOQUESEA0001',                          // debe ignorarse
+            'fecha' => now(),
+            'itbis_incluido' => false,
             'lineas' => [
                 ['producto_id' => $producto->id, 'cantidad' => 1, 'costo_unitario' => 10],
             ],
@@ -291,15 +291,15 @@ class CompraServiceTest extends TestCase
     public function test_proveedor_formal_usa_ncf_digitado_manualmente(): void
     {
         $proveedor = Proveedor::factory()->create(); // formal por defecto
-        $producto  = $this->crearProducto();
-        $user      = User::factory()->create();
+        $producto = $this->crearProducto();
+        $user = User::factory()->create();
 
         $compra = app(CompraService::class)->crear([
-            'proveedor_id'     => $proveedor->id,
+            'proveedor_id' => $proveedor->id,
             'tipo_comprobante' => TipoComprobante::FACTURA_CREDITO_FISCAL,
-            'ncf'              => 'B0100000001',
-            'fecha'            => now(),
-            'itbis_incluido'   => false,
+            'ncf' => 'B0100000001',
+            'fecha' => now(),
+            'itbis_incluido' => false,
             'lineas' => [
                 ['producto_id' => $producto->id, 'cantidad' => 1, 'costo_unitario' => 10],
             ],
@@ -312,18 +312,18 @@ class CompraServiceTest extends TestCase
     public function test_guarda_monto_total_factura_aunque_no_coincida_con_el_calculado(): void
     {
         $proveedor = Proveedor::factory()->create();
-        $producto  = $this->crearProducto();
-        $user      = User::factory()->create();
+        $producto = $this->crearProducto();
+        $user = User::factory()->create();
 
         // Total calculado real: 5 * 60 = 300 + 18% = 354. Se digita un monto distinto
         // (ej. la factura trae flete aparte) y debe guardarse sin bloquear ni corregirse.
         $compra = app(CompraService::class)->crear([
-            'proveedor_id'         => $proveedor->id,
-            'tipo_comprobante'     => TipoComprobante::COMPRAS,
-            'ncf'                  => null,
-            'fecha'                => now(),
-            'itbis_incluido'       => false,
-            'monto_total_factura'  => 400.00,
+            'proveedor_id' => $proveedor->id,
+            'tipo_comprobante' => TipoComprobante::COMPRAS,
+            'ncf' => null,
+            'fecha' => now(),
+            'itbis_incluido' => false,
+            'monto_total_factura' => 400.00,
             'lineas' => [
                 ['producto_id' => $producto->id, 'cantidad' => 5, 'costo_unitario' => 60],
             ],
@@ -343,7 +343,7 @@ class CompraServiceTest extends TestCase
         $almacenista = User::factory()->create();
         $almacenista->assignRole('Almacenista');
 
-        $this->assertTrue($admin->can('anular_compras'));
-        $this->assertFalse($almacenista->can('anular_compras'));
+        $this->assertTrue($admin->can('compras.anular'));
+        $this->assertFalse($almacenista->can('compras.anular'));
     }
 }

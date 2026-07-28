@@ -15,25 +15,30 @@ class DevolucionCompra extends Model
     protected $table = 'devoluciones_compra';
 
     protected $fillable = [
-        'compra_id', 'proveedor_id', 'user_id', 'fecha', 'motivo',
+        'empresa_id', 'compra_id', 'proveedor_id', 'user_id', 'fecha', 'motivo',
         'subtotal', 'monto_gravado_18', 'monto_gravado_16', 'monto_gravado_0',
         'itbis_18', 'itbis_16', 'itbis', 'total',
         'estado', 'motivo_anulacion', 'anulada_en',
     ];
 
     protected $casts = [
-        'estado'           => EstadoDevolucion::class,
-        'fecha'            => 'datetime',
-        'anulada_en'       => 'datetime',
-        'subtotal'         => 'decimal:2',
+        'estado' => EstadoDevolucion::class,
+        'fecha' => 'datetime',
+        'anulada_en' => 'datetime',
+        'subtotal' => 'decimal:2',
         'monto_gravado_18' => 'decimal:2',
         'monto_gravado_16' => 'decimal:2',
-        'monto_gravado_0'  => 'decimal:2',
-        'itbis_18'         => 'decimal:2',
-        'itbis_16'         => 'decimal:2',
-        'itbis'            => 'decimal:2',
-        'total'            => 'decimal:2',
+        'monto_gravado_0' => 'decimal:2',
+        'itbis_18' => 'decimal:2',
+        'itbis_16' => 'decimal:2',
+        'itbis' => 'decimal:2',
+        'total' => 'decimal:2',
     ];
+
+    public function empresa(): BelongsTo
+    {
+        return $this->belongsTo(Empresa::class);
+    }
 
     public function compra(): BelongsTo
     {

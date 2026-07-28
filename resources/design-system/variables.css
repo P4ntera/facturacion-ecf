@@ -1,40 +1,133 @@
 :root{
 
-    /*======== COLORES PRINCIPALES ========*/
+    /*======== IDENTIDAD STITCH — paleta (fuente única de verdad) ========
+       Para recolorear todo el panel + POS, cambia el valor BASE de un color aquí (p.ej.
+       --primary) y corre `sail npm run build`. Cada color trae además su escala 50-950: la usan
+       AdminPanelProvider (slots de Filament) y cualquier estado que necesite una variante más
+       clara/oscura. Ver docs/estilos.md para el mapa completo de dónde se consume cada token. */
 
-    --primary:#2563EB;
-    --primary-dark:#1D4ED8;
-    --primary-light:#60A5FA;
+    --primary:#5D87FF;
+    --primary-50:#F3F5FC;
+    --primary-100:#E3E8F7;
+    --primary-200:#C1CEF6;
+    --primary-300:#8EA9F6;
+    --primary-400:#5D87FF;
+    --primary-500:#1753FF;
+    --primary-600:#003BE6;
+    --primary-700:#0030B8;
+    --primary-800:#062889;
+    --primary-900:#081E5E;
+    --primary-950:#051239;
 
-    --secondary:#10B981;
-    --secondary-dark:#059669;
+    --secondary:#49BEFF;
+    --secondary-50:#F3F9FC;
+    --secondary-100:#E3F0F7;
+    --secondary-200:#C1E3F6;
+    --secondary-300:#8ED1F6;
+    --secondary-400:#49BEFF;
+    --secondary-500:#17ACFF;
+    --secondary-600:#0094E6;
+    --secondary-700:#0076B8;
+    --secondary-800:#065A89;
+    --secondary-900:#083F5E;
+    --secondary-950:#052639;
 
-    --info:#06B6D4;
+    --tertiary:#13DEB9; /* también --success: color de confirmación/éxito */
+    --tertiary-50:#F4FBFA;
+    --tertiary-100:#E5F5F2;
+    --tertiary-200:#C5F2EA;
+    --tertiary-300:#96EEDE;
+    --tertiary-400:#56F1D4;
+    --tertiary-500:#29EDC9;
+    --tertiary-600:#13DEB9;
+    --tertiary-700:#0EA98D;
+    --tertiary-800:#107F6B;
+    --tertiary-900:#0E584A;
+    --tertiary-950:#09352D;
+
+    --neutral:#7C808D; /* gris de marca Stitch: sustituye al gris genérico de Filament */
+    --neutral-50:#F7F7F8;
+    --neutral-100:#ECEDEE;
+    --neutral-200:#D9DADD;
+    --neutral-300:#BEC0C5;
+    --neutral-400:#9DA0AA;
+    --neutral-500:#7C808D;
+    --neutral-600:#6B6F7B;
+    --neutral-700:#555862;
+    --neutral-800:#43454C;
+    --neutral-900:#303136;
+    --neutral-950:#1D1E20;
 
     --warning:#F59E0B;
-    --warning-dark:#D97706;
+    --warning-50:#FBF8F3;
+    --warning-100:#F6EFE4;
+    --warning-200:#F4E2C3;
+    --warning-300:#F2CE92;
+    --warning-400:#F8B94F;
+    --warning-500:#F59E0B;
+    --warning-600:#DC8E09;
+    --warning-700:#B07107;
+    --warning-800:#84570B;
+    --warning-900:#5B3D0B;
+    --warning-950:#372507;
 
     --danger:#EF4444;
-    --danger-dark:#DC2626;
+    --danger-50:#FBF4F4;
+    --danger-100:#F5E5E5;
+    --danger-200:#F2C5C5;
+    --danger-300:#EE9696;
+    --danger-400:#EF4444;
+    --danger-500:#ED2929;
+    --danger-600:#D31212;
+    --danger-700:#A90E0E;
+    --danger-800:#7F1010;
+    --danger-900:#580E0E;
+    --danger-950:#350909;
 
-    --purple:#7C3AED;
+    /*======== ALIAS DE COMPATIBILIDAD ========
+       El resto del design-system (buttons/forms/tables/badges/pos.css) referencia estos nombres
+       cortos en vez de la escala completa; quedan como alias para no reescribir cada consumidor
+       cada vez que se ajuste la paleta. */
 
-    /*======== GRISES ========*/
+    --success:var(--tertiary);
+    --success-dark:var(--tertiary-700);
+    --primary-dark:var(--primary-700);
+    --secondary-dark:var(--secondary-700);
+    --warning-dark:var(--warning-700);
+    --danger-dark:var(--danger-700);
 
-    --gray-900:#111827;
-    --gray-700:#374151;
-    --gray-500:#6B7280;
-    --gray-400:#9CA3AF;
-    --gray-300:#D1D5DB;
-    --gray-200:#E5E7EB;
-    --gray-100:#F3F4F6;
-    --background:#032e5a;
+    --gray-900:var(--neutral-900);
+    --gray-700:var(--neutral-700);
+    --gray-500:var(--neutral-500);
+    --gray-400:var(--neutral-400);
+    --gray-300:var(--neutral-300);
+    --gray-200:var(--neutral-200);
+    --gray-100:var(--neutral-100);
+
+    --background:#F9FAFB; /* fondo general de páginas no-Filament (.bg-app), sin relación con el
+       panel de Filament — ver --fondo-pagina más abajo para ESE fondo. */
     --white:#FFFFFF;
 
-    /*======== RADIOS ========*/
+    /*======== SUPERFICIES / FONDOS DEL PANEL ========
+       Un token con nombre obvio por cada fondo/borde/sombra que se ve en el panel — para no tener
+       que adivinar cuál controla qué. Todos con el MISMO valor que ya se veía antes de nombrarlos
+       así: esto es organizar y documentar, no recolorear. Receta de "cómo cambio X" en
+       docs/estilos.md. */
 
-    --radius-sm:0.25rem;
-    --radius-md:0.375rem;
-    --radius-lg:0.5rem;
+    --fondo-pagina:#F4F6FA;   /* fondo general del panel, detrás de las tarjetas — .fi-body en
+       theme.css lo lee directo de este token (no del slot 'gray' de Filament). */
+    --fondo-tarjeta:#FFFFFF;  /* fondo de tarjetas/secciones: Sections, stat cards, modales,
+       tablas y las tarjetas del POS. */
+    --fondo-sidebar:#F7F7F8;  /* fondo del menú lateral. */
+    --borde-tarjeta:#E5E7EB;  /* borde de tarjetas/secciones; el sidebar y los paneles flotantes
+       (menú de usuario, notificaciones) reusan el mismo valor para su borde. */
+    --sombra-tarjeta:0 1px 3px rgb(16 24 40 / 0.06), 0 1px 2px rgb(16 24 40 / 0.04); /* sombra de
+       tarjetas/secciones y paneles flotantes. */
+
+    /*======== FORMAS ========*/
+
+    --radius-sm:0.375rem;
+    --radius:0.625rem;
+    --radius-lg:1rem;
 
 }

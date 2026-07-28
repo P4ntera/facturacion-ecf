@@ -7,9 +7,11 @@ use App\Enums\AnchoPapel;
 use App\Enums\EstadoFiscal;
 use App\Enums\EstadoVenta;
 use App\Enums\EventoEcf;
+use App\Enums\Modulo;
 use App\Enums\ModuloImpresion;
 use App\Enums\TipoComprobante;
 use App\Exceptions\VentaYaAnuladaException;
+use App\Filament\Concerns\RestringidoPorModulo;
 use App\Filament\Resources\VentaResource\Pages;
 use App\Jobs\EnviarEcfJob;
 use App\Models\Venta;
@@ -36,7 +38,14 @@ use Illuminate\Database\Eloquent\Builder;
 
 class VentaResource extends Resource
 {
+    use RestringidoPorModulo;
+
     protected static ?string $model = Venta::class;
+
+    public static function modulo(): Modulo
+    {
+        return Modulo::VENTAS_LISTADO;
+    }
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-receipt-percent';
 
@@ -47,6 +56,8 @@ class VentaResource extends Resource
     protected static ?string $pluralModelLabel = 'Ventas';
 
     protected static string|\UnitEnum|null $navigationGroup = 'Ventas';
+
+    protected static ?int $navigationSort = 2;
 
     // Las ventas se crean únicamente desde el Punto de Venta (VentaService::registrar).
     public static function canCreate(): bool
@@ -192,11 +203,13 @@ class VentaResource extends Resource
                 TextColumn::make('tipo_comprobante')
                     ->label('Tipo')
                     ->formatStateUsing(fn (TipoComprobante $state) => $state->etiqueta())
+                    ->toggleable(isToggledHiddenByDefault: true)
                     ->sortable(),
 
                 TextColumn::make('total')
                     ->label('Total')
-                    ->formatStateUsing(fn (Venta $record) => "{$record->moneda} ".number_format((float) $record->total, 2))
+                    ->money(fn (Venta $record) => $record->moneda)
+                    ->alignEnd()
                     ->sortable(),
 
                 TextColumn::make('estado')
@@ -259,6 +272,7 @@ class VentaResource extends Resource
                     ->label('Imprimir')
                     ->icon('heroicon-o-printer')
                     ->color('gray')
+                    ->visible(fn (): bool => auth()->user()?->can('ventas.imprimir') ?? false)
                     ->url(fn (Venta $record) => route('ventas.pdf', $record))
                     ->openUrlInNewTab(),
 
@@ -269,7 +283,7 @@ class VentaResource extends Resource
                     ->icon('heroicon-o-x-circle')
                     ->color('danger')
                     ->visible(fn (Venta $record) => $record->estado === EstadoVenta::EMITIDA
-                        && (auth()->user()?->can('anular_ventas') ?? false))
+                        && (auth()->user()?->can('ventas.anular') ?? false))
                     ->requiresConfirmation()
                     ->schema([
                         Textarea::make('motivo')
@@ -307,6 +321,7 @@ class VentaResource extends Resource
             ->label('Reimprimir ticket')
             ->icon('heroicon-o-printer')
             ->color('gray')
+            ->visible(fn (): bool => auth()->user()?->can('ventas.imprimir') ?? false)
             ->action(function (Venta $record): void {
                 $impresora = app(ImpresionService::class)->resolverImpresora(ModuloImpresion::FACTURACION, auth()->user());
                 $resultado = app(ImpresionService::class)->imprimirTicket($record, $impresora);
@@ -339,7 +354,7 @@ class VentaResource extends Resource
             ->icon('heroicon-o-arrow-path')
             ->color('gray')
             ->visible(fn (Venta $record) => $record->pac_id !== null
-                && (auth()->user()?->can('gestionar_ecf') ?? false))
+                && (auth()->user()?->can('ecf.gestionar') ?? false))
             ->action(function (Venta $record): void {
                 $respuesta = app(EnvioEcfService::class)->refrescarEstado($record);
                 $record->refresh();
@@ -363,7 +378,7 @@ class VentaResource extends Resource
             ->label('Reintentar envío')
             ->icon('heroicon-o-paper-airplane')
             ->color('warning')
-            ->visible(fn (Venta $record) => (auth()->user()?->can('gestionar_ecf') ?? false)
+            ->visible(fn (Venta $record) => (auth()->user()?->can('ecf.gestionar') ?? false)
                 && ($record->estado_fiscal === EstadoFiscal::PENDIENTE || isset($record->ecf_respuesta['error'])))
             ->requiresConfirmation()
             ->action(function (Venta $record): void {

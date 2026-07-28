@@ -13,16 +13,19 @@ class ProveedorFactory extends Factory
     public function definition(): array
     {
         return [
-            'rnc'                 => fake()->unique()->numerify('#########'),
-            'tipo'                 => TipoProveedor::FORMAL->value,
-            'nombre'               => fake()->company(),
-            'nombre_comercial'     => null,
-            'actividad_economica'  => null,
-            'telefono'             => null,
-            'email'                => null,
-            'direccion'            => null,
-            'estado'               => 'ACTIVO',
-            'activo'               => true,
+            // empresa_id: sin default aquí a propósito. En producción lo asocia Filament (tenant
+            // ownership); en tests, Tests\Support\TenantDefaults lo rellena si no se pasa uno
+            // explícito.
+            'rnc' => fake()->unique()->numerify('#########'),
+            'tipo' => TipoProveedor::FORMAL->value,
+            'nombre' => fake()->company(),
+            'nombre_comercial' => null,
+            'actividad_economica' => null,
+            'telefono' => null,
+            'email' => null,
+            'direccion' => null,
+            'estado' => 'ACTIVO',
+            'activo' => true,
         ];
     }
 

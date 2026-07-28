@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Reportes;
 
 use App\Http\Controllers\Controller;
-use App\Settings\EmpresaSettings;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -15,6 +14,18 @@ use Symfony\Component\HttpFoundation\Response;
 
 abstract class ReportePdfController extends Controller
 {
+    /**
+     * empresa_id del usuario autenticado, para scopear los *Query() de ReporteService: estas
+     * rutas están fuera del panel de Filament, así que el scoping automático por tenant no
+     * aplica (ver BelongsToTenant de Filament) y hay que filtrar a mano. Corta en seco (403) en
+     * vez de devolver un reporte sin filtrar: el super-admin no tiene empresa propia y no debe
+     * poder exportar un reporte mezclando datos de todas las empresas por esta vía.
+     */
+    protected function empresaId(Request $request): int
+    {
+        return $request->user()->empresa_id ?? abort(403);
+    }
+
     protected function rangoDesde(Request $request): Carbon
     {
         return Carbon::parse($request->query('desde', now()->startOfMonth()->toDateString()))->startOfDay();
@@ -46,6 +57,7 @@ abstract class ReportePdfController extends Controller
      * @param  array<string, string>  $resumen
      */
     protected function responder(
+        Request $request,
         string $titulo,
         array $columnas,
         array $filas,
@@ -56,7 +68,7 @@ abstract class ReportePdfController extends Controller
     ): Response {
         $pdf = Pdf::loadView('reportes.pdf', [
             'titulo' => $titulo,
-            'empresa' => app(EmpresaSettings::class),
+            'empresa' => $request->user()->empresa,
             'columnas' => $columnas,
             'filas' => $filas,
             'totales' => $totales,

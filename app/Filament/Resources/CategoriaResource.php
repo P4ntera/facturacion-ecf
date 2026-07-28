@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\Modulo;
+use App\Filament\Concerns\RestringidoPorModulo;
 use App\Filament\Resources\CategoriaResource\Pages;
 use App\Models\Categoria;
 use Filament\Forms\Components\Textarea;
@@ -16,7 +18,14 @@ use Filament\Tables\Table;
 
 class CategoriaResource extends Resource
 {
+    use RestringidoPorModulo;
+
     protected static ?string $model = Categoria::class;
+
+    public static function modulo(): Modulo
+    {
+        return Modulo::MAESTROS_CATEGORIAS;
+    }
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-tag';
 
@@ -27,6 +36,8 @@ class CategoriaResource extends Resource
     protected static ?string $pluralModelLabel = 'Categorías';
 
     protected static string|\UnitEnum|null $navigationGroup = 'Maestros';
+
+    protected static ?int $navigationSort = 12;
 
     public static function form(Schema $schema): Schema
     {
@@ -61,7 +72,8 @@ class CategoriaResource extends Resource
                 TextColumn::make('descripcion')
                     ->label('Descripción')
                     ->limit(50)
-                    ->placeholder('—'),
+                    ->placeholder('—')
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('productos_count')
                     ->label('Productos')
@@ -70,7 +82,7 @@ class CategoriaResource extends Resource
 
                 ToggleColumn::make('activo')
                     ->label('Activo')
-                    ->disabled(fn (): bool => ! auth()->user()?->can('gestionar_maestros'))
+                    ->disabled(fn (): bool => ! auth()->user()?->can('categorias.desactivar'))
                     ->sortable(),
 
                 TextColumn::make('created_at')

@@ -5,12 +5,15 @@ namespace App\Filament\Resources;
 use App\Enums\CanalRecepcionEcf;
 use App\Enums\EstadoAprobacionComercial;
 use App\Enums\EstadoReenvioPac;
+use App\Enums\Modulo;
 use App\Enums\TipoComprobante;
+use App\Filament\Concerns\RestringidoPorModulo;
 use App\Filament\Resources\DocumentoRecibidoResource\Pages;
 use App\Models\DocumentoRecibido;
-use App\Services\Dgii\DgiiGatewayInterface;
+use App\Services\Dgii\DgiiGatewayFactory;
 use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
+use Filament\Facades\Filament;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -32,7 +35,14 @@ use Illuminate\Database\Eloquent\Builder;
  */
 class DocumentoRecibidoResource extends Resource
 {
+    use RestringidoPorModulo;
+
     protected static ?string $model = DocumentoRecibido::class;
+
+    public static function modulo(): Modulo
+    {
+        return Modulo::ECF_RECIBIDOS;
+    }
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-inbox-arrow-down';
 
@@ -42,7 +52,9 @@ class DocumentoRecibidoResource extends Resource
 
     protected static ?string $pluralModelLabel = 'e-CF Recibidos';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Compras';
+    protected static string|\UnitEnum|null $navigationGroup = 'Fiscal';
+
+    protected static ?int $navigationSort = 41;
 
     public static function getEloquentQuery(): Builder
     {
@@ -118,11 +130,13 @@ class DocumentoRecibidoResource extends Resource
                     ->placeholder('—')
                     ->formatStateUsing(fn (?string $state) => $state !== null
                         ? (TipoComprobante::tryFrom($state)?->etiqueta() ?? $state)
-                        : null),
+                        : null)
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('monto_total')
                     ->label('Monto')
                     ->money('DOP')
+                    ->alignEnd()
                     ->placeholder('—')
                     ->sortable(),
 
@@ -193,7 +207,7 @@ class DocumentoRecibidoResource extends Resource
                     ->action(function (DocumentoRecibido $record, array $data): void {
                         $decision = EstadoAprobacionComercial::from($data['decision']);
 
-                        $respuesta = app(DgiiGatewayInterface::class)->registrarAprobacionComercial([
+                        $respuesta = app(DgiiGatewayFactory::class)->make(Filament::getTenant())->registrarAprobacionComercial([
                             'encf' => $record->encf,
                             'rncEmisor' => $record->rnc_emisor,
                             'decision' => $decision->value,

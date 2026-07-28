@@ -2,8 +2,10 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\Modulo;
 use App\Enums\TipoComprobante;
 use App\Exceptions\RangoNcfSolapadoException;
+use App\Filament\Concerns\RestringidoPorModulo;
 use App\Filament\Resources\SecuenciaNcfResource\Pages;
 use App\Models\SecuenciaNcf;
 use App\Services\SecuenciaNcfService;
@@ -27,7 +29,14 @@ use Illuminate\Support\Carbon;
 
 class SecuenciaNcfResource extends Resource
 {
+    use RestringidoPorModulo;
+
     protected static ?string $model = SecuenciaNcf::class;
+
+    public static function modulo(): Modulo
+    {
+        return Modulo::ECF_SECUENCIAS;
+    }
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-hashtag';
 
@@ -37,7 +46,9 @@ class SecuenciaNcfResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Secuencias NCF';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Configuración';
+    protected static string|\UnitEnum|null $navigationGroup = 'Fiscal';
+
+    protected static ?int $navigationSort = 40;
 
     public static function form(Schema $schema): Schema
     {

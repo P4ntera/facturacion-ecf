@@ -26,13 +26,13 @@ class VentaFiscalDetailTest extends TestCase
     {
         parent::setUp();
 
-        Permission::firstOrCreate(['name' => 'registrar_ventas', 'guard_name' => 'web']);
+        Permission::firstOrCreate(['name' => 'ventas.ver', 'guard_name' => 'web']);
     }
 
     private function usuarioAutorizado(): User
     {
         $rol = Role::firstOrCreate(['name' => 'Vendedor-fiscal', 'guard_name' => 'web']);
-        $rol->syncPermissions(['registrar_ventas']);
+        $rol->syncPermissions(['ventas.ver']);
 
         $usuario = User::factory()->create();
         $usuario->assignRole($rol);
@@ -71,7 +71,7 @@ class VentaFiscalDetailTest extends TestCase
         return app(VentaService::class)->registrar([
             'cliente_id' => $cliente->id,
             'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
-        ])->refresh();
+        ], $this->empresaDefault)->refresh();
     }
 
     public function test_muestra_trackid_codigo_de_seguridad_y_ambiente(): void

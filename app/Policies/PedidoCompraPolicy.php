@@ -11,17 +11,17 @@ class PedidoCompraPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->can('gestionar_compras');
+        return $user->can('compras.ver');
     }
 
     public function view(User $user, PedidoCompra $pedidoCompra): bool
     {
-        return $user->can('gestionar_compras');
+        return $user->can('compras.ver');
     }
 
     public function create(User $user): bool
     {
-        return $user->can('gestionar_compras');
+        return $user->can('compras.crear');
     }
 
     public function delete(User $user, PedidoCompra $pedidoCompra): bool

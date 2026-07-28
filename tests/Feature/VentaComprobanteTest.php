@@ -11,7 +11,6 @@ use App\Models\SecuenciaNcf;
 use App\Models\User;
 use App\Models\Venta;
 use App\Services\VentaService;
-use App\Settings\EmpresaSettings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
 use Spatie\Permission\Models\Permission;
@@ -24,9 +23,9 @@ class VentaComprobanteTest extends TestCase
 
     private function usuarioAutorizado(): User
     {
-        Permission::firstOrCreate(['name' => 'registrar_ventas', 'guard_name' => 'web']);
+        Permission::firstOrCreate(['name' => 'ventas.imprimir', 'guard_name' => 'web']);
         $rol = Role::firstOrCreate(['name' => 'Vendedor', 'guard_name' => 'web']);
-        $rol->syncPermissions(['registrar_ventas']);
+        $rol->syncPermissions(['ventas.imprimir']);
 
         $usuario = User::factory()->create();
         $usuario->assignRole('Vendedor');
@@ -65,7 +64,7 @@ class VentaComprobanteTest extends TestCase
             'cliente_id' => $cliente->id,
             'user_id' => null,
             'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
-        ]);
+        ], $this->empresaDefault);
     }
 
     public function test_genera_el_pdf_del_comprobante(): void
@@ -101,7 +100,7 @@ class VentaComprobanteTest extends TestCase
 
         $html = view('ventas.comprobante', [
             'venta' => $venta,
-            'empresa' => app(EmpresaSettings::class),
+            'empresa' => $venta->empresa,
             'qrTimbre' => base64_encode((string) QrCode::format('png')->size(120)->generate($venta->dgii_url)),
         ])->render();
 
@@ -116,7 +115,7 @@ class VentaComprobanteTest extends TestCase
 
         $html = view('ventas.comprobante', [
             'venta' => $venta,
-            'empresa' => app(EmpresaSettings::class),
+            'empresa' => $venta->empresa,
             'qrTimbre' => null,
         ])->render();
 

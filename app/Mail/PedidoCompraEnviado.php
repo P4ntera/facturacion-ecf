@@ -3,7 +3,6 @@
 namespace App\Mail;
 
 use App\Models\PedidoCompra;
-use App\Settings\EmpresaSettings;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
@@ -35,11 +34,11 @@ class PedidoCompraEnviado extends Mailable
     /** @return array<int, Attachment> */
     public function attachments(): array
     {
-        $pedido = $this->pedido->loadMissing('detalles.producto', 'proveedor');
+        $pedido = $this->pedido->loadMissing('detalles.producto', 'proveedor', 'empresa');
 
         $pdf = Pdf::loadView('pedidos.pedido-compra-pdf', [
-            'pedido'  => $pedido,
-            'empresa' => app(EmpresaSettings::class),
+            'pedido' => $pedido,
+            'empresa' => $pedido->empresa,
         ]);
 
         return [

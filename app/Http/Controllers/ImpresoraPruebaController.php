@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Impresora;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\Request;
 
 /**
  * Vista de prueba para impresoras NAVEGADOR: el servidor no puede elegir la impresora física
@@ -14,8 +15,12 @@ use Illuminate\Contracts\View\View;
  */
 class ImpresoraPruebaController extends Controller
 {
-    public function __invoke(Impresora $impresora): View
+    public function __invoke(Request $request, Impresora $impresora): View
     {
+        // Ruta fuera del panel de Filament: el scoping automático por tenant no aplica aquí (ver
+        // BelongsToTenant de Filament), así que la pertenencia a la empresa se verifica a mano.
+        abort_unless($request->user()->perteneceAEmpresa($impresora->empresa_id), 403);
+
         return view('impresoras.prueba', ['impresora' => $impresora]);
     }
 }
