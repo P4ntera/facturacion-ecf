@@ -25,6 +25,8 @@ class StockBajo extends Page
 
     protected static string|UnitEnum|null $navigationGroup = 'Compras';
 
+    protected static ?int $navigationSort = 32;
+
     protected static ?string $navigationLabel = 'Stock Bajo';
 
     protected static ?string $title = 'Productos con Stock Bajo';

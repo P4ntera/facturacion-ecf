@@ -43,6 +43,8 @@ class EmpresaResource extends Resource
 
     protected static string|\UnitEnum|null $navigationGroup = 'Super Admin';
 
+    protected static ?int $navigationSort = 70;
+
     public static function form(Schema $schema): Schema
     {
         return $schema

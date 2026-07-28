@@ -20,6 +20,8 @@ class ReporteVentasPorVendedor extends ReportePage
 
     protected static ?string $navigationLabel = 'Ventas por Vendedor';
 
+    protected static ?int $navigationSort = 52;
+
     protected static ?string $title = 'Ventas por vendedor';
 
     protected static ?string $slug = 'reportes/ventas-por-vendedor';

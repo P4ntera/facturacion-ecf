@@ -46,7 +46,9 @@ class SecuenciaNcfResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Secuencias NCF';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Configuración';
+    protected static string|\UnitEnum|null $navigationGroup = 'Fiscal';
+
+    protected static ?int $navigationSort = 40;
 
     public static function form(Schema $schema): Schema
     {

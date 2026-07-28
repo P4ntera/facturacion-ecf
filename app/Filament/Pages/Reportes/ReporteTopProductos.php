@@ -19,6 +19,8 @@ class ReporteTopProductos extends ReportePage
 
     protected static ?string $navigationLabel = 'Top Productos';
 
+    protected static ?int $navigationSort = 53;
+
     protected static ?string $title = 'Top de productos';
 
     protected static ?string $slug = 'reportes/top-productos';

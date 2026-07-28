@@ -51,6 +51,8 @@ class ImpresoraResource extends Resource
 
     protected static string|\UnitEnum|null $navigationGroup = 'Configuración';
 
+    protected static ?int $navigationSort = 64;
+
     public static function form(Schema $schema): Schema
     {
         return $schema

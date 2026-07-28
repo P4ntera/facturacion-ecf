@@ -25,6 +25,8 @@ class ReporteVentas extends ReportePage
 
     protected static ?string $navigationLabel = 'Ventas';
 
+    protected static ?int $navigationSort = 50;
+
     protected static ?string $title = 'Reporte de ventas';
 
     protected static ?string $slug = 'reportes/ventas';

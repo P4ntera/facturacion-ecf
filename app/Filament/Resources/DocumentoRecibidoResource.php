@@ -52,7 +52,9 @@ class DocumentoRecibidoResource extends Resource
 
     protected static ?string $pluralModelLabel = 'e-CF Recibidos';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Compras';
+    protected static string|\UnitEnum|null $navigationGroup = 'Fiscal';
+
+    protected static ?int $navigationSort = 41;
 
     public static function getEloquentQuery(): Builder
     {

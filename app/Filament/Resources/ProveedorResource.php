@@ -49,6 +49,8 @@ class ProveedorResource extends Resource
 
     protected static string|\UnitEnum|null $navigationGroup = 'Maestros';
 
+    protected static ?int $navigationSort = 13;
+
     public static function form(Schema $schema): Schema
     {
         return $schema->columns(2)->components([

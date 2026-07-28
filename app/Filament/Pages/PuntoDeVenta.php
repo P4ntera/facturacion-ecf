@@ -44,6 +44,8 @@ class PuntoDeVenta extends Page
 
     protected static string|UnitEnum|null $navigationGroup = 'Ventas';
 
+    protected static ?int $navigationSort = 1;
+
     protected static ?string $navigationLabel = 'Punto de Venta';
 
     protected static ?string $title = 'Punto de Venta';

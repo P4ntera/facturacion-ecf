@@ -46,6 +46,8 @@ class ArqueoCajaResource extends Resource
 
     protected static string|\UnitEnum|null $navigationGroup = 'Ventas';
 
+    protected static ?int $navigationSort = 3;
+
     // Solo lectura: la apertura/cierre se hace desde el Punto de Venta.
     public static function canCreate(): bool
     {

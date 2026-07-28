@@ -29,6 +29,8 @@ class ManageEmpresa extends Page
 
     protected static string|UnitEnum|null $navigationGroup = 'Configuración';
 
+    protected static ?int $navigationSort = 60;
+
     protected static ?string $navigationLabel = 'Datos de la Empresa';
 
     protected static ?string $title = 'Datos de la Empresa';

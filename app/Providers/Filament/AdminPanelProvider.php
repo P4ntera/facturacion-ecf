@@ -9,6 +9,7 @@ use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
+use Filament\Navigation\NavigationGroup;
 use Filament\Pages\Dashboard;
 use Filament\Panel;
 use Filament\PanelProvider;
@@ -44,6 +45,36 @@ class AdminPanelProvider extends PanelProvider
             // normal con una sola empresa entra directo (getDefaultTenant) y no lo necesita, pero
             // no le estorba dejarlo visible.
             ->tenantMenu()
+            // Orden = orden en el sidebar (ver NavigationManager::get()); por eso Ventas va
+            // primero (el diario del negocio) y Super Admin al final (solo lo ve el super-admin,
+            // ver EmpresaResource). Todos colapsados por defecto salvo Ventas: menos ruido visual
+            // al entrar, sin esconder lo que se usa a diario.
+            ->navigationGroups([
+                NavigationGroup::make('Ventas')
+                    ->icon('heroicon-o-shopping-bag')
+                    ->collapsed(false),
+                NavigationGroup::make('Maestros')
+                    ->icon('heroicon-o-rectangle-stack')
+                    ->collapsed(),
+                NavigationGroup::make('Inventario')
+                    ->icon('heroicon-o-archive-box')
+                    ->collapsed(),
+                NavigationGroup::make('Compras')
+                    ->icon('heroicon-o-shopping-cart')
+                    ->collapsed(),
+                NavigationGroup::make('Fiscal')
+                    ->icon('heroicon-o-document-text')
+                    ->collapsed(),
+                NavigationGroup::make('Reportes')
+                    ->icon('heroicon-o-chart-bar')
+                    ->collapsed(),
+                NavigationGroup::make('Configuración')
+                    ->icon('heroicon-o-cog-6-tooth')
+                    ->collapsed(),
+                NavigationGroup::make('Super Admin')
+                    ->icon('heroicon-o-building-office-2')
+                    ->collapsed(),
+            ])
             ->colors([
                 'primary' => Color::hex('#5D87FF'), // --primary
                 'info' => Color::hex('#49BEFF'), // --secondary (rol "informativo" de Filament)

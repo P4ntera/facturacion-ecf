@@ -26,6 +26,8 @@ class ReporteFiscal607 extends ReportePage
 
     protected static ?string $navigationLabel = 'Fiscal 607';
 
+    protected static ?int $navigationSort = 55;
+
     protected static ?string $title = 'Formato 607 — Envío de ventas';
 
     protected static ?string $slug = 'reportes/fiscal-607';

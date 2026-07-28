@@ -25,6 +25,8 @@ class ManageFacturacion extends Page
 
     protected static string|UnitEnum|null $navigationGroup = 'Configuración';
 
+    protected static ?int $navigationSort = 61;
+
     protected static ?string $navigationLabel = 'Facturación';
 
     protected static ?string $title = 'Facturación';

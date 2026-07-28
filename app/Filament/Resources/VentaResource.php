@@ -57,6 +57,8 @@ class VentaResource extends Resource
 
     protected static string|\UnitEnum|null $navigationGroup = 'Ventas';
 
+    protected static ?int $navigationSort = 2;
+
     // Las ventas se crean únicamente desde el Punto de Venta (VentaService::registrar).
     public static function canCreate(): bool
     {
