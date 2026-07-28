@@ -30,20 +30,28 @@ class ReporteStatsOverviewWidget extends StatsOverviewWidget
         return [
             Stat::make('Ventas de hoy', Number::currency((float) $hoy['total_vendido'], 'DOP'))
                 ->description($hoy['cantidad_ventas'].' venta(s)')
+                ->descriptionIcon('heroicon-o-arrow-trending-up')
+                ->icon('heroicon-o-banknotes')
                 ->color('success'),
 
             Stat::make('Ventas del mes', Number::currency((float) $mes['total_vendido'], 'DOP'))
                 ->description($mes['cantidad_ventas'].' venta(s)')
+                ->descriptionIcon('heroicon-o-shopping-bag')
+                ->icon('heroicon-o-chart-bar')
                 ->color('primary'),
 
             Stat::make('ITBIS del mes', Number::currency((float) $mes['total_itbis'], 'DOP'))
+                ->icon('heroicon-o-receipt-percent')
                 ->color('info'),
 
             Stat::make('Valor del inventario', Number::currency((float) $servicio->valorInventario(), 'DOP'))
+                ->icon('heroicon-o-archive-box')
                 ->color('gray'),
 
             Stat::make('Productos bajo mínimo', (string) $productosBajoMinimo)
                 ->description($productosBajoMinimo > 0 ? 'Requieren reposición' : 'Todo en orden')
+                ->descriptionIcon($productosBajoMinimo > 0 ? 'heroicon-o-exclamation-triangle' : 'heroicon-o-check-circle')
+                ->icon('heroicon-o-exclamation-triangle')
                 ->color($productosBajoMinimo > 0 ? 'danger' : 'success'),
         ];
     }

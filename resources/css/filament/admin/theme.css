@@ -58,6 +58,43 @@
     box-shadow:var(--shadow-card);
 }
 
+/*======== STAT CARDS (KPIs): ícono con fondo de color suave ========
+   Filament no colorea el ícono de un Stat por defecto (solo la descripción y el mini-gráfico vía
+   ->color()); el chip de acá viene del override de vista en
+   resources/views/vendor/filament-widgets/stats-overview-widget/stat.blade.php, que envuelve el
+   ícono en `.stat-icon-chip-{color}`. Los colores salen directo de los tokens del proyecto
+   (--primary-100, --tertiary-100...), no de la paleta OKLCH interna de Filament, para no tener
+   que reimplementar el mapeo de "shade 100/600" que Filament ya hace distinto para cada
+   componente (ver docs/estilos.md). */
+
+.stat-icon-chip{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    width:2.75rem;
+    height:2.75rem;
+    border-radius:var(--radius);
+    flex-shrink:0;
+}
+
+.stat-icon-chip .fi-icon{
+    height:1.5rem;
+    width:1.5rem;
+    color:inherit;
+}
+
+.stat-icon-chip-primary{ background-color:var(--primary-100); color:var(--primary-600); }
+.stat-icon-chip-success{ background-color:var(--tertiary-100); color:var(--tertiary-700); }
+.stat-icon-chip-info{ background-color:var(--secondary-100); color:var(--secondary-700); }
+.stat-icon-chip-warning{ background-color:var(--warning-100); color:var(--warning-700); }
+.stat-icon-chip-danger{ background-color:var(--danger-100); color:var(--danger-600); }
+.stat-icon-chip-gray{ background-color:var(--neutral-100); color:var(--neutral-600); }
+
+.fi-wi-stats-overview-stat-label-ctn{
+    align-items:center;
+    gap:0.75rem;
+}
+
 /*======== TIPOGRAFÍA DE TITULARES: Manrope en headings, Inter en el resto (->font()) ========*/
 
 .fi-header-heading,

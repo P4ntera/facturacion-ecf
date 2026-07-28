@@ -9,6 +9,7 @@ use Filament\Schemas\Schema;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Number;
 use Illuminate\Support\ServiceProvider;
 use Spatie\Activitylog\Models\Activity;
 
@@ -78,5 +79,11 @@ class AppServiceProvider extends ServiceProvider
                 ->defaultNumberLocale('es_DO')
                 ->defaultCurrency('DOP');
         });
+
+        // Mismo motivo que arriba, pero para los widgets de KPIs (ReporteStatsOverviewWidget),
+        // que arman su valor con Number::currency() directo en PHP en vez de un componente de
+        // Filament — Table/Schema::configureUsing() no los cubre. Number::useLocale() es el
+        // equivalente global de Laravel: mismo 'es_DO', mismo resultado "RD$1,234.50".
+        Number::useLocale('es_DO');
     }
 }
