@@ -1,153 +1,172 @@
-# Pipeline de estilos: panel, POS y design-system
+# Identidad visual del panel (Stitch): mapa de estilos
 
-Este documento mapea de dónde toma sus estilos cada parte del sistema y documenta la estrategia
-de modo claro/oscuro. Léelo antes de tocar cualquier CSS o el color de algo.
+Este documento mapea de dónde sale cada parte de la identidad visual del panel/POS y, sobre todo,
+**qué archivo tocar para cambiarla**. La regla de fondo de todo este rediseño: la paleta,
+tipografía y radios viven en **un solo archivo** (`resources/design-system/variables.css`);
+todo lo demás (Filament, POS, botones) lee de ahí, directa o indirectamente.
 
-## 1. Los 3 entry points de Vite
+## 1. Entry point de Vite
 
-`vite.config.js` compila tres entradas independientes:
+Uno solo: `resources/css/filament/admin/theme.css` (`->viteTheme(...)` en
+`AdminPanelProvider.php`). Los remanentes de Breeze (`resources/css/app.css`,
+`resources/js/app.js`, `tailwind.config.js`, y las versiones sin scope de
+`buttons/forms/tables/badges/components.css`) se eliminaron: no los servía ninguna vista.
 
-| Entry point | Para qué |
-|---|---|
-| `resources/css/filament/admin/theme.css` | El panel de Filament (incluyendo el POS, que vive dentro del panel). **Este es el que importa.** |
-| `resources/css/app.css` | Legado de Breeze. **Huérfano**: ninguna vista lo carga hoy (`grep @vite( resources/views/` no devuelve nada — los layouts de Breeze que lo referenciaban se eliminaron). Sigue compilando porque nadie borró la entrada, pero no llega al navegador. |
-| `resources/js/app.js` | Igual de huérfano que `app.css`, por la misma razón. |
-
-## 2. De dónde saca sus colores/superficies/tipografía el panel Filament
-
-Todo se configura en `app/Providers/Filament/AdminPanelProvider.php`:
-
-- **Colores de acento** (`->colors([...])`): mapea los slots `primary`, `success`, `info`,
-  `warning`, `danger` a los mismos hexadecimales que `--primary`, `--secondary`, `--info`,
-  `--warning`, `--danger` del design-system (están anotados con el nombre del token en
-  comentario). Es una copia manual del valor — si cambias el token en `variables.css`, tienes
-  que cambiar también el hex aquí; no hay una sola fuente de verdad para esto.
-- **Superficies/fondo** (`gray` slot): usa `Color::Gray`, la escala de grises **propia** de
-  Filament (`Filament\Support\Colors\Color`). No está atada a `--gray-*` del design-system. Es
-  Filament quien decide el fondo de sidebar, topbar, tablas, cards de Filament, etc.
-- **Tipografía**: `->font('Inter')`, igual que `--font-family:'Inter',sans-serif` del
-  design-system.
-- **Tema custom**: `->viteTheme('resources/css/filament/admin/theme.css')` es el punto de entrada
-  que Filament compila junto a su propio `theme.css` base. Ahí es donde se inyecta el
-  design-system del proyecto (ver sección 3).
-- **Modo claro/oscuro**: `->darkMode(false)`. El switch de Filament no aparece; el panel siempre
-  se renderiza en modo claro. Ver sección 5.
-
-## 3. Cómo llega el design-system al panel y al POS
-
-`resources/css/filament/admin/theme.css`:
+`theme.css` importa, en orden:
 
 ```css
+@import url('https://fonts.bunny.net/css?family=manrope:...');   /* Manrope, para titulares */
 @import '.../vendor/filament/filament/resources/css/theme.css';   /* base de Filament */
 
-@import '../../../design-system/variables.css';   /* tokens: paleta */
-@import '../../../design-system/colors.css';       /* tokens: alias semánticos */
-@import '../../../design-system/typography.css';
+@import '../../../design-system/variables.css';   /* PALETA, RADIOS — fuente única */
+@import '../../../design-system/colors.css';       /* alias semánticos (--text, --border...) */
+@import '../../../design-system/typography.css';   /* --font-headline, --font-body, --fs-* */
 @import '../../../design-system/spacing.css';
 @import '../../../design-system/shadows.css';
 
-@import '../../../design-system/pos.css';           /* clases .card/.btn/.table/... SOLO para el POS */
+@import '../../../design-system/pos.css';           /* .card/.btn/.table/... SOLO para el POS */
 ```
 
-Nota lo que **no** importa: `buttons.css`, `forms.css`, `tables.css`, `badges.css`,
-`components.css` (las versiones de clases *sin scope*). Es deliberado — si esos archivos
-entraran al tema de Filament, sus selectores (`.btn`, `.table`, `.card`...) sobrescribirían los
-componentes propios de Filament (`.fi-btn`, `.fi-ta-table`...) en todo el panel, no solo en el
-POS.
+Después de los imports, `theme.css` tiene además unas pocas reglas propias (radios de Filament,
+fondo de tarjetas, tipografía de titulares) — ver secciones 3 y 4.
 
-En cambio, el **POS** (`app/Filament/Pages/PuntoDeVenta.php` + su Blade
-`resources/views/filament/pages/punto-de-venta.blade.php`) es una página de trabajo con markup
-propio (no generado por Filament) que sí usa `class="card"`, `class="btn btn-primary"`,
-`class="table"`, `class="badge badge-success"`, etc. Para que esas clases tengan estilo sin tocar
-el resto del panel, `pos.css` **reimplementa** cada una de esas reglas con el prefijo `.pos-screen`
-delante (p. ej. `.pos-screen .btn-primary`), y la vista Blade envuelve todo su contenido en
-`<div class="pos-screen">`. Mismos tokens, mismos valores que `buttons.css`/`tables.css`/etc.,
-pero con un selector distinto para quedar aislado.
+## 2. La paleta: un solo lugar, dos consumidores
 
-**Resumen de la pregunta "¿cómo llegan las clases del design-system al POS?"**: ni vía `app.css`
-+ `@vite` en un layout Blade (ese archivo está huérfano), ni vía `FilamentAsset::register()`
-(no se usa en ningún lugar del código — verificado por grep), sino vía el propio `->viteTheme()`
-del panel, que importa `pos.css`.
+`resources/design-system/variables.css` define 6 colores base (`--primary`, `--secondary`,
+`--tertiary`, `--neutral`, `--warning`, `--danger`), cada uno con su escala completa `-50` a
+`-950`, más los radios (`--radius-sm`, `--radius`, `--radius-lg`).
 
-## 4. Qué archivo define qué
+**Para cambiar un color de identidad (p. ej. `--primary`) hay que tocarlo en DOS lugares:**
 
-| Archivo | Define | Se usa en |
+1. `resources/design-system/variables.css` — el token y su escala. Esto repinta el POS
+   (`pos.css` lee estos tokens) y cualquier CSS del panel que los use directamente.
+2. `app/Providers/Filament/AdminPanelProvider.php`, dentro de `->colors([...])` — el mismo hex,
+   porque Filament genera su propia paleta OKLCH en PHP y no puede leer variables CSS. Cada línea
+   de `->colors([...])` está comentada con el token del que copia el valor (`// --primary`, etc.)
+   para que sea fácil mantenerlos sincronizados.
+
+Mapeo de slots de Filament ↔ tokens:
+
+| Slot de Filament | Token | Uso |
 |---|---|---|
-| `resources/design-system/variables.css` | Tokens crudos: `--primary`, `--gray-*`, `--background`, `--radius-*` | Todo lo demás depende de este |
-| `resources/design-system/colors.css` | Alias semánticos: `--text`, `--border`, `--surface`, `--link` (sobre los tokens crudos) + `.bg-app` | `.bg-app` está sin uso hoy (ver hallazgo abajo) |
-| `typography.css`, `spacing.css`, `shadows.css` | Tokens de tipografía/espaciado/sombra (`--fs-*`, `--space-*`, `--shadow-card`) | Panel (vía theme.css) y POS |
-| `buttons.css`, `forms.css`, `tables.css`, `badges.css`, `components.css` | Clases de componentes **sin scope** (`.btn`, `.form-input`, `.table`, `.badge`, `.card`) | Solo en `app.css`, que está huérfano — **no llegan a ningún navegador hoy** |
-| `resources/design-system/pos.css` | Las mismas clases de arriba, pero con scope `.pos-screen` delante | El POS, vía `theme.css` |
+| `primary` | `--primary` (`#5D87FF`) | Acento principal, botones primary |
+| `info` | `--secondary` (`#49BEFF`) | Filament no tiene slot "secondary"; el rol informativo de Filament es el que mejor mapea al secondary de Stitch |
+| `success` | `--tertiary` / `--success` (`#13DEB9`) | Estados de éxito |
+| `warning` | `--warning` (`#F59E0B`) | Estados de alerta |
+| `danger` | `--danger` (`#EF4444`) | Estados de error/peligro |
+| `gray` | `--neutral` (`#7C808D`) | Fondos, bordes, superficies de TODO el panel (sidebar, topbar, tablas...) |
+| `dark` (slot extra, no nativo) | `--neutral-900`/`950` | Variante "Inverted" de botones (ver sección 5) |
 
-## 5. Hallazgo: `--background` no coincide con lo documentado
+## 3. Radios: el truco de la variable compartida
 
-`variables.css` tiene hoy:
+Tailwind v4 expone su escala de radios como variables CSS propias (`--radius-lg`, `--radius-xl`,
+que las utilidades compiladas de Filament usan directo: `rounded-lg` en botones/inputs,
+`rounded-xl` en el contenedor de cada Section/tarjeta). `variables.css` define **su propio**
+`--radius-lg` con ese mismo nombre a propósito: como se importa después del `theme.css` base de
+Filament, gana en la cascada y agranda botones e inputs sin tocar ni un selector de Filament.
+`theme.css` solo necesita una línea más para igualar `--radius-xl` (borde exterior de la
+tarjeta) al mismo valor, para que no quede más chico que su contenido:
 
 ```css
---background:#032e5a;   /* azul marino oscuro */
+:root{ --radius-xl:var(--radius-lg); }
 ```
 
-Tanto el comentario en `AdminPanelProvider.php` como el resto del design-system (que es
-enteramente claro: `--white`, `--gray-100`, `--surface: var(--white)`...) asumen
-`--background:#F9FAFB` (gris muy claro). Se rastreó el historial con `git log -p`:
+**Para cambiar el radio de TODO el panel + POS: edita `--radius`/`--radius-lg` en
+`variables.css`.** No hay que tocar `theme.css` ni ningún Resource.
 
-1. El token nació como `#F9FAFB` (commit `529c99d`).
-2. Un commit posterior y aislado, `6f52e93` ("Cambios en lso colores"), lo cambió a `#032e5a`
-   sin tocar ningún otro archivo ni actualizar el comentario en `AdminPanelProvider.php`.
+## 4. Tipografía
 
-**Impacto real hoy: ninguno.** El único consumidor de `--background` es `.bg-app` en
-`colors.css`, y `.bg-app` no aparece en ninguna vista (`grep -rln bg-app resources/views app`
-no devuelve nada). Es CSS muerto. Pero es una inconsistencia real entre el token, el comentario
-del código y la intención del design-system — se corrige en la sección 6.
+- `--font-body` (Inter) — cuerpo de texto. `AdminPanelProvider.php` usa `->font('Inter')`
+  (proveedor Bunny Fonts, el mismo que usa Filament por defecto).
+- `--font-headline` (Manrope) — titulares. Filament no permite una segunda familia solo para
+  headings vía `->font()`, así que se aplica en `theme.css` sobre las hook classes de heading de
+  Filament (`.fi-header-heading`, `.fi-section-header-heading`, `.fi-modal-heading`, etc.) y se
+  carga con su propio `@import url(...)` de Bunny Fonts al inicio de `theme.css`.
 
-## 6. Estrategia de modo claro/oscuro: (a) SOLO CLARO
+**Para cambiar de fuente: edita `--font-headline`/`--font-body` en
+`resources/design-system/typography.css` y actualiza el `@import` de Bunny Fonts en `theme.css`
+(y `->font()` en `AdminPanelProvider.php` si cambia la de cuerpo).**
 
-Decisión: **mantener el panel y el POS únicamente en modo claro.**
+## 5. Botones: 4 variantes, nativas de Filament
 
-Por qué:
+Los 4 estilos de Stitch (Primary/Secondary/Inverted/Outlined) mapean 1:1 a mecanismos nativos de
+Filament — no hace falta CSS custom para el panel:
 
-- `->darkMode(false)` ya estaba activo en `AdminPanelProvider.php` antes de este análisis.
-- Los 10 archivos del design-system (`variables.css` → `components.css`, incluyendo `pos.css`)
-  son 100% modo-claro: cero media queries, cero selector `.dark`, cero variante alternativa en
-  ningún archivo. Implementar modo oscuro real (opción b) implicaría escribir y mantener
-  variantes oscuras para cada uno de ellos sin que exista hoy ninguna necesidad de negocio que lo
-  pida.
-- Con el switch apagado, no hay forma de que el usuario entre a un estado donde Filament oscurece
-  sus propias superficies (`gray` slot) pero el design-system del proyecto (`--white`,
-  `--gray-100`, `.card`, `.table`...) se queda claro — que era el problema original que motivó
-  este análisis.
+| Variante Stitch | Cómo se logra en una Action de Filament | Clase equivalente en POS (`pos.css`) |
+|---|---|---|
+| Primary (sólido) | Color por defecto, sin `->outlined()` (Filament ya pinta sólido, shade 600) | `.btn-primary` |
+| Secondary (gris suave) | `->color('gray')` (Filament no le pone color: fondo blanco/borde suave) | `.btn-secondary` |
+| Inverted (oscuro) | `->color('dark')` — slot custom registrado en `AdminPanelProvider.php` | `.btn-inverted` |
+| Outlined (borde) | `->outlined()` | `.btn-outlined` |
 
-Filament marca el modo oscuro agregando la clase `.dark` al `<html>`
-(`vendor/filament/filament/resources/js/dark-mode.js`, función que hace
-`document.documentElement.classList.add('dark')`). Si en el futuro se decide pasar a la
-estrategia (b), ese es el selector a usar (`.dark { --background: ...; }` o
-`html.dark & { ... }` dentro de cada archivo del design-system) — queda documentado aquí para no
-tener que volver a inspeccionarlo.
+El slot `dark` (ver sección 2) usa una escala explícita en vez de `Color::hex()`: Filament pinta
+el fondo sólido de un botón con el shade 600 de su color, así que ese shade tiene que ser YA el
+oscuro que se quiere (los shades 700-950 son los mismos pasos de `--neutral-900`/`--neutral-950`
+de `variables.css` — si esos tokens cambian, hay que actualizar también el array en
+`AdminPanelProvider.php`).
 
-Cambios aplicados como parte de esta decisión:
+## 6. Densidad: tablas y formularios
 
-- `--background` corregido de `#032e5a` a `#F9FAFB` en `variables.css`, para que coincida con el
-  resto del design-system (aunque hoy no tenga consumidores visibles, evita que alguien lo reuse
-  a futuro pensando que es un fondo claro y se encuentre con un azul oscuro).
-- Comentario de `AdminPanelProvider.php` actualizado para dejar de citar el valor obsoleto y en
-  su lugar apuntar a esta sección del documento.
+- **Paginación y formato de moneda**, en un solo lugar para TODO el panel:
+  `app/Providers/AppServiceProvider.php::boot()`, vía `Table::configureUsing()` y
+  `Schema::configureUsing()` (Filament permite fijar defaults globales así, en vez de repetirlos
+  en cada Resource). De ahí sale que `->money('DOP')` se vea como `RD$1,234.50` (se fija
+  `defaultNumberLocale('es_DO')` solo para los componentes de Filament, sin tocar
+  `config('app.locale')`, que seguiría afectando fechas/traducciones de toda la app) y que las
+  tablas paginen en 10/25.
+- **Columnas secundarias** (teléfono, email, metadatos de auditoría...): `->toggleable
+  (isToggledHiddenByDefault: true)` en cada `TextColumn` del Resource — ocultas por defecto, el
+  usuario las reactiva desde el selector de columnas de la tabla.
+- **Formularios**: agrupados en `Section::make('Título')` con 2-3 columnas donde aporta (ver
+  `ProductoResource`, `ProveedorResource`, `CompraResource`, `EmpresaResource` como referencia).
 
-## 7. Cheat-sheet: "quiero cambiar X"
+## 7. El POS: la única pantalla con markup propio
 
-- **Cambiar el color primario/de acento de todo el sistema** → `--primary` en
-  `resources/design-system/variables.css` **y** el hex correspondiente en
-  `->colors(['primary' => ...])` de `AdminPanelProvider.php` (no hay una sola fuente de verdad;
-  hay que tocar los dos).
-- **Cambiar el fondo/superficies del panel de Filament** (sidebar, topbar, tablas de Filament) →
-  el slot `gray` en `->colors([...])` de `AdminPanelProvider.php` (usa la escala `Color::Gray` de
-  Filament, no un token del proyecto).
-- **Cambiar los estilos del POS** (`.card`, `.btn`, `.table`, `.badge`, `.form-input` dentro de
-  `.pos-screen`) → `resources/design-system/pos.css`. Si el cambio es de un token (color,
-  espaciado, radio), tócalo en `variables.css`/`spacing.css`/etc. en vez de hardcodear un valor
-  nuevo en `pos.css`.
-- **Activar/desactivar el switch de modo claro/oscuro** → `->darkMode(bool)` en
-  `AdminPanelProvider.php`. Si se activa, hay que escribir antes las variantes `.dark` en todo
-  el design-system (ver sección 6) o el panel y el POS quedarán visualmente inconsistentes.
-- **Cualquier cambio a `theme.css` o a los archivos de `resources/design-system/`** no se ve en
-  el navegador hasta correr `./vendor/bin/sail npm run build` (o `npm run dev` para hot-reload
-  mientras se trabaja).
+El Punto de Venta (`app/Filament/Pages/PuntoDeVenta.php` +
+`resources/views/filament/pages/punto-de-venta.blade.php`) no usa componentes de Filament para su
+UI de venta: es HTML propio con clases `class="card"`, `class="btn btn-primary"`, `class="table"`,
+`class="badge badge-success"`, etc. `resources/design-system/pos.css` es la ÚNICA fuente de esas
+clases (las versiones sin scope que existían en `buttons.css`/`tables.css`/etc. se eliminaron por
+huérfanas — ver Paso 6 del rediseño): mismas reglas, mismos tokens, con el selector `.pos-screen`
+por delante para no afectar nada fuera de esta página.
+
+**Para cambiar los estilos del POS**: `resources/design-system/pos.css`. Si el cambio es de un
+token (color, espaciado, radio), tócalo en `variables.css`/`spacing.css`/etc., no lo hardcodees
+en `pos.css`.
+
+## 8. Navegación
+
+Los grupos del menú (`Ventas`, `Maestros`, `Inventario`, `Compras`, `Fiscal`, `Reportes`,
+`Configuración`, `Super Admin`) se registran explícitamente en
+`AdminPanelProvider.php::navigationGroups([...])`, con icono y `->collapsed()` por grupo — todos
+colapsados por defecto salvo `Ventas` (el uso diario). El **orden** de esa lista es el orden en el
+sidebar. Cada Resource/Page fija su grupo (`$navigationGroup`) y su posición dentro del grupo
+(`$navigationSort`, valores por decenas: 1x Ventas, 1x Maestros con prefijo distinto, etc. — ver
+cualquier Resource para el patrón).
+
+## 9. Modo claro/oscuro
+
+Sigue como estaba: **solo claro** (`->darkMode(false)` en `AdminPanelProvider.php`). El
+design-system del proyecto (`variables.css` → `pos.css`) es 100% modo-claro — cero `.dark`, cero
+media queries. Si en el futuro se necesita modo oscuro real, hay que escribir esas variantes en
+cada archivo del design-system antes de activar el switch, o el panel (que sí sabe oscurecerse
+solo, vía el slot `gray`) y el POS (que no) quedarían inconsistentes.
+
+## 10. Cheat-sheet: "quiero cambiar X"
+
+- **El color primario/de acento de todo el sistema** → `--primary` (+ su escala) en
+  `variables.css` **y** el hex en `->colors(['primary' => ...])` de `AdminPanelProvider.php`
+  (sección 2 — dos lugares, uno es CSS y el otro PHP, no se puede evitar).
+- **El gris/fondo de TODO el panel** (sidebar, topbar, tablas de Filament) → `--neutral` en
+  `variables.css` + el slot `gray` en `AdminPanelProvider.php`.
+- **Los radios** (botones, inputs, tarjetas) → `--radius`/`--radius-lg` en `variables.css`
+  únicamente (sección 3).
+- **La tipografía** → `--font-headline`/`--font-body` en `typography.css` (sección 4).
+- **Los estilos del POS** → `resources/design-system/pos.css` (sección 7).
+- **Qué se ve en cada grupo del menú y en qué orden** → `navigationGroups([...])` en
+  `AdminPanelProvider.php` (orden de grupos) + `$navigationGroup`/`$navigationSort` en cada
+  Resource/Page (sección 8).
+- **Paginación por defecto o formato de moneda de las tablas** → `AppServiceProvider::boot()`
+  (sección 6), no cada Resource.
+- Cualquier cambio a `theme.css` o a `resources/design-system/` no se ve en el navegador hasta
+  correr `./vendor/bin/sail npm run build` (o `npm run dev` para hot-reload mientras se trabaja).
