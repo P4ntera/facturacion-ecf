@@ -34,12 +34,28 @@
     --radius-xl:var(--radius-lg);
 }
 
-/*======== TARJETAS: fondo gris muy claro (identidad Stitch), no blanco puro ========*/
+/*======== CAPAS DE SUPERFICIE: fondo de app gris-azulado vs. tarjetas blancas ========
+   El bug visual que corrige este bloque ("fondo blanco y cuadros raritos"): una versión anterior
+   pintaba de gris `.fi-section-content-ctn`, que NO es la tarjeta en sí sino su contenedor
+   interno de contenido — el resultado era un rectángulo gris flotando DENTRO de una tarjeta que
+   seguía blanca por default de Filament (`.fi-section`). Corregido así: el gris va en el fondo de
+   la app (`.fi-body`, detrás de todo) vía --surface-app; las tarjetas (`.fi-section`, stat cards,
+   modales, tablas) se dejan en --surface (blanco, que es como las trae Filament por defecto) y
+   se les agrega borde + sombra EXPLÍCITOS con nuestros tokens para que se distingan del fondo sin
+   depender del ring por defecto de Filament (que es casi invisible sobre un fondo ya claro). */
 
-.fi-section-content-ctn,
-.fi-in-modal .fi-modal-window,
-.fi-wi-stats-overview-stat{
-    background-color:var(--surface-muted);
+.fi-body{
+    background-color:var(--surface-app);
+}
+
+.fi-section:not(.fi-section-not-contained):not(.fi-aside),
+.fi-section.fi-aside > .fi-section-content-ctn,
+.fi-wi-stats-overview-stat,
+.fi-modal-window,
+.fi-ta-ctn{
+    background-color:var(--surface);
+    border:1px solid var(--border);
+    box-shadow:var(--shadow-card);
 }
 
 /*======== TIPOGRAFÍA DE TITULARES: Manrope en headings, Inter en el resto (->font()) ========*/
