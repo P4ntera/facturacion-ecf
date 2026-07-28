@@ -1,3 +1,8 @@
+/* Manrope para titulares (ver sección "Tipografía de titulares" más abajo). Bunny Fonts: mismo
+   proveedor sin API key que usa Filament por defecto en ->font(), sin necesidad de un segundo
+   FontProvider solo para esta fuente. */
+@import url('https://fonts.bunny.net/css?family=manrope:500,600,700,800');
+
 @import '../../../../vendor/filament/filament/resources/css/theme.css';
 
 @source '../../../../app/Filament/**/*';
@@ -16,6 +21,37 @@
    design-system. pos.css los trae scopeados bajo `.pos-screen` para no afectar el resto
    del panel. */
 @import '../../../design-system/pos.css';
+
+/*======== FORMAS: radio grande en botones, inputs y tarjetas ========
+   Tailwind v4 expone su propia escala de radios como variables CSS (--radius-lg, --radius-xl...)
+   y las utilidades compiladas de Filament las consumen directamente (rounded-lg en botones/
+   inputs vía .fi-btn/input wrapper, rounded-xl en el contenedor exterior de cada Section/
+   tarjeta). variables.css ya define --radius-lg con el mismo nombre a propósito: alcanza para
+   agrandar botones e inputs sin tocar Filament. Solo falta igualar --radius-xl (borde exterior
+   de la tarjeta) para que no quede más chico que su contenido. Cambiar el radio de TODO el panel
+   es, entonces, editar --radius/--radius-lg en variables.css — no este archivo. */
+:root{
+    --radius-xl:var(--radius-lg);
+}
+
+/*======== TARJETAS: fondo gris muy claro (identidad Stitch), no blanco puro ========*/
+
+.fi-section-content-ctn,
+.fi-in-modal .fi-modal-window,
+.fi-wi-stats-overview-stat{
+    background-color:var(--surface-muted);
+}
+
+/*======== TIPOGRAFÍA DE TITULARES: Manrope en headings, Inter en el resto (->font()) ========*/
+
+.fi-header-heading,
+.fi-simple-header-heading,
+.fi-section-header-heading,
+.fi-modal-heading,
+.fi-ta-header-heading{
+    font-family:var(--font-headline);
+    font-weight:700;
+}
 
 /* Ejemplo (a): escalar todo el panel cambiando el font-size base.
    :root { font-size: 15px; } */

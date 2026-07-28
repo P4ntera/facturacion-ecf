@@ -45,12 +45,13 @@ class AdminPanelProvider extends PanelProvider
             // no le estorba dejarlo visible.
             ->tenantMenu()
             ->colors([
-                'primary' => Color::hex('#2563EB'), // --primary
-                'success' => Color::hex('#10B981'), // --secondary
-                'info' => Color::hex('#06B6D4'), // --info
+                'primary' => Color::hex('#5D87FF'), // --primary
+                'info' => Color::hex('#49BEFF'), // --secondary (rol "informativo" de Filament)
+                'success' => Color::hex('#13DEB9'), // --tertiary / --success
                 'warning' => Color::hex('#F59E0B'), // --warning
                 'danger' => Color::hex('#EF4444'), // --danger
-                'gray' => Color::Gray,
+                'gray' => Color::hex('#7C808D'), // --neutral: gris de marca Stitch, no el gris
+                // genérico de Filament — de aquí salen fondos, bordes y superficies del panel.
             ])
             // El fondo/superficies del panel salen del slot 'gray' + el modo de color, no de
             // 'primary'. El design-system del proyecto (resources/design-system/) es enteramente
@@ -61,6 +62,9 @@ class AdminPanelProvider extends PanelProvider
             ->databaseNotifications()
             ->maxContentWidth(Width::Full)
             ->sidebarCollapsibleOnDesktop()
+            // Cuerpo de texto (--font-body). Filament no permite una segunda familia solo para
+            // titulares vía este método: Manrope (--font-headline) se aplica en theme.css sobre
+            // las hook classes de heading de Filament (fi-header-heading y similares).
             ->font('Inter')
             ->brandName('Facturación e-CF')
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')
