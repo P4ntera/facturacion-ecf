@@ -1,3 +1,13 @@
+/*
+ * 4 variantes de la identidad Stitch. Equivalencia con las Actions de Filament (theme.css no
+ * necesita repetir esto: Filament ya las resuelve de forma nativa a partir del color/->outlined()
+ * de la Action, ver docs/estilos.md):
+ *   Primary   -> .btn-primary   ~ Action sin ->outlined() con color por defecto (solid, shade 600)
+ *   Secondary -> .btn-secondary ~ Action ->color('gray')                        (gris suave)
+ *   Inverted  -> .btn-inverted  ~ Action ->color('dark')                        (oscuro, solid)
+ *   Outlined  -> .btn-outlined  ~ Action ->outlined()                           (borde)
+ */
+
 .btn{
     display:inline-flex;
     align-items:center;
@@ -28,12 +38,28 @@
 }
 
 .btn-secondary{
-    background-color:var(--white);
-    border-color:var(--gray-300);
+    background-color:var(--gray-100);
     color:var(--gray-700);
 }
 .btn-secondary:hover:not(:disabled){
-    background-color:var(--gray-100);
+    background-color:var(--gray-200);
+}
+
+.btn-inverted{
+    background-color:var(--neutral-900);
+    color:var(--white);
+}
+.btn-inverted:hover:not(:disabled){
+    background-color:var(--neutral-800);
+}
+
+.btn-outlined{
+    background-color:transparent;
+    border-color:var(--primary);
+    color:var(--primary);
+}
+.btn-outlined:hover:not(:disabled){
+    background-color:var(--primary-50);
 }
 
 .btn-danger{

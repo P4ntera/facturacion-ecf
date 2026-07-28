@@ -78,12 +78,28 @@
 }
 
 .pos-screen .btn-secondary{
-    background-color:var(--white);
-    border-color:var(--gray-300);
+    background-color:var(--gray-100);
     color:var(--gray-700);
 }
 .pos-screen .btn-secondary:hover:not(:disabled){
-    background-color:var(--gray-100);
+    background-color:var(--gray-200);
+}
+
+.pos-screen .btn-inverted{
+    background-color:var(--neutral-900);
+    color:var(--white);
+}
+.pos-screen .btn-inverted:hover:not(:disabled){
+    background-color:var(--neutral-800);
+}
+
+.pos-screen .btn-outlined{
+    background-color:transparent;
+    border-color:var(--primary);
+    color:var(--primary);
+}
+.pos-screen .btn-outlined:hover:not(:disabled){
+    background-color:var(--primary-50);
 }
 
 .pos-screen .btn-danger{

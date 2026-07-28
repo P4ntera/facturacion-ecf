@@ -52,6 +52,26 @@ class AdminPanelProvider extends PanelProvider
                 'danger' => Color::hex('#EF4444'), // --danger
                 'gray' => Color::hex('#7C808D'), // --neutral: gris de marca Stitch, no el gris
                 // genérico de Filament — de aquí salen fondos, bordes y superficies del panel.
+                // Slot extra (no es uno de los 6 nativos de Filament) para la variante "Inverted"
+                // (oscuro sólido) de Stitch: se usa con ->color('dark') en una Action. Filament
+                // pinta el fondo sólido de un botón con el shade 600 de su color, así que ese
+                // shade tiene que ser YA el oscuro que queremos, no un tono medio autogenerado a
+                // partir de un solo hex — de ahí la escala explícita en vez de Color::hex().
+                // Los shades 700-950 son los mismos pasos de --neutral-900/--neutral-950 en
+                // variables.css; si esos tokens cambian, actualizar también aquí (docs/estilos.md).
+                'dark' => [
+                    50 => '#F7F7F8',
+                    100 => '#ECEDEE',
+                    200 => '#D9DADD',
+                    300 => '#BEC0C5',
+                    400 => '#9DA0AA',
+                    500 => '#6B6F7B',
+                    600 => '#303136',
+                    700 => '#1D1E20',
+                    800 => '#141517',
+                    900 => '#0D0E0F',
+                    950 => '#08090A',
+                ],
             ])
             // El fondo/superficies del panel salen del slot 'gray' + el modo de color, no de
             // 'primary'. El design-system del proyecto (resources/design-system/) es enteramente
