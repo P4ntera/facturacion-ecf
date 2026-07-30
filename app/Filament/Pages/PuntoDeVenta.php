@@ -9,6 +9,7 @@ use App\Enums\Modulo;
 use App\Enums\ModuloImpresion;
 use App\Enums\TipoComprobante;
 use App\Enums\TipoDocumentoCliente;
+use App\Enums\TipoPago;
 use App\Exceptions\SecuenciaNcfAgotadaException;
 use App\Exceptions\StockInsuficienteException;
 use App\Exceptions\VentaInvalidaException;
@@ -64,6 +65,10 @@ class PuntoDeVenta extends Page
     public string $descuentoGlobal = '0.00';
 
     public string $formaPago = 'efectivo';
+
+    public bool $ventaACredito = false;
+
+    public string $fechaLimitePago = '';
 
     /** @var array<string, string> */
     public array $totales = [];
@@ -454,6 +459,8 @@ class PuntoDeVenta extends Page
                 'descuento_global' => $this->descuentoGlobal,
                 'forma_pago' => $this->formaPago,
                 'arqueo_caja_id' => $this->arqueoAbierto()?->id,
+                'tipo_pago' => $this->ventaACredito ? TipoPago::CREDITO->value : TipoPago::CONTADO->value,
+                'fecha_limite_pago' => $this->ventaACredito && filled($this->fechaLimitePago) ? $this->fechaLimitePago : null,
                 'lineas' => $this->lineasParaService(),
             ], $this->empresa());
         } catch (VentaInvalidaException|StockInsuficienteException|SecuenciaNcfAgotadaException $e) {
@@ -465,6 +472,8 @@ class PuntoDeVenta extends Page
         $this->carrito = [];
         $this->descuentoGlobal = '0.00';
         $this->busquedaProducto = '';
+        $this->ventaACredito = false;
+        $this->fechaLimitePago = '';
         $this->recalcularTotales();
 
         $this->notificarVentaRegistradaEImprimirTicket($venta);

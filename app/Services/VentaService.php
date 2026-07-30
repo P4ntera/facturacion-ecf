@@ -11,6 +11,9 @@ use App\Enums\OrigenMovimiento;
 use App\Enums\TasaItbis;
 use App\Enums\TipoComprobante;
 use App\Enums\TipoMovimiento;
+use App\Enums\TipoPago;
+use App\Exceptions\ArqueoCajaCerradoException;
+use App\Exceptions\CuentaConPagosRegistradosException;
 use App\Exceptions\SecuenciaNcfAgotadaException;
 use App\Exceptions\StockInsuficienteException;
 use App\Exceptions\VentaInvalidaException;
@@ -30,6 +33,7 @@ class VentaService
     public function __construct(
         private readonly SecuenciaNcfService $ncfService,
         private readonly InventarioService $inventarioService,
+        private readonly CuentaPorCobrarService $cuentaPorCobrarService,
     ) {}
 
     /**
@@ -100,6 +104,13 @@ class VentaService
             // consume secuencia ni lleva NCF.
             $ncf = $usaEcf ? $this->ncfService->siguiente($tipoComprobante) : null;
 
+            $tipoPago = $datos['tipo_pago'] ?? TipoPago::CONTADO;
+            $tipoPago = $tipoPago instanceof TipoPago ? $tipoPago : TipoPago::from((int) $tipoPago);
+
+            $fechaLimitePago = $tipoPago === TipoPago::CREDITO
+                ? ($datos['fecha_limite_pago'] ?? now()->addDays(30)->toDateString())
+                : null;
+
             $venta = Venta::create([
                 // Se deriva del cliente (ya validado arriba) en vez de depender de que Filament
                 // haya asociado el tenant automáticamente: este service puede invocarse fuera
@@ -111,6 +122,8 @@ class VentaService
                 'ncf' => $ncf,
                 'forma_pago' => $datos['forma_pago'] ?? FormaPago::EFECTIVO,
                 'arqueo_caja_id' => $datos['arqueo_caja_id'] ?? null,
+                'tipo_pago' => $tipoPago,
+                'fecha_limite_pago' => $fechaLimitePago,
                 'fecha' => now(),
                 'moneda' => $config->moneda,
                 'subtotal' => $acumulado['subtotal'],
@@ -141,6 +154,10 @@ class VentaService
                     $venta->id,
                     $datos['user_id'] ?? null,
                 );
+            }
+
+            if ($tipoPago === TipoPago::CREDITO) {
+                $this->cuentaPorCobrarService->crearDesdeVenta($venta);
             }
 
             return $venta->load('detalles.producto', 'cliente');
@@ -198,6 +215,22 @@ class VentaService
             if ($venta->estaAnulada()) {
                 throw new VentaYaAnuladaException("La venta #{$venta->id} ya fue anulada anteriormente.");
             }
+
+            if ($venta->arqueoCaja?->estaCerrado()) {
+                throw new ArqueoCajaCerradoException(
+                    "No se puede anular la venta #{$venta->id}: pertenece a un arqueo de caja ya cerrado."
+                );
+            }
+
+            $cuentaPorCobrar = $venta->cuentaPorCobrar;
+
+            if ($cuentaPorCobrar !== null && (float) $cuentaPorCobrar->monto_pagado > 0) {
+                throw new CuentaConPagosRegistradosException(
+                    "No se puede anular la venta #{$venta->id}: su cuenta por cobrar ya tiene pagos registrados."
+                );
+            }
+
+            $cuentaPorCobrar?->delete();
 
             foreach ($venta->detalles as $detalle) {
                 $producto = $detalle->producto;

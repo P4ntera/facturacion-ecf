@@ -54,6 +54,14 @@ class Permisos
                 'devoluciones.ver' => 'Ver devoluciones a proveedor',
                 'devoluciones.crear' => 'Registrar devoluciones a proveedor',
             ],
+            'Cuentas' => [
+                'cxc.ver' => 'Ver cuentas por cobrar',
+                'cxc.cobrar' => 'Registrar pagos de clientes',
+                'cxc.anular' => 'Anular pagos de clientes',
+                'cxp.ver' => 'Ver cuentas por pagar',
+                'cxp.pagar' => 'Registrar pagos a proveedores',
+                'cxp.anular' => 'Anular pagos a proveedores',
+            ],
             'Reportes' => [
                 'reportes.ver' => 'Ver reportes',
                 'reportes.exportar' => 'Exportar reportes (PDF/Excel)',

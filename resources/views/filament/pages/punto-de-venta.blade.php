@@ -310,6 +310,21 @@
             </select>
           </div>
 
+          <div class="mt-2">
+            <label class="form-label">
+              <input type="checkbox" wire:model.live="ventaACredito" />
+              Vender a crédito (fiar al cliente)
+            </label>
+          </div>
+
+          @if ($ventaACredito)
+            <div class="mt-2">
+              <label class="form-label">Fecha límite de pago</label>
+              <input type="date" class="form-input" wire:model.live="fechaLimitePago" />
+              <p style="color:var(--text-muted);font-size:0.8125rem;margin-top:0.25rem;">Si la dejas vacía, se usan 30 días desde hoy.</p>
+            </div>
+          @endif
+
           <button
             type="button"
             class="btn btn-primary btn-cobrar mt-2"

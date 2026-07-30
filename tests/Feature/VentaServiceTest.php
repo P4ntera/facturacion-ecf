@@ -6,6 +6,7 @@ use App\Enums\FormaPago;
 use App\Enums\TasaItbis;
 use App\Enums\TipoComprobante;
 use App\Enums\TipoProducto;
+use App\Exceptions\ArqueoCajaCerradoException;
 use App\Exceptions\VentaInvalidaException;
 use App\Models\Cliente;
 use App\Models\Producto;
@@ -181,5 +182,49 @@ class VentaServiceTest extends TestCase
 
         $this->assertSame(FormaPago::TARJETA, $venta->forma_pago);
         $this->assertSame($arqueo->id, $venta->arqueo_caja_id);
+    }
+
+    public function test_no_permite_anular_una_venta_de_un_arqueo_ya_cerrado(): void
+    {
+        $this->secuencia(TipoComprobante::FACTURA_CONSUMO, 'E32');
+
+        $producto = $this->producto('VS-ARQ-CERRADO');
+        $cliente = Cliente::create(['nombre' => 'Consumidor Final', 'activo' => true]);
+        $cajero = User::factory()->create();
+        $arqueo = app(ArqueoCajaService::class)->abrir('500.00', $cajero->id, $this->empresaDefault);
+
+        $venta = app(VentaService::class)->registrar([
+            'cliente_id' => $cliente->id,
+            'forma_pago' => FormaPago::EFECTIVO,
+            'arqueo_caja_id' => $arqueo->id,
+            'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
+        ], $this->empresaDefault);
+
+        app(ArqueoCajaService::class)->cerrar($arqueo, '618.00', null, $cajero->id);
+
+        $this->expectException(ArqueoCajaCerradoException::class);
+
+        app(VentaService::class)->anular($venta, 'Intento tardío', $cajero->id);
+    }
+
+    public function test_permite_anular_una_venta_de_un_arqueo_todavia_abierto(): void
+    {
+        $this->secuencia(TipoComprobante::FACTURA_CONSUMO, 'E32');
+
+        $producto = $this->producto('VS-ARQ-ABIERTO');
+        $cliente = Cliente::create(['nombre' => 'Consumidor Final', 'activo' => true]);
+        $cajero = User::factory()->create();
+        $arqueo = app(ArqueoCajaService::class)->abrir('500.00', $cajero->id, $this->empresaDefault);
+
+        $venta = app(VentaService::class)->registrar([
+            'cliente_id' => $cliente->id,
+            'forma_pago' => FormaPago::EFECTIVO,
+            'arqueo_caja_id' => $arqueo->id,
+            'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
+        ], $this->empresaDefault);
+
+        $anulada = app(VentaService::class)->anular($venta, 'Cliente se arrepintió', $cajero->id);
+
+        $this->assertTrue($anulada->estaAnulada());
     }
 }

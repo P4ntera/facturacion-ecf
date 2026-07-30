@@ -29,6 +29,9 @@ enum Modulo: string
     case COMPRAS_STOCK_BAJO = 'compras_stock_bajo';
     case DEVOLUCIONES = 'devoluciones';
 
+    case CUENTAS_POR_COBRAR = 'cuentas_por_cobrar';
+    case CUENTAS_POR_PAGAR = 'cuentas_por_pagar';
+
     case ECF_SECUENCIAS = 'ecf_secuencias';
     case ECF_RECIBIDOS = 'ecf_recibidos';
 
@@ -50,6 +53,8 @@ enum Modulo: string
             self::COMPRAS_PEDIDOS => 'Pedidos de Compra',
             self::COMPRAS_STOCK_BAJO => 'Stock Bajo',
             self::DEVOLUCIONES => 'Devoluciones a Proveedor',
+            self::CUENTAS_POR_COBRAR => 'Cuentas por Cobrar',
+            self::CUENTAS_POR_PAGAR => 'Cuentas por Pagar',
             self::ECF_SECUENCIAS => 'Secuencias NCF',
             self::ECF_RECIBIDOS => 'e-CF Recibidos',
             self::IMPRESORAS => 'Impresoras',
@@ -70,6 +75,8 @@ enum Modulo: string
 
             self::COMPRAS, self::COMPRAS_PEDIDOS,
             self::COMPRAS_STOCK_BAJO, self::DEVOLUCIONES => 'Compras',
+
+            self::CUENTAS_POR_COBRAR, self::CUENTAS_POR_PAGAR => 'Cuentas',
 
             self::ECF_SECUENCIAS, self::ECF_RECIBIDOS => 'e-CF',
 
@@ -100,6 +107,8 @@ enum Modulo: string
         return match ($this) {
             self::VENTAS_POS => [self::MAESTROS_PRODUCTOS],
             self::DEVOLUCIONES => [self::COMPRAS],
+            self::CUENTAS_POR_COBRAR => [self::VENTAS_LISTADO],
+            self::CUENTAS_POR_PAGAR => [self::COMPRAS],
             default => [],
         };
     }

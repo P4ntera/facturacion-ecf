@@ -10,6 +10,7 @@ use App\Enums\EventoEcf;
 use App\Enums\Modulo;
 use App\Enums\ModuloImpresion;
 use App\Enums\TipoComprobante;
+use App\Exceptions\ArqueoCajaCerradoException;
 use App\Exceptions\VentaYaAnuladaException;
 use App\Filament\Concerns\RestringidoPorModulo;
 use App\Filament\Resources\VentaResource\Pages;
@@ -283,6 +284,7 @@ class VentaResource extends Resource
                     ->icon('heroicon-o-x-circle')
                     ->color('danger')
                     ->visible(fn (Venta $record) => $record->estado === EstadoVenta::EMITIDA
+                        && ! ($record->arqueoCaja?->estaCerrado() ?? false)
                         && (auth()->user()?->can('ventas.anular') ?? false))
                     ->requiresConfirmation()
                     ->schema([
@@ -294,7 +296,7 @@ class VentaResource extends Resource
                     ->action(function (Venta $record, array $data): void {
                         try {
                             app(VentaService::class)->anular($record, $data['motivo'], auth()->id());
-                        } catch (VentaYaAnuladaException $e) {
+                        } catch (VentaYaAnuladaException|ArqueoCajaCerradoException $e) {
                             Notification::make()->title($e->getMessage())->danger()->send();
 
                             return;

@@ -7,6 +7,7 @@ namespace App\Services;
 use App\Enums\EstadoArqueoCaja;
 use App\Enums\EstadoVenta;
 use App\Enums\FormaPago;
+use App\Enums\TipoPago;
 use App\Models\ArqueoCaja;
 use App\Models\Empresa;
 use Illuminate\Support\Facades\DB;
@@ -52,6 +53,9 @@ class ArqueoCajaService
         return DB::transaction(function () use ($arqueo, $efectivoContado, $notas) {
             $sumasPorFormaPago = $arqueo->ventas()
                 ->where('estado', '!=', EstadoVenta::ANULADA)
+                // Ventas a crédito no representan efectivo/tarjeta recibido hoy: se cobran
+                // después vía CuentaPorCobrarService, no deben inflar el efectivo esperado.
+                ->where('tipo_pago', TipoPago::CONTADO)
                 ->selectRaw('forma_pago, COALESCE(SUM(total), 0) as total')
                 ->groupBy('forma_pago')
                 ->pluck('total', 'forma_pago');

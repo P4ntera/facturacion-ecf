@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 
@@ -86,6 +87,16 @@ class Venta extends Model
     public function arqueoCaja(): BelongsTo
     {
         return $this->belongsTo(ArqueoCaja::class);
+    }
+
+    public function cuentaPorCobrar(): HasOne
+    {
+        return $this->hasOne(CuentaPorCobrar::class);
+    }
+
+    public function esACredito(): bool
+    {
+        return $this->tipo_pago === TipoPago::CREDITO;
     }
 
     /**
