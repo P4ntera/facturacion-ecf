@@ -3,15 +3,6 @@
     class="pos-screen"
     x-data
     x-init="
-      /*
-       * Paso 1: el POS es una pantalla de trabajo, así que entra con el sidebar colapsado
-       * para aprovechar el ancho. Usamos el store global de Alpine que trae Filament
-       * ($store.sidebar, ver vendor/filament/filament/resources/js/stores/sidebar.js) para
-       * cerrarlo al montar esta página y restaurar el estado que tenía al salir de ella
-       * (evento `livewire:navigate`, que Livewire dispara justo antes de navegar a otra
-       * página). El botón de hamburguesa del topbar de Filament no se toca: sigue
-       * funcionando en todo momento para reabrir el sidebar manualmente.
-       */
       let posSidebarAbiertoAntes = $store.sidebar.isOpen;
       $store.sidebar.close();
 
@@ -130,32 +121,12 @@
               @endif
             </div>
           @endif
-        </div>
 
-        {{-- Comprobante --}}
-        <div class="card">
-          <h3 class="card-title">Comprobante</h3>
-          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <label class="form-label">Tipo de comprobante</label>
-              <select class="form-select" wire:model.live="tipoComprobante">
-                @foreach ($this->tiposComprobante() as $valor => $etiqueta)
-                  <option value="{{ $valor }}">{{ $etiqueta }}</option>
-                @endforeach
-              </select>
-            </div>
-            <div>
-              <label class="form-label">Próximo e-NCF</label>
-              <div>
-                @if (! $this->usaEcf())
-                  <span class="badge badge-success">No aplica (empresa sin e-CF)</span>
-                @elseif ($this->proximoNcf())
-                  <span class="badge badge-success">{{ $this->proximoNcf() }}</span>
-                @else
-                  <span class="badge badge-danger">No disponible: carga un rango de NCF</span>
-                @endif
-              </div>
-            </div>
+          <div class="mt-2">
+            <label class="form-label">
+              <input type="checkbox" wire:model.live="creditoFiscal" />
+              ¿Con comprobante de crédito fiscal? (para el negocio del cliente)
+            </label>
           </div>
         </div>
 

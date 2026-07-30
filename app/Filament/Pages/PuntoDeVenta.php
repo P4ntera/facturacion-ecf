@@ -45,11 +45,11 @@ class PuntoDeVenta extends Page
 
     protected static string|UnitEnum|null $navigationGroup = 'Ventas';
 
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = 2;
 
-    protected static ?string $navigationLabel = 'Punto de Venta';
+    protected static ?string $navigationLabel = 'Facturación';
 
-    protected static ?string $title = 'Punto de Venta';
+    protected static ?string $title = 'Facturación';
 
     public ?int $clienteId = null;
 
@@ -80,7 +80,7 @@ class PuntoDeVenta extends Page
 
     public static function puedeAccederPorPermiso(): bool
     {
-        return auth()->user()?->can('pos.acceder') ?? false;
+        return auth()->user()?->can('facturacion.acceder') ?? false;
     }
 
     public function mount(): void
@@ -109,13 +109,13 @@ class PuntoDeVenta extends Page
         return $this->empresa()->usaEcf();
     }
 
-    private function empresa(): Empresa
+    protected function empresa(): Empresa
     {
         /** @var Empresa */
         return Filament::getTenant();
     }
 
-    private function empresaId(): int
+    protected function empresaId(): int
     {
         return $this->empresa()->id;
     }
@@ -487,7 +487,7 @@ class PuntoDeVenta extends Page
      * impresora configurada) -> el navegador decide la impresora física, así que solo podemos
      * abrir la vista del ticket y dejar que window.print() (en la propia vista) dispare el diálogo.
      */
-    private function notificarVentaRegistradaEImprimirTicket(Venta $venta): void
+    protected function notificarVentaRegistradaEImprimirTicket(Venta $venta): void
     {
         $impresora = app(ImpresionService::class)->resolverImpresora(ModuloImpresion::FACTURACION, auth()->user());
         $resultado = app(ImpresionService::class)->imprimirTicket($venta, $impresora);
@@ -540,7 +540,7 @@ class PuntoDeVenta extends Page
             ->send();
     }
 
-    private function recalcularTotales(): void
+    protected function recalcularTotales(): void
     {
         if (empty($this->carrito)) {
             $this->totales = $this->totalesVacios();
@@ -559,7 +559,7 @@ class PuntoDeVenta extends Page
     }
 
     /** @return array<string, string> */
-    private function totalesVacios(): array
+    protected function totalesVacios(): array
     {
         return [
             'subtotal' => '0.00',
@@ -575,7 +575,7 @@ class PuntoDeVenta extends Page
     }
 
     /** @return array<int, array<string, mixed>> */
-    private function lineasParaService(): array
+    protected function lineasParaService(): array
     {
         return collect($this->carrito)->map(fn (array $linea) => [
             'producto_id' => $linea['producto_id'],
@@ -585,7 +585,7 @@ class PuntoDeVenta extends Page
         ])->all();
     }
 
-    private function clienteConsumidorFinal(): Cliente
+    protected function clienteConsumidorFinal(): Cliente
     {
         // Sin empresa_id en la búsqueda, todas las empresas colisionarían en el mismo
         // "Consumidor Final" (nombre no es único): cada una necesita el suyo propio.

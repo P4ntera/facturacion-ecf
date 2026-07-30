@@ -38,7 +38,8 @@ class Permisos
                 'categorias.desactivar' => 'Activar/Desactivar categorías',
             ],
             'Ventas' => [
-                'pos.acceder' => 'Acceder al Punto de Venta',
+                'pos.acceder' => 'Acceder a Caja (venta rápida)',
+                'facturacion.acceder' => 'Acceder a Facturación (comprobantes avanzados)',
                 'ventas.ver' => 'Ver ventas',
                 'ventas.anular' => 'Anular ventas',
                 'ventas.imprimir' => 'Imprimir comprobantes y tickets',

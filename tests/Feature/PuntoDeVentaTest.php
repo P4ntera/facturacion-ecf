@@ -29,8 +29,9 @@ class PuntoDeVentaTest extends TestCase
     private function vendedor(): User
     {
         Permission::firstOrCreate(['name' => 'pos.acceder', 'guard_name' => 'web']);
+        Permission::firstOrCreate(['name' => 'facturacion.acceder', 'guard_name' => 'web']);
         $rol = Role::firstOrCreate(['empresa_id' => $this->empresaDefault->id, 'name' => 'Vendedor', 'guard_name' => 'web']);
-        $rol->syncPermissions(['pos.acceder']);
+        $rol->syncPermissions(['pos.acceder', 'facturacion.acceder']);
 
         $usuario = User::factory()->create();
         $usuario->assignRole('Vendedor');

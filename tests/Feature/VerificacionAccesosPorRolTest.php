@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Filament\Pages\Caja;
 use App\Filament\Pages\ManageEmpresa;
 use App\Filament\Pages\ManageFacturacion;
 use App\Filament\Pages\PuntoDeVenta;
@@ -77,10 +78,12 @@ class VerificacionAccesosPorRolTest extends TestCase
 
         $this->actingAs($usuarioCajero);
 
-        // Puede entrar al POS...
-        $this->assertTrue(PuntoDeVenta::canAccess());
+        // Puede entrar a Caja (pos.acceder)...
+        $this->assertTrue(Caja::canAccess());
 
-        // ...pero no a ningún otro Resource/Page del panel: el menú se reduce a lo que puede ver.
+        // ...pero no a Facturación (necesita facturacion.acceder, que Cajero no tiene) ni a
+        // ningún otro Resource/Page del panel: el menú se reduce a lo que puede ver.
+        $this->assertFalse(PuntoDeVenta::canAccess(), 'Cajero no debería ver Facturación (solo Caja)');
         $this->assertFalse(VentaResource::canAccess(), 'no debería ver el listado de Ventas (solo pos.acceder + ventas.imprimir)');
         $this->assertFalse(ProductoResource::canAccess());
         $this->assertFalse(ClienteResource::canAccess());
@@ -94,8 +97,9 @@ class VerificacionAccesosPorRolTest extends TestCase
         $this->assertFalse(ManageEmpresa::canAccess());
         $this->assertFalse(ManageFacturacion::canAccess());
 
-        // La página del POS en sí responde 200; cualquier otra, 403.
-        $this->get(PuntoDeVenta::getUrl())->assertOk();
+        // La página de Caja en sí responde 200; Facturación y cualquier otra, 403.
+        $this->get(Caja::getUrl())->assertOk();
+        $this->get(PuntoDeVenta::getUrl())->assertForbidden();
         $this->get(VentaResource::getUrl('index'))->assertForbidden();
         $this->get(ProductoResource::getUrl('index'))->assertForbidden();
     }
@@ -135,6 +139,7 @@ class VerificacionAccesosPorRolTest extends TestCase
         $admin = $this->administrador();
         $this->actingAs($admin);
 
+        $this->assertTrue(Caja::canAccess());
         $this->assertTrue(PuntoDeVenta::canAccess());
         $this->assertTrue(VentaResource::canAccess());
         $this->assertTrue(ProductoResource::canAccess());
@@ -149,6 +154,7 @@ class VerificacionAccesosPorRolTest extends TestCase
         $this->assertTrue(ManageEmpresa::canAccess());
         $this->assertTrue(ManageFacturacion::canAccess());
 
+        $this->get(Caja::getUrl())->assertOk();
         $this->get(PuntoDeVenta::getUrl())->assertOk();
         $this->get(VentaResource::getUrl('index'))->assertOk();
         $this->get(RoleResource::getUrl('index'))->assertOk();

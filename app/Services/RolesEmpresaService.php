@@ -38,7 +38,11 @@ class RolesEmpresaService
                 'guard_name' => 'web',
             ]);
             $vendedor->syncPermissions([
+                // Vendedor conserva ambas pantallas: Caja para el día a día rápido, y
+                // Facturación por si necesita emitir un comprobante con más control (a
+                // diferencia de Cajero, que un Administrador crea aparte solo con Caja).
                 'pos.acceder',
+                'facturacion.acceder',
                 'ventas.ver',
                 'ventas.imprimir',
                 'gestionar_arqueo_caja',
