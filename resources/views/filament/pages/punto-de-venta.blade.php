@@ -42,8 +42,8 @@
         </div>
       </div>
     @else
-      {{-- Caja abierta: estado del turno + acción de cierre --}}
-      <div class="card pos-estado-caja" x-data="{ cerrando: false, efectivoContado: '0.00', notas: '' }">
+      {{-- Caja abierta: solo estado informativo. El cierre se hace desde Arqueos de Caja. --}}
+      <div class="card pos-estado-caja">
         <div class="flex items-center justify-between flex-wrap gap-2">
           <div>
             <span class="badge badge-success">Caja abierta</span>
@@ -53,23 +53,6 @@
               fondo RD$ {{ number_format((float) $this->arqueoAbierto()->fondo_inicial, 2) }}
             </span>
           </div>
-          <button type="button" class="btn btn-secondary" x-on:click="cerrando = ! cerrando">
-            Cerrar caja
-          </button>
-        </div>
-
-        <div x-show="cerrando" class="mt-3 flex flex-wrap items-end gap-2">
-          <div>
-            <label class="form-label">Efectivo contado</label>
-            <input type="number" min="0" step="0.01" class="form-input" x-model="efectivoContado" />
-          </div>
-          <div>
-            <label class="form-label">Notas (opcional)</label>
-            <input type="text" class="form-input" x-model="notas" />
-          </div>
-          <button type="button" class="btn btn-primary" x-on:click="$wire.cerrarCaja(efectivoContado, notas)">
-            Confirmar cierre
-          </button>
         </div>
       </div>
 

@@ -320,28 +320,6 @@ class PuntoDeVentaTest extends TestCase
         $this->assertSame(1, ArqueoCaja::where('user_id', $usuario->id)->count());
     }
 
-    public function test_cerrar_caja_calcula_la_diferencia_visible_en_la_pagina(): void
-    {
-        $this->habilitarSecuenciaNcfDeConsumo();
-        $producto = $this->producto();
-
-        $componente = Livewire::actingAs($this->vendedor())
-            ->test(PuntoDeVenta::class)
-            ->call('abrirCaja', '500.00')
-            ->call('agregarProducto', $producto->id)
-            ->set('tipoComprobante', TipoComprobante::FACTURA_CONSUMO->value)
-            ->call('cobrar');
-
-        $arqueo = $componente->instance()->arqueoAbierto();
-        $componente->call('cerrarCaja', '600.00', 'sobrante de prueba');
-
-        $arqueo->refresh();
-        $this->assertTrue($arqueo->estaCerrado());
-        $this->assertSame('118.00', (string) $arqueo->total_ventas_efectivo);
-        $this->assertSame('618.00', (string) $arqueo->efectivo_esperado);
-        $this->assertSame('-18.00', (string) $arqueo->diferencia);
-    }
-
     public function test_cobrar_persiste_la_forma_de_pago_elegida(): void
     {
         $this->habilitarSecuenciaNcfDeConsumo();

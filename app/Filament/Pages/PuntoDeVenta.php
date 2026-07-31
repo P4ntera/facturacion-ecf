@@ -416,25 +416,6 @@ class PuntoDeVenta extends Page
         Notification::make()->title('Caja abierta')->success()->send();
     }
 
-    public function cerrarCaja(string $efectivoContado, ?string $notas = null): void
-    {
-        $arqueo = $this->arqueoAbierto();
-
-        if ($arqueo === null) {
-            return;
-        }
-
-        try {
-            app(ArqueoCajaService::class)->cerrar($arqueo, $efectivoContado, $notas, auth()->id());
-        } catch (RuntimeException $e) {
-            Notification::make()->title($e->getMessage())->danger()->send();
-
-            return;
-        }
-
-        Notification::make()->title('Caja cerrada')->success()->send();
-    }
-
     public function cobrar(): void
     {
         if ($this->arqueoAbierto() === null) {

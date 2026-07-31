@@ -125,11 +125,20 @@ class User extends Authenticatable implements FilamentUser, HasDefaultTenant, Ha
      * true si $empresaId es la empresa de este usuario. Para rutas FUERA del panel (descargas de
      * PDF/XML/ticket, reportes): ahí Filament::getTenant() no existe, así que el scoping
      * automático de Filament (global scope por tenant) no aplica y hay que comparar a mano contra
-     * la empresa del usuario autenticado. El super-admin no tiene empresa propia —no se le da
-     * acceso implícito a estas rutas fuera del panel; entra por el panel, con tenant explícito—.
+     * la empresa del usuario autenticado.
+     *
+     * El super-admin SÍ pasa (bypass total, igual que canAccessPanel()/canAccessTenant()): opera
+     * dentro de un tenant explícito elegido en el panel (p. ej. cobra una venta en Caja), y esas
+     * mismas pantallas disparan estas rutas externas (PDF del comprobante, ticket de impresión)
+     * como parte normal del flujo — bloquearlo aquí rompía "Cobrar" con un 403 al abrir su propio
+     * comprobante recién emitido.
      */
     public function perteneceAEmpresa(?int $empresaId): bool
     {
+        if ($this->es_super_admin) {
+            return true;
+        }
+
         return $empresaId !== null && $this->empresa_id === $empresaId;
     }
 
