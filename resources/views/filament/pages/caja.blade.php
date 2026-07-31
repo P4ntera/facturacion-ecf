@@ -33,119 +33,106 @@
         </div>
       </div>
     @else
-      {{-- Caja abierta: solo estado informativo. El cierre se hace desde Arqueos de Caja. --}}
-      <div class="card pos-estado-caja">
-        <div class="flex items-center justify-between flex-wrap gap-2">
-          <div>
-            <span class="badge badge-success">Caja abierta</span>
-            <span class="pos-muted">
-              {{ $this->arqueoAbierto()->user?->name ?? 'Usuario' }} —
-              desde {{ $this->arqueoAbierto()->abierto_en->format('d/m/Y H:i') }} —
-              fondo RD$ {{ number_format((float) $this->arqueoAbierto()->fondo_inicial, 2) }}
-            </span>
-          </div>
-        </div>
-      </div>
-
       <div class="pos-grid">
       <div class="pos-main">
-        {{-- Cliente --}}
-        <div class="card">
-          <h3 class="card-title">Cliente</h3>
+        {{-- Fila superior compacta: buscar cliente + buscar producto, solo sobre el carrito --}}
+        <div class="pos-top-row">
+          <div class="card pos-buscador-compacto">
+            <h3 class="card-title">Cliente</h3>
 
-          @if ($this->clienteSeleccionado())
-            <div class="flex items-center justify-between">
-              <div>
-                <p class="font-semibold">{{ $this->clienteSeleccionado()->nombre }}</p>
-                @if ($this->clienteSeleccionado()->documento)
-                  <p class="pos-muted">{{ $this->clienteSeleccionado()->documento }}</p>
+            @if ($this->clienteSeleccionado())
+              <div class="flex items-center justify-between">
+                <div>
+                  <p class="font-semibold">{{ $this->clienteSeleccionado()->nombre }}</p>
+                  @if ($this->clienteSeleccionado()->documento)
+                    <p class="pos-muted">{{ $this->clienteSeleccionado()->documento }}</p>
+                  @endif
+                </div>
+                <button type="button" class="btn btn-secondary" wire:click="quitarCliente">Cambiar</button>
+              </div>
+
+              @if ($this->mensajeFaltaRncComprador())
+                <p class="mt-2 pos-alerta">{{ $this->mensajeFaltaRncComprador() }}</p>
+              @endif
+            @else
+              <div class="space-y-2">
+                <div class="flex gap-2">
+                  <input
+                    type="text"
+                    class="form-input"
+                    placeholder="Buscar cliente por nombre o documento..."
+                    wire:model.live.debounce.300ms="busquedaCliente"
+                  />
+                  <button type="button" class="btn btn-secondary pos-nowrap" wire:click="seleccionarConsumidorFinal">
+                    Consumidor Final
+                  </button>
+                </div>
+
+                @if ($busquedaCliente !== '')
+                  <ul class="pos-resultados">
+                    @forelse ($this->clientesSugeridos() as $cliente)
+                      <li>
+                        <button type="button" wire:click="seleccionarCliente({{ $cliente->id }})">
+                          <span>{{ $cliente->nombre }}</span>
+                          @if ($cliente->documento)
+                            <span class="pos-muted">{{ $cliente->documento }}</span>
+                          @endif
+                        </button>
+                      </li>
+                    @empty
+                      <li class="pos-vacio">
+                        Sin resultados locales.
+                        <button type="button" class="btn btn-secondary pos-nowrap" wire:click="buscarClienteEnDgii">
+                          Buscar en DGII/JCE
+                        </button>
+                      </li>
+                    @endforelse
+                  </ul>
                 @endif
               </div>
-              <button type="button" class="btn btn-secondary" wire:click="quitarCliente">Cambiar</button>
-            </div>
-
-            @if ($this->mensajeFaltaRncComprador())
-              <p class="mt-2 pos-alerta">{{ $this->mensajeFaltaRncComprador() }}</p>
             @endif
-          @else
-            <div class="space-y-2">
-              <div class="flex gap-2">
-                <input
-                  type="text"
-                  class="form-input"
-                  placeholder="Buscar cliente por nombre o documento..."
-                  wire:model.live.debounce.300ms="busquedaCliente"
-                />
-                <button type="button" class="btn btn-secondary pos-nowrap" wire:click="seleccionarConsumidorFinal">
-                  Consumidor Final
-                </button>
-              </div>
 
-              @if ($busquedaCliente !== '')
-                <ul class="pos-resultados">
-                  @forelse ($this->clientesSugeridos() as $cliente)
-                    <li>
-                      <button type="button" wire:click="seleccionarCliente({{ $cliente->id }})">
-                        <span>{{ $cliente->nombre }}</span>
-                        @if ($cliente->documento)
-                          <span class="pos-muted">{{ $cliente->documento }}</span>
-                        @endif
-                      </button>
-                    </li>
-                  @empty
-                    <li class="pos-vacio">
-                      Sin resultados locales.
-                      <button type="button" class="btn btn-secondary pos-nowrap" wire:click="buscarClienteEnDgii">
-                        Buscar en DGII/JCE
-                      </button>
-                    </li>
-                  @endforelse
-                </ul>
-              @endif
+            <div class="mt-2">
+              <label class="form-label">
+                <input type="checkbox" wire:model.live="creditoFiscal" />
+                ¿Con comprobante de crédito fiscal? (para el negocio del cliente)
+              </label>
             </div>
-          @endif
-
-          <div class="mt-2">
-            <label class="form-label">
-              <input type="checkbox" wire:model.live="creditoFiscal" />
-              ¿Con comprobante de crédito fiscal? (para el negocio del cliente)
-            </label>
           </div>
-        </div>
 
-        {{-- Buscar producto --}}
-        <div class="card">
-          <h3 class="card-title">Productos</h3>
-          <input
-            type="text"
-            class="form-input"
-            x-ref="buscadorProducto"
-            placeholder="Buscar por código, nombre o escanear código de barras..."
-            wire:model.live.debounce.300ms="busquedaProducto"
-            wire:keydown.enter="escanearOBuscar"
-          />
+          <div class="card pos-buscador-compacto">
+            <h3 class="card-title">Productos</h3>
+            <input
+              type="text"
+              class="form-input"
+              x-ref="buscadorProducto"
+              placeholder="Buscar por código, nombre o escanear código de barras..."
+              wire:model.live.debounce.300ms="busquedaProducto"
+              wire:keydown.enter="escanearOBuscar"
+            />
 
-          @if ($busquedaProducto !== '')
-            <ul class="pos-resultados">
-              @forelse ($this->productosSugeridos() as $producto)
-                <li>
-                  <button type="button" wire:click="agregarProducto({{ $producto->id }})">
-                    <span>{{ $producto->codigo }} — {{ $producto->nombre }}</span>
-                    <span class="flex items-center gap-2 pos-muted">
-                      RD$ {{ number_format((float) $producto->precio, 2) }}
-                      @if ($producto->controla_stock)
-                        <span class="badge {{ (float) $producto->stock > 0 ? 'badge-success' : 'badge-danger' }}">
-                          stock {{ number_format((float) $producto->stock, 2) }}
-                        </span>
-                      @endif
-                    </span>
-                  </button>
-                </li>
-              @empty
-                <li class="pos-vacio">Sin resultados.</li>
-              @endforelse
-            </ul>
-          @endif
+            @if ($busquedaProducto !== '')
+              <ul class="pos-resultados">
+                @forelse ($this->productosSugeridos() as $producto)
+                  <li>
+                    <button type="button" wire:click="agregarProducto({{ $producto->id }})">
+                      <span>{{ $producto->codigo }} — {{ $producto->nombre }}</span>
+                      <span class="flex items-center gap-2 pos-muted">
+                        RD$ {{ number_format((float) $producto->precio, 2) }}
+                        @if ($producto->controla_stock)
+                          <span class="badge {{ (float) $producto->stock > 0 ? 'badge-success' : 'badge-danger' }}">
+                            stock {{ number_format((float) $producto->stock, 2) }}
+                          </span>
+                        @endif
+                      </span>
+                    </button>
+                  </li>
+                @empty
+                  <li class="pos-vacio">Sin resultados.</li>
+                @endforelse
+              </ul>
+            @endif
+          </div>
         </div>
 
         {{-- Carrito --}}
@@ -179,10 +166,10 @@
                     <td class="pos-num">
                       <input
                         type="number"
-                        min="0.001"
-                        step="0.001"
+                        min="0"
+                        step="1"
                         class="form-input"
-                        wire:model.live.debounce.400ms="carrito.{{ $indice }}.cantidad"
+                        wire:model.live="carrito.{{ $indice }}.cantidad"
                       />
                     </td>
                     <td class="pos-num">RD$ {{ number_format((float) $linea['precio_unitario'], 2) }}</td>
@@ -215,14 +202,19 @@
         </div>
       </div>
 
-      {{-- Totales --}}
       <div class="pos-side">
+        {{-- Totales --}}
         <div class="card pos-totales">
           <h3 class="card-title">Totales</h3>
 
           <div class="mb-2">
             <label class="form-label">Descuento global</label>
-            <input type="number" min="0" step="0.01" class="form-input" wire:model.live.debounce.400ms="descuentoGlobal" />
+            <select class="form-select" wire:model.live="descuentoId">
+              <option value="">Sin descuento</option>
+              @foreach ($this->descuentosDisponibles() as $descuento)
+                <option value="{{ $descuento->id }}">{{ $descuento->nombre }} ({{ number_format((float) $descuento->porcentaje, 2) }}%)</option>
+              @endforeach
+            </select>
           </div>
 
           <dl>

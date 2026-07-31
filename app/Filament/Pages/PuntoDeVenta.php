@@ -16,6 +16,7 @@ use App\Exceptions\VentaInvalidaException;
 use App\Filament\Concerns\RestringidoPorModulo;
 use App\Models\ArqueoCaja;
 use App\Models\Cliente;
+use App\Models\Descuento;
 use App\Models\Empresa;
 use App\Models\Producto;
 use App\Models\Venta;
@@ -62,6 +63,14 @@ class PuntoDeVenta extends Page
     /** @var array<int, array<string, mixed>> */
     public array $carrito = [];
 
+    /** Id (como string) del Descuento elegido en el <select>; '' = sin descuento. */
+    public string $descuentoId = '';
+
+    /**
+     * Monto en pesos del descuento global, calculado a partir de $descuentoId y el subtotal del
+     * carrito (ver recalcularTotales()). Ya no es un input libre: el usuario elige un Descuento
+     * configurado por el Administrador (Mantenimiento de Descuentos) y esto se deriva solo.
+     */
     public string $descuentoGlobal = '0.00';
 
     public string $formaPago = 'efectivo';
@@ -92,7 +101,7 @@ class PuntoDeVenta extends Page
 
     public function updated(string $name): void
     {
-        if ($name === 'descuentoGlobal' || str($name)->startsWith('carrito.')) {
+        if ($name === 'descuentoId' || str($name)->startsWith('carrito.')) {
             $this->recalcularTotales();
         }
     }
@@ -387,6 +396,33 @@ class PuntoDeVenta extends Page
             ->all();
     }
 
+    /** @return Collection<int, Descuento> */
+    public function descuentosDisponibles(): Collection
+    {
+        return Descuento::query()
+            ->where('empresa_id', $this->empresaId())
+            ->where('activo', true)
+            ->orderBy('nombre')
+            ->get();
+    }
+
+    /**
+     * Re-valida $descuentoId contra empresa_id/activo en cada uso (no confía en lo que llegó del
+     * navegador): un id de otra empresa, o de un descuento ya desactivado, simplemente no aplica
+     * ningún descuento en vez de filtrar datos entre empresas.
+     */
+    public function descuentoSeleccionado(): ?Descuento
+    {
+        if (blank($this->descuentoId)) {
+            return null;
+        }
+
+        return Descuento::query()
+            ->where('empresa_id', $this->empresaId())
+            ->where('activo', true)
+            ->find((int) $this->descuentoId);
+    }
+
     /** Turno de caja abierto del usuario actual, si tiene uno. Lookup fresco, sin cachear. */
     public function arqueoAbierto(): ?ArqueoCaja
     {
@@ -451,6 +487,7 @@ class PuntoDeVenta extends Page
         }
 
         $this->carrito = [];
+        $this->descuentoId = '';
         $this->descuentoGlobal = '0.00';
         $this->busquedaProducto = '';
         $this->ventaACredito = false;
@@ -525,18 +562,40 @@ class PuntoDeVenta extends Page
     {
         if (empty($this->carrito)) {
             $this->totales = $this->totalesVacios();
+            $this->descuentoGlobal = '0.00';
 
             return;
         }
 
         try {
+            $lineas = $this->lineasParaService();
+
+            // El % del descuento seleccionado se aplica sobre el subtotal (ya con descuentos de
+            // línea aplicados, antes de ITBIS): primero se necesita ese subtotal sin descuento
+            // global para poder calcular el monto en pesos que se le pasa a VentaService, que
+            // sigue trabajando con un monto fijo (descuento_global), no con un porcentaje.
+            $sinDescuento = app(VentaService::class)->previsualizar(['descuento_global' => '0', 'lineas' => $lineas], $this->empresa());
+            $this->descuentoGlobal = $this->calcularMontoDescuento($sinDescuento['subtotal']);
+
             $this->totales = app(VentaService::class)->previsualizar([
                 'descuento_global' => $this->descuentoGlobal,
-                'lineas' => $this->lineasParaService(),
+                'lineas' => $lineas,
             ], $this->empresa());
         } catch (VentaInvalidaException) {
             $this->totales = $this->totalesVacios();
+            $this->descuentoGlobal = '0.00';
         }
+    }
+
+    private function calcularMontoDescuento(string $subtotal): string
+    {
+        $descuento = $this->descuentoSeleccionado();
+
+        if ($descuento === null) {
+            return '0.00';
+        }
+
+        return bcdiv(bcmul($subtotal, (string) $descuento->porcentaje, 4), '100', 2);
     }
 
     /** @return array<string, string> */

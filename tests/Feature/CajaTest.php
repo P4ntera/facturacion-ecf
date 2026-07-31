@@ -114,4 +114,37 @@ class CajaTest extends TestCase
             ->assertSet('carrito.0.producto_id', $producto->id)
             ->assertSet('totales.total', '118.00');
     }
+
+    public function test_bajar_la_cantidad_a_cero_quita_el_producto_del_carrito(): void
+    {
+        $producto = $this->producto();
+
+        Livewire::actingAs($this->cajero())
+            ->test(Caja::class)
+            ->call('agregarProducto', $producto->id)
+            ->set('carrito.0.cantidad', 0)
+            ->assertSet('carrito', []);
+    }
+
+    public function test_bajar_la_cantidad_por_debajo_de_cero_tambien_quita_el_producto(): void
+    {
+        $producto = $this->producto();
+
+        Livewire::actingAs($this->cajero())
+            ->test(Caja::class)
+            ->call('agregarProducto', $producto->id)
+            ->set('carrito.0.cantidad', -3)
+            ->assertSet('carrito', []);
+    }
+
+    public function test_la_cantidad_ingresada_se_trunca_a_entero(): void
+    {
+        $producto = $this->producto(['stock' => 10]);
+
+        Livewire::actingAs($this->cajero())
+            ->test(Caja::class)
+            ->call('agregarProducto', $producto->id)
+            ->set('carrito.0.cantidad', '2.9')
+            ->assertSet('carrito.0.cantidad', 2);
+    }
 }

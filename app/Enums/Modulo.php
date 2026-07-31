@@ -17,6 +17,7 @@ enum Modulo: string
     case MAESTROS_PROVEEDORES = 'maestros_proveedores';
     case MAESTROS_PRODUCTOS = 'maestros_productos';
     case MAESTROS_CATEGORIAS = 'maestros_categorias';
+    case MAESTROS_DESCUENTOS = 'maestros_descuentos';
 
     case VENTAS_POS = 'ventas_pos';
     case VENTAS_LISTADO = 'ventas_listado';
@@ -45,6 +46,7 @@ enum Modulo: string
             self::MAESTROS_PROVEEDORES => 'Proveedores',
             self::MAESTROS_PRODUCTOS => 'Productos',
             self::MAESTROS_CATEGORIAS => 'Categorías',
+            self::MAESTROS_DESCUENTOS => 'Descuentos',
             self::VENTAS_POS => 'Punto de Venta',
             self::VENTAS_LISTADO => 'Ventas',
             self::VENTAS_ARQUEO_CAJA => 'Arqueos de Caja',
@@ -67,7 +69,8 @@ enum Modulo: string
     {
         return match ($this) {
             self::MAESTROS_CLIENTES, self::MAESTROS_PROVEEDORES,
-            self::MAESTROS_PRODUCTOS, self::MAESTROS_CATEGORIAS => 'Maestros',
+            self::MAESTROS_PRODUCTOS, self::MAESTROS_CATEGORIAS,
+            self::MAESTROS_DESCUENTOS => 'Maestros',
 
             self::VENTAS_POS, self::VENTAS_LISTADO, self::VENTAS_ARQUEO_CAJA => 'Ventas',
 

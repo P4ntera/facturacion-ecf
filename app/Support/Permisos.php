@@ -36,6 +36,10 @@ class Permisos
                 'categorias.crear' => 'Crear categorías',
                 'categorias.editar' => 'Editar categorías',
                 'categorias.desactivar' => 'Activar/Desactivar categorías',
+                'descuentos.ver' => 'Ver descuentos configurados',
+                'descuentos.crear' => 'Crear descuentos',
+                'descuentos.editar' => 'Editar descuentos',
+                'descuentos.desactivar' => 'Activar/Desactivar descuentos',
             ],
             'Ventas' => [
                 'pos.acceder' => 'Acceder a Caja (venta rápida)',

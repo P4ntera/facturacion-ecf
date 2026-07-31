@@ -5,6 +5,7 @@ namespace Tests\Support;
 use App\Models\Categoria;
 use App\Models\Cliente;
 use App\Models\Compra;
+use App\Models\Descuento;
 use App\Models\DevolucionCompra;
 use App\Models\Empresa;
 use App\Models\Impresora;
@@ -39,6 +40,7 @@ class TenantDefaults
         Impresora::class,
         DevolucionCompra::class,
         User::class,
+        Descuento::class,
     ];
 
     private static ?int $empresaId = null;

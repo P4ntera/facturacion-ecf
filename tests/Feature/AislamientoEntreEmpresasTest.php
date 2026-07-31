@@ -9,11 +9,14 @@ use App\Enums\TipoProveedor;
 use App\Filament\Pages\PuntoDeVenta;
 use App\Filament\Resources\ArqueoCajaResource;
 use App\Filament\Resources\ClienteResource;
+use App\Filament\Resources\DescuentoResource;
+use App\Filament\Resources\DescuentoResource\Pages\CreateDescuento;
 use App\Filament\Resources\EmpresaResource;
 use App\Filament\Resources\PedidoCompraResource;
 use App\Filament\Resources\ProductoResource;
 use App\Filament\Resources\ProductoResource\Pages\CreateProducto;
 use App\Models\Cliente;
+use App\Models\Descuento;
 use App\Models\Empresa;
 use App\Models\Producto;
 use App\Models\Proveedor;
@@ -377,5 +380,47 @@ class AislamientoEntreEmpresasTest extends TestCase
             'notas' => null,
             'lineas' => [['producto_id' => $productoTobogan->id, 'cantidad' => 1, 'costo_unitario' => 50]],
         ], $adminA->id, $empresaA);
+    }
+
+    /**
+     * 12. Mantenimiento de Descuentos (Caja/Facturación, T-descuentos): cada empresa solo ve sus
+     * propios descuentos configurados en el índice, y crear uno lo asocia a la empresa activa.
+     */
+    public function test_12_cada_empresa_solo_ve_sus_propios_descuentos_y_crearlos_los_asocia_a_la_actual(): void
+    {
+        ['empresa' => $empresaA, 'admin' => $adminA] = $this->crearEmpresaConDatos('Empresa A', '131000001');
+        ['empresa' => $empresaTobogan, 'admin' => $adminTobogan] = $this->crearEmpresaConDatos('Tobogán', '131000002');
+
+        $this->comoEmpresa($empresaTobogan);
+        $descuentoTobogan = Descuento::create([
+            'empresa_id' => $empresaTobogan->id,
+            'nombre' => 'Descuento de Tobogán',
+            'porcentaje' => 15,
+            'activo' => true,
+        ]);
+
+        $this->comoEmpresa($empresaA);
+        $descuentoA = Descuento::create([
+            'empresa_id' => $empresaA->id,
+            'nombre' => 'Descuento de Empresa A',
+            'porcentaje' => 10,
+            'activo' => true,
+        ]);
+
+        $this->actingAs($adminA)
+            ->get(DescuentoResource::getUrl('index', tenant: $empresaA))
+            ->assertOk()
+            ->assertSee($descuentoA->nombre)
+            ->assertDontSee($descuentoTobogan->nombre);
+
+        TenantDefaults::reiniciar($empresaA);
+
+        Livewire::actingAs($adminA)
+            ->test(CreateDescuento::class)
+            ->fillForm(['nombre' => 'Nuevo descuento', 'porcentaje' => 20, 'activo' => true])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $this->assertDatabaseHas('descuentos', ['nombre' => 'Nuevo descuento', 'empresa_id' => $empresaA->id]);
     }
 }

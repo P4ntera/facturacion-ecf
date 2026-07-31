@@ -251,7 +251,12 @@
 
           <div class="mb-2">
             <label class="form-label">Descuento global</label>
-            <input type="number" min="0" step="0.01" class="form-input" wire:model.live.debounce.400ms="descuentoGlobal" />
+            <select class="form-select" wire:model.live="descuentoId">
+              <option value="">Sin descuento</option>
+              @foreach ($this->descuentosDisponibles() as $descuento)
+                <option value="{{ $descuento->id }}">{{ $descuento->nombre }} ({{ number_format((float) $descuento->porcentaje, 2) }}%)</option>
+              @endforeach
+            </select>
           </div>
 
           <dl>
