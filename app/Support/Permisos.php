@@ -47,6 +47,7 @@ class Permisos
                 'ventas.ver' => 'Ver ventas',
                 'ventas.anular' => 'Anular ventas',
                 'ventas.imprimir' => 'Imprimir comprobantes y tickets',
+                'arqueo.cerrar_ajeno' => 'Cerrar cajas de otros cajeros (no solo la propia)',
             ],
             'Inventario' => [
                 'kardex.ver' => 'Ver kardex de movimientos',

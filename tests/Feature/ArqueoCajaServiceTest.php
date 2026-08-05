@@ -173,6 +173,19 @@ class ArqueoCajaServiceTest extends TestCase
         $service->cerrar($arqueo, '500.00', null, $otro->id);
     }
 
+    public function test_con_puede_cerrar_ajena_otro_usuario_si_puede_cerrarla(): void
+    {
+        $cajero = User::factory()->create();
+        $administrador = User::factory()->create();
+        $service = app(ArqueoCajaService::class);
+
+        $arqueo = $service->abrir('500.00', $cajero->id, $this->empresaDefault);
+        $cerrado = $service->cerrar($arqueo, '500.00', null, $administrador->id, puedeCerrarAjena: true);
+
+        $this->assertEquals(EstadoArqueoCaja::CERRADO, $cerrado->estado);
+        $this->assertEquals($cajero->id, $cerrado->user_id);
+    }
+
     public function test_arqueo_abierto_de_retorna_null_si_no_hay_ninguno_abierto(): void
     {
         $user = User::factory()->create();

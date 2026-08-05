@@ -25,6 +25,16 @@ class ArqueoCajaResourceTest extends TestCase
         return $usuario;
     }
 
+    private function administrador(): User
+    {
+        $this->seed(RolePermissionSeeder::class);
+
+        $usuario = User::factory()->create();
+        $usuario->assignRole('Administrador');
+
+        return $usuario;
+    }
+
     public function test_la_pagina_indice_de_arqueos_carga_para_quien_tiene_permiso(): void
     {
         $usuario = $this->usuarioConPermiso();
@@ -119,5 +129,26 @@ class ArqueoCajaResourceTest extends TestCase
         Livewire::actingAs($usuario)
             ->test(ListArqueosCaja::class)
             ->assertTableActionHidden('cerrarCaja', $arqueo);
+    }
+
+    /** Un Administrador (permiso arqueo.cerrar_ajeno) sí puede cerrar la caja de un cajero. */
+    public function test_administrador_puede_cerrar_la_caja_de_otro_cajero(): void
+    {
+        $cajero = $this->usuarioConPermiso();
+        $administrador = $this->administrador();
+        $arqueo = app(ArqueoCajaService::class)->abrir('500.00', $cajero->id, $this->empresaDefault);
+
+        Livewire::actingAs($administrador)
+            ->test(ListArqueosCaja::class)
+            ->assertTableActionVisible('cerrarCaja', $arqueo)
+            ->callTableAction('cerrarCaja', $arqueo, data: [
+                'efectivo_contado' => '500.00',
+                'notas' => null,
+            ])
+            ->assertHasNoTableActionErrors();
+
+        $arqueo->refresh();
+        $this->assertTrue($arqueo->estaCerrado());
+        $this->assertSame($cajero->id, $arqueo->user_id);
     }
 }

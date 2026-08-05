@@ -191,9 +191,11 @@ class ArqueoCajaResource extends Resource
                     ->icon('heroicon-o-lock-closed')
                     ->color('warning')
                     ->requiresConfirmation()
-                    // Mismo dueño que exige ArqueoCajaService::cerrar(): solo quien abrió el
-                    // turno puede cerrarlo, para no confundir con un intento que igual fallaría.
-                    ->visible(fn (ArqueoCaja $record): bool => $record->estaAbierto() && $record->user_id === auth()->id())
+                    // Mismo criterio que exige ArqueoCajaService::cerrar(): quien abrió el turno
+                    // siempre puede cerrarlo; además, quien tiene 'arqueo.cerrar_ajeno'
+                    // (Administrador) puede cerrar la caja de cualquier cajero de su empresa.
+                    ->visible(fn (ArqueoCaja $record): bool => $record->estaAbierto()
+                        && ($record->user_id === auth()->id() || (auth()->user()?->can('arqueo.cerrar_ajeno') ?? false)))
                     ->schema([
                         TextInput::make('efectivo_contado')
                             ->label('Efectivo contado')
@@ -212,6 +214,7 @@ class ArqueoCajaResource extends Resource
                                 $data['efectivo_contado'],
                                 $data['notas'] ?? null,
                                 auth()->id(),
+                                auth()->user()?->can('arqueo.cerrar_ajeno') ?? false,
                             );
                         } catch (RuntimeException $e) {
                             Notification::make()->title($e->getMessage())->danger()->send();
