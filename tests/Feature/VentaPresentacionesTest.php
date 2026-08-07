@@ -6,6 +6,7 @@ use App\Enums\TasaItbis;
 use App\Enums\TipoComprobante;
 use App\Enums\TipoProducto;
 use App\Enums\TipoVenta;
+use App\Exceptions\StockInsuficienteException;
 use App\Exceptions\VentaInvalidaException;
 use App\Models\Cliente;
 use App\Models\Producto;
@@ -206,6 +207,36 @@ class VentaPresentacionesTest extends TestCase
         app(VentaService::class)->registrar([
             'cliente_id' => $this->cliente()->id,
             'lineas' => [['producto_id' => $productoB->id, 'presentacion_id' => $cajaDeA->id, 'cantidad' => 1]],
+        ], $this->empresaDefault);
+    }
+
+    public function test_vender_mas_cajas_de_las_que_hay_en_stock_bloquea_con_mensaje_en_espanol(): void
+    {
+        $this->secuencia(TipoComprobante::FACTURA_CONSUMO, 'E32');
+        $producto = $this->productoConPresentaciones(); // stock 100, caja factor 24
+        $caja = $producto->presentaciones()->where('nombre', 'Caja')->first();
+
+        $this->expectException(StockInsuficienteException::class);
+        $this->expectExceptionMessage('Stock insuficiente');
+
+        app(VentaService::class)->registrar([
+            'cliente_id' => $this->cliente()->id,
+            // 5 cajas × 24 = 120, por encima de las 100 unidades base disponibles.
+            'lineas' => [['producto_id' => $producto->id, 'presentacion_id' => $caja->id, 'cantidad' => 5]],
+        ], $this->empresaDefault);
+    }
+
+    public function test_pesar_mas_de_lo_que_hay_en_stock_bloquea_con_mensaje_en_espanol(): void
+    {
+        $this->secuencia(TipoComprobante::FACTURA_CONSUMO, 'E32');
+        $producto = $this->productoPesado(); // stock 50 lb
+
+        $this->expectException(StockInsuficienteException::class);
+        $this->expectExceptionMessage('Stock insuficiente');
+
+        app(VentaService::class)->registrar([
+            'cliente_id' => $this->cliente()->id,
+            'lineas' => [['producto_id' => $producto->id, 'cantidad' => 60, 'precio_unitario' => 45]],
         ], $this->empresaDefault);
     }
 

@@ -6,6 +6,7 @@ use App\Enums\TasaItbis;
 use App\Enums\TipoDocumentoCliente;
 use App\Enums\TipoProducto;
 use App\Enums\TipoProveedor;
+use App\Exceptions\VentaInvalidaException;
 use App\Filament\Pages\PuntoDeVenta;
 use App\Filament\Resources\ArqueoCajaResource;
 use App\Filament\Resources\ClienteResource;
@@ -13,6 +14,7 @@ use App\Filament\Resources\EmpresaResource;
 use App\Filament\Resources\PedidoCompraResource;
 use App\Filament\Resources\ProductoResource;
 use App\Filament\Resources\ProductoResource\Pages\CreateProducto;
+use App\Filament\Resources\ProductoResource\Pages\ListProductos;
 use App\Models\Cliente;
 use App\Models\Empresa;
 use App\Models\Producto;
@@ -21,6 +23,7 @@ use App\Models\User;
 use App\Services\ArqueoCajaService;
 use App\Services\PedidoCompraService;
 use App\Services\RolesEmpresaService;
+use App\Services\VentaService;
 use Database\Seeders\RolePermissionSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -377,5 +380,98 @@ class AislamientoEntreEmpresasTest extends TestCase
             'notas' => null,
             'lineas' => [['producto_id' => $productoTobogan->id, 'cantidad' => 1, 'costo_unitario' => 50]],
         ], $adminA->id, $empresaA);
+    }
+
+    /** 12. El POS de Empresa A no encuentra (ni agrega) una presentación de un producto de OTRA empresa. */
+    public function test_12_el_pos_no_escanea_presentaciones_de_otra_empresa(): void
+    {
+        ['empresa' => $empresaA, 'admin' => $adminA] = $this->crearEmpresaConDatos('Empresa A', '131000001');
+        ['empresa' => $empresaTobogan, 'producto' => $productoTobogan] = $this->crearEmpresaConDatos('Tobogán', '131000002');
+
+        $productoTobogan->presentaciones()->create([
+            'empresa_id' => $empresaTobogan->id,
+            'nombre' => 'Caja',
+            'factor' => 24,
+            'codigo_barra' => '999999',
+            'precio' => 500,
+            'es_base' => false,
+            'activa' => true,
+        ]);
+
+        $this->comoEmpresa($empresaA);
+
+        Livewire::actingAs($adminA)
+            ->test(PuntoDeVenta::class)
+            ->set('busquedaProducto', '999999')
+            ->call('escanearOBuscar')
+            ->assertSet('carrito', []);
+    }
+
+    /**
+     * 12b. VentaService::registrar() rechaza una presentación que no pertenece al producto de la
+     * línea, incluso si ambos ids existen (uno de la empresa activa, la presentación de otra):
+     * la revalidación es por producto_id, así que ninguna combinación cruzada pasa.
+     */
+    public function test_12b_no_se_puede_vender_la_presentacion_de_un_producto_de_otra_empresa(): void
+    {
+        ['empresa' => $empresaA, 'admin' => $adminA, 'producto' => $productoA, 'cliente' => $clienteA] =
+            $this->crearEmpresaConDatos('Empresa A', '131000001');
+        ['empresa' => $empresaTobogan, 'producto' => $productoTobogan] = $this->crearEmpresaConDatos('Tobogán', '131000002');
+
+        // usa_ecf tiene default true a nivel de BD, pero Empresa::create() no lo refleja en el
+        // modelo en memoria (mismo gotcha de siempre con columnas con default en Postgres):
+        // refresh() lo trae de vuelta antes de que VentaService lo necesite.
+        $empresaA->refresh();
+
+        $presentacionTobogan = $productoTobogan->presentaciones()->create([
+            'empresa_id' => $empresaTobogan->id,
+            'nombre' => 'Caja',
+            'factor' => 24,
+            'codigo_barra' => '999998',
+            'precio' => 500,
+            'es_base' => false,
+            'activa' => true,
+        ]);
+
+        $this->comoEmpresa($empresaA);
+
+        $this->expectException(VentaInvalidaException::class);
+
+        app(VentaService::class)->registrar([
+            'cliente_id' => $clienteA->id,
+            'lineas' => [['producto_id' => $productoA->id, 'presentacion_id' => $presentacionTobogan->id, 'cantidad' => 1]],
+        ], $empresaA);
+    }
+
+    /** 13. La búsqueda de la tabla de productos de Empresa A no encuentra por el código de barras de una presentación de OTRA empresa. */
+    public function test_13_la_busqueda_de_productos_no_encuentra_presentaciones_de_otra_empresa(): void
+    {
+        ['empresa' => $empresaA, 'admin' => $adminA, 'producto' => $productoA] =
+            $this->crearEmpresaConDatos('Empresa A', '131000001');
+        ['empresa' => $empresaTobogan, 'producto' => $productoTobogan] = $this->crearEmpresaConDatos('Tobogán', '131000002');
+
+        $productoTobogan->presentaciones()->create([
+            'empresa_id' => $empresaTobogan->id,
+            'nombre' => 'Caja',
+            'factor' => 24,
+            'codigo_barra' => '888888',
+            'precio' => 500,
+            'es_base' => false,
+            'activa' => true,
+        ]);
+
+        $this->comoEmpresa($empresaA);
+
+        // El global scope de tenancy de Filament sobre Producto se registra la primera vez que
+        // una request real pasa por el middleware del panel (IdentifyTenant); Livewire::test()
+        // no lo dispara por sí solo (ver el comentario de comoEmpresa() más arriba sobre el
+        // mismo tipo de gap). Un GET real "calienta" el registro antes de usar Livewire::test()
+        // para la aserción de búsqueda.
+        $this->actingAs($adminA)->get(ProductoResource::getUrl('index', tenant: $empresaA));
+
+        Livewire::actingAs($adminA)
+            ->test(ListProductos::class)
+            ->searchTable('888888')
+            ->assertCanNotSeeTableRecords([$productoA, $productoTobogan]);
     }
 }
