@@ -19,6 +19,7 @@ use App\Models\Cliente;
 use App\Models\Empresa;
 use App\Models\EmpresaConfiguracion;
 use App\Models\Producto;
+use App\Models\ProductoPresentacion;
 use App\Models\Venta;
 use App\Strategies\Impuesto\ConItbisIncluido;
 use App\Strategies\Impuesto\ImpuestoStrategy;
@@ -45,6 +46,7 @@ class VentaService
      *   arqueo_caja_id?: int|null,
      *   lineas: array<int, array{
      *     producto_id: int,
+     *     presentacion_id?: int|null,
      *     cantidad: float,
      *     precio_unitario?: string|float|int|null,
      *     descuento?: string|float|int|null,
@@ -156,6 +158,7 @@ class VentaService
      *   descuento_global?: string|float|int|null,
      *   lineas: array<int, array{
      *     producto_id: int,
+     *     presentacion_id?: int|null,
      *     cantidad: float,
      *     precio_unitario?: string|float|int|null,
      *     descuento?: string|float|int|null,
@@ -207,7 +210,7 @@ class VentaService
                         $producto,
                         TipoMovimiento::ENTRADA,
                         OrigenMovimiento::ANULACION,
-                        (float) $detalle->cantidad,
+                        (float) $detalle->cantidad * (float) $detalle->factor,
                         $venta->id,
                         $userId,
                         $motivo,
@@ -298,7 +301,27 @@ class VentaService
                 throw new VentaInvalidaException("El producto #{$idProducto} no existe o está inactivo.");
             }
 
-            $precioUnitario = $this->aMoneda($linea['precio_unitario'] ?? $producto->precio);
+            // presentacion_id viene del formulario/POS (client-controllable): el factor y el
+            // nombre de la presentación se resuelven SIEMPRE desde la BD, nunca desde lo que
+            // mande el cliente — de lo contrario se podría cobrar una caja pero descontar (y
+            // facturar) como si fuera 1 unidad. La restricción producto_id = $producto->id de
+            // paso impide referenciar la presentación de otro producto.
+            $presentacion = null;
+            $factor = 1.0;
+            $descripcion = $producto->nombre;
+
+            if (filled($linea['presentacion_id'] ?? null)) {
+                $presentacion = ProductoPresentacion::where('producto_id', $producto->id)->find($linea['presentacion_id']);
+
+                if ($presentacion === null) {
+                    throw new VentaInvalidaException("La presentación indicada no existe o no pertenece a «{$producto->nombre}».");
+                }
+
+                $factor = (float) $presentacion->factor;
+                $descripcion = $presentacion->es_base ? $producto->nombre : "{$producto->nombre} - {$presentacion->nombre}";
+            }
+
+            $precioUnitario = $this->aMoneda($linea['precio_unitario'] ?? $presentacion?->precio ?? $producto->precio);
             $descuentoLinea = $this->aMoneda($linea['descuento'] ?? '0');
             $tasaEfectiva = $config->aplica_itbis ? $producto->tasa_itbis : TasaItbis::CERO;
 
@@ -321,8 +344,10 @@ class VentaService
 
             $detalles[] = [
                 'producto_id' => $producto->id,
-                'descripcion' => $producto->nombre,
+                'presentacion_id' => $presentacion?->id,
+                'descripcion' => $descripcion,
                 'cantidad' => $cantidad,
+                'factor' => $factor,
                 'precio_unitario' => $precioUnitario,
                 'descuento' => $descuentoLinea,
                 'tasa_itbis' => $tasaEfectiva,
@@ -330,7 +355,9 @@ class VentaService
                 'subtotal' => $desglose->base,
             ];
 
-            $productosLineas[] = ['producto' => $producto, 'cantidad' => $cantidad];
+            // El inventario SIEMPRE se mueve en unidad base: cantidad × factor (una caja de 24
+            // consume 24 unidades base aunque la línea diga cantidad 1).
+            $productosLineas[] = ['producto' => $producto, 'cantidad' => $cantidad * $factor];
         }
 
         return [$detalles, $productosLineas, $acumulado];
