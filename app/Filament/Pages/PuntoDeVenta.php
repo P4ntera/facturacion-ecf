@@ -9,6 +9,7 @@ use App\Enums\Modulo;
 use App\Enums\ModuloImpresion;
 use App\Enums\TipoComprobante;
 use App\Enums\TipoDocumentoCliente;
+use App\Enums\TipoVenta;
 use App\Exceptions\SecuenciaNcfAgotadaException;
 use App\Exceptions\StockInsuficienteException;
 use App\Exceptions\VentaInvalidaException;
@@ -17,6 +18,7 @@ use App\Models\ArqueoCaja;
 use App\Models\Cliente;
 use App\Models\Empresa;
 use App\Models\Producto;
+use App\Models\ProductoPresentacion;
 use App\Models\Venta;
 use App\Services\ArqueoCajaService;
 use App\Services\Dgii\ConsultaContribuyenteService;
@@ -258,6 +260,20 @@ class PuntoDeVenta extends Page
             return;
         }
 
+        $presentacion = $this->buscarPresentacionPorCodigo($texto);
+
+        if ($presentacion !== null) {
+            if (! $this->validarProductoParaVenta($presentacion->producto)) {
+                return;
+            }
+
+            $this->agregarLineaContable($presentacion->producto, $presentacion);
+            $this->busquedaProducto = '';
+            $this->dispatch('producto-escaneado');
+
+            return;
+        }
+
         $producto = Producto::query()
             ->where('empresa_id', $this->empresaId())
             ->where(fn (Builder $q) => $q->where('codigo_barra', 'ilike', $texto)->orWhere('codigo', 'ilike', $texto))
@@ -267,19 +283,24 @@ class PuntoDeVenta extends Page
             return;
         }
 
-        if (! $producto->activo) {
-            Notification::make()->title("«{$producto->nombre}» está inactivo y no se puede vender")->danger()->send();
+        if (! $this->validarProductoParaVenta($producto)) {
+            return;
+        }
+
+        if ($producto->tipo_venta === TipoVenta::PESADO) {
+            // No se agrega solo: el peso varía en cada venta y hay que capturarlo a mano en el
+            // buscador (el listado de sugerencias, ya visible, trae el campo de peso).
+            Notification::make()
+                ->title("«{$producto->nombre}» se vende por peso")
+                ->body('Ingresa el peso en el resultado de abajo para agregarlo.')
+                ->warning()
+                ->send();
 
             return;
         }
 
-        if ($producto->controla_stock && (float) $producto->stock <= 0) {
-            Notification::make()->title("«{$producto->nombre}» no tiene stock disponible")->danger()->send();
-
-            return;
-        }
-
-        $this->agregarProducto($producto->id);
+        $this->agregarLineaContable($producto, $producto->presentacionBase());
+        $this->busquedaProducto = '';
         $this->dispatch('producto-escaneado');
     }
 
@@ -290,28 +311,53 @@ class PuntoDeVenta extends Page
             ->where('activo', true)
             ->find($productoId);
 
+        if ($producto === null || $producto->tipo_venta === TipoVenta::PESADO) {
+            return;
+        }
+
+        $this->agregarLineaContable($producto, $producto->presentacionBase());
+        $this->busquedaProducto = '';
+    }
+
+    /**
+     * Venta por peso (habichuelas, carnes...): el peso no viene de un código de barras fijo, se
+     * captura a mano en el momento. Cada captura es una línea nueva (no se suma a una anterior:
+     * dos pesadas del mismo producto son dos pesos distintos, no una cantidad acumulable).
+     */
+    public function agregarProductoPorPeso(int $productoId, string $peso): void
+    {
+        $producto = Producto::query()
+            ->where('empresa_id', $this->empresaId())
+            ->where('activo', true)
+            ->where('tipo_venta', TipoVenta::PESADO->value)
+            ->find($productoId);
+
         if ($producto === null) {
             return;
         }
 
-        foreach ($this->carrito as $indice => $linea) {
-            if ($linea['producto_id'] === $productoId) {
-                $this->carrito[$indice]['cantidad']++;
-                $this->busquedaProducto = '';
-                $this->recalcularTotales();
+        if ((float) $peso <= 0) {
+            Notification::make()->title('Ingresa un peso mayor a cero.')->danger()->send();
 
-                return;
-            }
+            return;
+        }
+
+        if (! $this->validarProductoParaVenta($producto)) {
+            return;
         }
 
         $this->carrito[] = [
             'producto_id' => $producto->id,
+            'presentacion_id' => null,
             'codigo' => $producto->codigo,
             'nombre' => $producto->nombre,
-            'precio_unitario' => (string) $producto->precio,
-            'cantidad' => 1,
+            'precio_unitario' => (string) ($producto->precio_por_peso ?? 0),
+            'cantidad' => $peso,
             'descuento' => '0.00',
             'controla_stock' => $producto->controla_stock,
+            'factor' => '1',
+            'tipo_venta' => TipoVenta::PESADO->value,
+            'unidad_base' => $producto->unidad_base,
         ];
 
         $this->busquedaProducto = '';
@@ -334,11 +380,90 @@ class PuntoDeVenta extends Page
         return (float) (Producto::query()->where('empresa_id', $this->empresaId())->find($linea['producto_id'])?->stock ?? 0);
     }
 
+    /**
+     * El stock siempre se compara en unidad base: cantidad × factor (una caja de 24 consume 24
+     * unidades base aunque la línea diga cantidad 1). Para peso, factor es 1 y cantidad es el
+     * peso mismo, así que la misma fórmula sirve para ambos casos.
+     */
     public function lineaConStockInsuficiente(array $linea): bool
     {
         $stock = $this->stockDeLinea($linea);
 
-        return $stock !== null && (float) $linea['cantidad'] > $stock;
+        if ($stock === null) {
+            return false;
+        }
+
+        $cantidadBase = (float) $linea['cantidad'] * (float) ($linea['factor'] ?? 1);
+
+        return $cantidadBase > $stock;
+    }
+
+    private function validarProductoParaVenta(Producto $producto): bool
+    {
+        if (! $producto->activo) {
+            Notification::make()->title("«{$producto->nombre}» está inactivo y no se puede vender")->danger()->send();
+
+            return false;
+        }
+
+        if ($producto->controla_stock && (float) $producto->stock <= 0) {
+            Notification::make()->title("«{$producto->nombre}» no tiene stock disponible")->danger()->send();
+
+            return false;
+        }
+
+        return true;
+    }
+
+    private function buscarPresentacionPorCodigo(string $texto): ?ProductoPresentacion
+    {
+        return ProductoPresentacion::query()
+            ->where('empresa_id', $this->empresaId())
+            ->where('activa', true)
+            ->where('codigo_barra', 'ilike', $texto)
+            ->whereHas('producto', fn (Builder $q) => $q->where('activo', true))
+            ->with('producto')
+            ->first();
+    }
+
+    /** Agrega (o suma 1 a) una línea CONTABLE: por presentación si se resolvió una, o el producto suelto si no tiene ninguna (compatibilidad con productos sin presentaciones). */
+    private function agregarLineaContable(Producto $producto, ?ProductoPresentacion $presentacion): void
+    {
+        $presentacionId = $presentacion?->id;
+
+        foreach ($this->carrito as $indice => $linea) {
+            if ($linea['producto_id'] === $producto->id && ($linea['presentacion_id'] ?? null) === $presentacionId) {
+                $this->carrito[$indice]['cantidad']++;
+                $this->recalcularTotales();
+
+                return;
+            }
+        }
+
+        $this->carrito[] = [
+            'producto_id' => $producto->id,
+            'presentacion_id' => $presentacionId,
+            'codigo' => $presentacion?->codigo_barra ?? $producto->codigo,
+            'nombre' => $this->nombreLineaContable($producto, $presentacion),
+            'precio_unitario' => (string) ($presentacion?->precio ?? $producto->precio),
+            'cantidad' => 1,
+            'descuento' => '0.00',
+            'controla_stock' => $producto->controla_stock,
+            'factor' => (string) ($presentacion?->factor ?? 1),
+            'tipo_venta' => TipoVenta::CONTABLE->value,
+            'unidad_base' => $producto->unidad_base,
+        ];
+
+        $this->recalcularTotales();
+    }
+
+    private function nombreLineaContable(Producto $producto, ?ProductoPresentacion $presentacion): string
+    {
+        if ($presentacion !== null && ! $presentacion->es_base) {
+            return "{$producto->nombre} - {$presentacion->nombre}";
+        }
+
+        return $producto->nombre;
     }
 
     public function hayLineasConStockInsuficiente(): bool
@@ -570,9 +695,11 @@ class PuntoDeVenta extends Page
     {
         return collect($this->carrito)->map(fn (array $linea) => [
             'producto_id' => $linea['producto_id'],
+            'presentacion_id' => $linea['presentacion_id'] ?? null,
             'cantidad' => (float) $linea['cantidad'],
             'precio_unitario' => $linea['precio_unitario'],
             'descuento' => $linea['descuento'],
+            'factor' => (float) ($linea['factor'] ?? 1),
         ])->all();
     }
 

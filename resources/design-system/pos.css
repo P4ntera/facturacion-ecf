@@ -263,6 +263,23 @@
     background-color:var(--surface-muted);
 }
 
+/* Fila de resultado de un producto PESADO: mismo layout que .pos-resultados button, pero no es
+   un botón (lleva un input de peso adentro, que no puede anidarse dentro de <button>). */
+.pos-screen .pos-resultados .pos-resultado-pesado{
+    display:flex;
+    width:100%;
+    align-items:center;
+    justify-content:space-between;
+    gap:var(--space-sm);
+    padding:var(--space-xs) var(--space-sm);
+    font-size:var(--fs-small);
+    color:var(--text);
+}
+
+.pos-screen .pos-input-sm{
+    width:6rem;
+}
+
 .pos-screen .pos-vacio{
     padding:var(--space-xs) var(--space-sm);
     font-size:var(--fs-small);
