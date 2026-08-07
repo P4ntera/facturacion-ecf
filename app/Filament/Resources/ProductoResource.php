@@ -7,12 +7,15 @@ use App\Enums\OrigenMovimiento;
 use App\Enums\TasaItbis;
 use App\Enums\TipoMovimiento;
 use App\Enums\TipoProducto;
+use App\Enums\TipoVenta;
 use App\Exceptions\StockInsuficienteException;
 use App\Filament\Concerns\RestringidoPorModulo;
 use App\Filament\Resources\ProductoResource\Pages;
 use App\Models\Producto;
 use App\Services\InventarioService;
 use Filament\Actions\Action;
+use Filament\Facades\Filament;
+use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -27,6 +30,7 @@ use Filament\Tables\Columns\ToggleColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 
 class ProductoResource extends Resource
@@ -87,6 +91,36 @@ class ProductoResource extends Resource
                             ->required()
                             ->default(TipoProducto::PRODUCTO->value),
 
+                        Select::make('tipo_venta')
+                            ->label('Tipo de venta')
+                            ->options([
+                                TipoVenta::CONTABLE->value => TipoVenta::CONTABLE->etiqueta(),
+                                TipoVenta::PESADO->value => TipoVenta::PESADO->etiqueta(),
+                            ])
+                            ->required()
+                            ->default(TipoVenta::CONTABLE->value)
+                            ->live()
+                            ->afterStateUpdated(function (Get $get, callable $set, ?string $state): void {
+                                if ($state === TipoVenta::PESADO->value) {
+                                    $set('unidad_base', $get('unidad_base') === 'unidad' ? 'libra' : $get('unidad_base'));
+
+                                    return;
+                                }
+
+                                $set('unidad_base', 'unidad');
+                                $set('precio_por_peso', null);
+                            }),
+
+                        Select::make('unidad_base')
+                            ->label('Unidad de peso')
+                            ->options([
+                                'libra' => 'Libra (lb)',
+                                'kilogramo' => 'Kilogramo (kg)',
+                            ])
+                            ->required()
+                            ->default('libra')
+                            ->visible(fn (Get $get): bool => $get('tipo_venta') === TipoVenta::PESADO->value),
+
                         Select::make('categoria_id')
                             ->label('Categoría')
                             ->relationship('categoria', 'nombre')
@@ -107,9 +141,20 @@ class ProductoResource extends Resource
                             ->label('Precio de venta')
                             ->numeric()
                             ->prefix('RD$')
-                            ->required()
                             ->minValue(0)
-                            ->default(0),
+                            ->default(0)
+                            ->live()
+                            ->required(fn (Get $get): bool => $get('tipo_venta') !== TipoVenta::PESADO->value)
+                            ->hidden(fn (Get $get): bool => $get('tipo_venta') === TipoVenta::PESADO->value)
+                            ->helperText('Precio de la presentación base (factor 1); las demás presentaciones tienen su propio precio.'),
+
+                        TextInput::make('precio_por_peso')
+                            ->label('Precio por unidad de peso')
+                            ->numeric()
+                            ->prefix('RD$')
+                            ->minValue(0)
+                            ->required(fn (Get $get): bool => $get('tipo_venta') === TipoVenta::PESADO->value)
+                            ->visible(fn (Get $get): bool => $get('tipo_venta') === TipoVenta::PESADO->value),
 
                         TextInput::make('costo')
                             ->label('Costo')
@@ -127,6 +172,90 @@ class ProductoResource extends Resource
                             ])
                             ->required()
                             ->default(TasaItbis::DIECIOCHO->value),
+                    ]),
+
+                Section::make('Presentaciones')
+                    ->description('Unidad, six-pack, caja... cada una con su propio código de barras y precio. El stock siempre se lleva en la unidad base.')
+                    ->visible(fn (Get $get): bool => $get('tipo_venta') !== TipoVenta::PESADO->value)
+                    ->components([
+                        Repeater::make('presentaciones')
+                            ->relationship()
+                            ->hiddenLabel()
+                            ->schema([
+                                TextInput::make('nombre')
+                                    ->label('Nombre')
+                                    ->placeholder('Unidad, Six-pack, Caja…')
+                                    ->required()
+                                    ->maxLength(50),
+
+                                TextInput::make('factor')
+                                    ->label('Factor')
+                                    ->helperText('Unidades base que representa (la base tiene factor 1).')
+                                    ->numeric()
+                                    ->required()
+                                    ->minValue(0.001)
+                                    ->default(1)
+                                    ->live(onBlur: true),
+
+                                TextInput::make('codigo_barra')
+                                    ->label('Código de barras')
+                                    ->maxLength(50)
+                                    ->distinct()
+                                    ->unique(table: 'producto_presentaciones', column: 'codigo_barra', ignoreRecord: true)
+                                    ->validationMessages([
+                                        'distinct' => 'Este código de barras ya se usó en otra presentación de este producto.',
+                                        'unique' => 'Ya existe otra presentación (de cualquier producto) con este código de barras.',
+                                    ]),
+
+                                TextInput::make('precio')
+                                    ->label('Precio')
+                                    ->numeric()
+                                    ->prefix('RD$')
+                                    ->required()
+                                    ->minValue(0)
+                                    ->helperText(function (Get $get): string {
+                                        $sugerido = (float) ($get('../../precio') ?? 0) * (float) ($get('factor') ?? 0);
+
+                                        return 'Sugerido: RD$ '.number_format($sugerido, 2).' (base × factor; el precio real puede ser menor por volumen).';
+                                    }),
+
+                                Toggle::make('es_base')
+                                    ->label('Es la presentación base')
+                                    ->default(false)
+                                    ->live(),
+
+                                Toggle::make('activa')
+                                    ->label('Activa')
+                                    ->default(true),
+                            ])
+                            ->columns(3)
+                            ->defaultItems(1)
+                            ->default([
+                                ['nombre' => 'Unidad', 'factor' => 1, 'precio' => 0, 'es_base' => true, 'activa' => true],
+                            ])
+                            ->minItems(1)
+                            ->addActionLabel('Agregar presentación')
+                            ->itemLabel(fn (array $state): ?string => $state['nombre'] ?? null)
+                            ->mutateRelationshipDataBeforeCreateUsing(
+                                fn (array $data): array => [...$data, 'empresa_id' => Filament::getTenant()->id],
+                            )
+                            ->rule(static function () {
+                                return function (string $attribute, mixed $value, \Closure $fail): void {
+                                    $items = collect($value ?? []);
+                                    $bases = $items->filter(fn ($item) => (bool) ($item['es_base'] ?? false));
+
+                                    if ($bases->count() !== 1) {
+                                        $fail('Debe haber exactamente una presentación marcada como base.');
+
+                                        return;
+                                    }
+
+                                    if ((float) ($bases->first()['factor'] ?? 0) !== 1.0) {
+                                        $fail('La presentación marcada como base debe tener factor 1.');
+                                    }
+                                };
+                            })
+                            ->columnSpanFull(),
                     ]),
 
                 Section::make('Inventario')
@@ -174,7 +303,12 @@ class ProductoResource extends Resource
 
                 TextColumn::make('codigo_barra')
                     ->label('Código de barras')
-                    ->searchable()
+                    ->searchable(query: function (Builder $query, string $search): Builder {
+                        return $query->where(
+                            fn (Builder $q) => $q->where('codigo_barra', 'ilike', "%{$search}%")
+                                ->orWhereHas('presentaciones', fn (Builder $p) => $p->where('codigo_barra', 'ilike', "%{$search}%")),
+                        );
+                    })
                     ->toggleable(isToggledHiddenByDefault: true)
                     ->placeholder('—'),
 
@@ -197,9 +331,16 @@ class ProductoResource extends Resource
                     })
                     ->toggleable(isToggledHiddenByDefault: true),
 
+                TextColumn::make('tipo_venta')
+                    ->label('Venta')
+                    ->formatStateUsing(fn (?TipoVenta $state): string => $state?->etiqueta() ?? '—')
+                    ->toggleable(isToggledHiddenByDefault: true),
+
                 TextColumn::make('precio')
                     ->label('Precio')
-                    ->money('DOP')
+                    ->formatStateUsing(fn (Producto $record): string => $record->tipo_venta === TipoVenta::PESADO
+                        ? ($record->precio_por_peso !== null ? 'RD$ '.number_format((float) $record->precio_por_peso, 2).' / '.$record->unidad_base : '—')
+                        : 'RD$ '.number_format((float) $record->precio, 2))
                     ->alignEnd()
                     ->sortable(),
 
