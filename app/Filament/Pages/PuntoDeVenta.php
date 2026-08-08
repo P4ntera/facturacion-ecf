@@ -10,12 +10,14 @@ use App\Enums\ModuloImpresion;
 use App\Enums\TipoComprobante;
 use App\Enums\TipoDocumentoCliente;
 use App\Enums\TipoVenta;
+use App\Enums\TipoPago;
 use App\Exceptions\SecuenciaNcfAgotadaException;
 use App\Exceptions\StockInsuficienteException;
 use App\Exceptions\VentaInvalidaException;
 use App\Filament\Concerns\RestringidoPorModulo;
 use App\Models\ArqueoCaja;
 use App\Models\Cliente;
+use App\Models\Descuento;
 use App\Models\Empresa;
 use App\Models\Producto;
 use App\Models\ProductoPresentacion;
@@ -46,11 +48,11 @@ class PuntoDeVenta extends Page
 
     protected static string|UnitEnum|null $navigationGroup = 'Ventas';
 
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = 2;
 
-    protected static ?string $navigationLabel = 'Punto de Venta';
+    protected static ?string $navigationLabel = 'Facturación';
 
-    protected static ?string $title = 'Punto de Venta';
+    protected static ?string $title = 'Facturación';
 
     public ?int $clienteId = null;
 
@@ -63,9 +65,21 @@ class PuntoDeVenta extends Page
     /** @var array<int, array<string, mixed>> */
     public array $carrito = [];
 
+    /** Id (como string) del Descuento elegido en el <select>; '' = sin descuento. */
+    public string $descuentoId = '';
+
+    /**
+     * Monto en pesos del descuento global, calculado a partir de $descuentoId y el subtotal del
+     * carrito (ver recalcularTotales()). Ya no es un input libre: el usuario elige un Descuento
+     * configurado por el Administrador (Mantenimiento de Descuentos) y esto se deriva solo.
+     */
     public string $descuentoGlobal = '0.00';
 
     public string $formaPago = 'efectivo';
+
+    public bool $ventaACredito = false;
+
+    public string $fechaLimitePago = '';
 
     /** @var array<string, string> */
     public array $totales = [];
@@ -77,7 +91,7 @@ class PuntoDeVenta extends Page
 
     public static function puedeAccederPorPermiso(): bool
     {
-        return auth()->user()?->can('pos.acceder') ?? false;
+        return auth()->user()?->can('facturacion.acceder') ?? false;
     }
 
     public function mount(): void
@@ -89,7 +103,7 @@ class PuntoDeVenta extends Page
 
     public function updated(string $name): void
     {
-        if ($name === 'descuentoGlobal' || str($name)->startsWith('carrito.')) {
+        if ($name === 'descuentoId' || str($name)->startsWith('carrito.')) {
             $this->recalcularTotales();
         }
     }
@@ -106,13 +120,13 @@ class PuntoDeVenta extends Page
         return $this->empresa()->usaEcf();
     }
 
-    private function empresa(): Empresa
+    protected function empresa(): Empresa
     {
         /** @var Empresa */
         return Filament::getTenant();
     }
 
-    private function empresaId(): int
+    protected function empresaId(): int
     {
         return $this->empresa()->id;
     }
@@ -507,6 +521,33 @@ class PuntoDeVenta extends Page
             ->all();
     }
 
+    /** @return Collection<int, Descuento> */
+    public function descuentosDisponibles(): Collection
+    {
+        return Descuento::query()
+            ->where('empresa_id', $this->empresaId())
+            ->where('activo', true)
+            ->orderBy('nombre')
+            ->get();
+    }
+
+    /**
+     * Re-valida $descuentoId contra empresa_id/activo en cada uso (no confía en lo que llegó del
+     * navegador): un id de otra empresa, o de un descuento ya desactivado, simplemente no aplica
+     * ningún descuento en vez de filtrar datos entre empresas.
+     */
+    public function descuentoSeleccionado(): ?Descuento
+    {
+        if (blank($this->descuentoId)) {
+            return null;
+        }
+
+        return Descuento::query()
+            ->where('empresa_id', $this->empresaId())
+            ->where('activo', true)
+            ->find((int) $this->descuentoId);
+    }
+
     /** Turno de caja abierto del usuario actual, si tiene uno. Lookup fresco, sin cachear. */
     public function arqueoAbierto(): ?ArqueoCaja
     {
@@ -536,25 +577,6 @@ class PuntoDeVenta extends Page
         Notification::make()->title('Caja abierta')->success()->send();
     }
 
-    public function cerrarCaja(string $efectivoContado, ?string $notas = null): void
-    {
-        $arqueo = $this->arqueoAbierto();
-
-        if ($arqueo === null) {
-            return;
-        }
-
-        try {
-            app(ArqueoCajaService::class)->cerrar($arqueo, $efectivoContado, $notas, auth()->id());
-        } catch (RuntimeException $e) {
-            Notification::make()->title($e->getMessage())->danger()->send();
-
-            return;
-        }
-
-        Notification::make()->title('Caja cerrada')->success()->send();
-    }
-
     public function cobrar(): void
     {
         if ($this->arqueoAbierto() === null) {
@@ -579,6 +601,8 @@ class PuntoDeVenta extends Page
                 'descuento_global' => $this->descuentoGlobal,
                 'forma_pago' => $this->formaPago,
                 'arqueo_caja_id' => $this->arqueoAbierto()?->id,
+                'tipo_pago' => $this->ventaACredito ? TipoPago::CREDITO->value : TipoPago::CONTADO->value,
+                'fecha_limite_pago' => $this->ventaACredito && filled($this->fechaLimitePago) ? $this->fechaLimitePago : null,
                 'lineas' => $this->lineasParaService(),
             ], $this->empresa());
         } catch (VentaInvalidaException|StockInsuficienteException|SecuenciaNcfAgotadaException $e) {
@@ -588,8 +612,11 @@ class PuntoDeVenta extends Page
         }
 
         $this->carrito = [];
+        $this->descuentoId = '';
         $this->descuentoGlobal = '0.00';
         $this->busquedaProducto = '';
+        $this->ventaACredito = false;
+        $this->fechaLimitePago = '';
         $this->recalcularTotales();
 
         $this->notificarVentaRegistradaEImprimirTicket($venta);
@@ -603,7 +630,7 @@ class PuntoDeVenta extends Page
      * impresora configurada) -> el navegador decide la impresora física, así que solo podemos
      * abrir la vista del ticket y dejar que window.print() (en la propia vista) dispare el diálogo.
      */
-    private function notificarVentaRegistradaEImprimirTicket(Venta $venta): void
+    protected function notificarVentaRegistradaEImprimirTicket(Venta $venta): void
     {
         $impresora = app(ImpresionService::class)->resolverImpresora(ModuloImpresion::FACTURACION, auth()->user());
         $resultado = app(ImpresionService::class)->imprimirTicket($venta, $impresora);
@@ -656,26 +683,48 @@ class PuntoDeVenta extends Page
             ->send();
     }
 
-    private function recalcularTotales(): void
+    protected function recalcularTotales(): void
     {
         if (empty($this->carrito)) {
             $this->totales = $this->totalesVacios();
+            $this->descuentoGlobal = '0.00';
 
             return;
         }
 
         try {
+            $lineas = $this->lineasParaService();
+
+            // El % del descuento seleccionado se aplica sobre el subtotal (ya con descuentos de
+            // línea aplicados, antes de ITBIS): primero se necesita ese subtotal sin descuento
+            // global para poder calcular el monto en pesos que se le pasa a VentaService, que
+            // sigue trabajando con un monto fijo (descuento_global), no con un porcentaje.
+            $sinDescuento = app(VentaService::class)->previsualizar(['descuento_global' => '0', 'lineas' => $lineas], $this->empresa());
+            $this->descuentoGlobal = $this->calcularMontoDescuento($sinDescuento['subtotal']);
+
             $this->totales = app(VentaService::class)->previsualizar([
                 'descuento_global' => $this->descuentoGlobal,
-                'lineas' => $this->lineasParaService(),
+                'lineas' => $lineas,
             ], $this->empresa());
         } catch (VentaInvalidaException) {
             $this->totales = $this->totalesVacios();
+            $this->descuentoGlobal = '0.00';
         }
     }
 
+    private function calcularMontoDescuento(string $subtotal): string
+    {
+        $descuento = $this->descuentoSeleccionado();
+
+        if ($descuento === null) {
+            return '0.00';
+        }
+
+        return bcdiv(bcmul($subtotal, (string) $descuento->porcentaje, 4), '100', 2);
+    }
+
     /** @return array<string, string> */
-    private function totalesVacios(): array
+    protected function totalesVacios(): array
     {
         return [
             'subtotal' => '0.00',
@@ -691,7 +740,7 @@ class PuntoDeVenta extends Page
     }
 
     /** @return array<int, array<string, mixed>> */
-    private function lineasParaService(): array
+    protected function lineasParaService(): array
     {
         return collect($this->carrito)->map(fn (array $linea) => [
             'producto_id' => $linea['producto_id'],
@@ -703,7 +752,7 @@ class PuntoDeVenta extends Page
         ])->all();
     }
 
-    private function clienteConsumidorFinal(): Cliente
+    protected function clienteConsumidorFinal(): Cliente
     {
         // Sin empresa_id en la búsqueda, todas las empresas colisionarían en el mismo
         // "Consumidor Final" (nombre no es único): cada una necesita el suyo propio.

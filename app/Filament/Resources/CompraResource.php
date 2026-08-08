@@ -7,6 +7,7 @@ use App\Enums\EstadoDevolucion;
 use App\Enums\Modulo;
 use App\Enums\TasaItbis;
 use App\Enums\TipoComprobante;
+use App\Enums\TipoPago;
 use App\Enums\TipoProducto;
 use App\Enums\TipoProveedor;
 use App\Filament\Concerns\RestringidoPorModulo;
@@ -195,6 +196,22 @@ class CompraResource extends Resource
                         ->live()
                         ->default(false)
                         ->columnSpanFull(),
+
+                    Select::make('tipo_pago')
+                        ->label('Condición de pago')
+                        ->options([
+                            TipoPago::CONTADO->value => TipoPago::CONTADO->etiqueta(),
+                            TipoPago::CREDITO->value => TipoPago::CREDITO->etiqueta(),
+                        ])
+                        ->default(TipoPago::CONTADO->value)
+                        ->live()
+                        ->required(),
+
+                    DatePicker::make('fecha_vencimiento')
+                        ->label('Fecha de vencimiento')
+                        ->default(now()->addDays(30))
+                        ->visible(fn (Get $get) => (int) $get('tipo_pago') === TipoPago::CREDITO->value)
+                        ->required(fn (Get $get) => (int) $get('tipo_pago') === TipoPago::CREDITO->value),
 
                     TextInput::make('monto_total_factura')
                         ->label('Monto total de la factura')
@@ -428,6 +445,16 @@ class CompraResource extends Resource
                     TextEntry::make('subtotal')->label('Subtotal')->money('DOP'),
                     TextEntry::make('itbis')->label('ITBIS')->money('DOP'),
                     TextEntry::make('total')->label('Total')->money('DOP'),
+                    TextEntry::make('tipo_pago')->label('Condición de pago')
+                        ->formatStateUsing(fn (TipoPago $state) => $state->etiqueta()),
+                    TextEntry::make('fecha_vencimiento')->label('Vence')->date('d/m/Y')
+                        ->placeholder('—')
+                        ->visible(fn (Compra $record) => $record->esACredito()),
+                    TextEntry::make('cuentaPorPagar.montoPendiente')
+                        ->label('Pendiente por pagar')
+                        ->state(fn (Compra $record) => $record->cuentaPorPagar?->montoPendiente())
+                        ->money('DOP')
+                        ->visible(fn (Compra $record) => $record->esACredito() && $record->cuentaPorPagar !== null),
                     TextEntry::make('monto_total_factura')
                         ->label('Monto total de la factura')
                         ->money('DOP')

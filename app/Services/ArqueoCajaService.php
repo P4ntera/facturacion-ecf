@@ -7,6 +7,7 @@ namespace App\Services;
 use App\Enums\EstadoArqueoCaja;
 use App\Enums\EstadoVenta;
 use App\Enums\FormaPago;
+use App\Enums\TipoPago;
 use App\Models\ArqueoCaja;
 use App\Models\Empresa;
 use Illuminate\Support\Facades\DB;
@@ -37,21 +38,27 @@ class ArqueoCajaService
     /**
      * Cierra el turno: calcula (y guarda, como snapshot) las ventas del turno agrupadas por
      * forma de pago, excluyendo anuladas, y compara el efectivo esperado (fondo inicial + ventas
-     * en efectivo) contra lo contado físicamente. Solo quien abrió el turno puede cerrarlo.
+     * en efectivo) contra lo contado físicamente. Por defecto solo quien abrió el turno puede
+     * cerrarlo; $puedeCerrarAjena la resuelve el llamador a partir del permiso
+     * 'arqueo.cerrar_ajeno' (Administrador), para que un supervisor pueda cerrar la caja de un
+     * cajero que ya se fue o se le olvidó.
      */
-    public function cerrar(ArqueoCaja $arqueo, string $efectivoContado, ?string $notas, int $userId): ArqueoCaja
+    public function cerrar(ArqueoCaja $arqueo, string $efectivoContado, ?string $notas, int $userId, bool $puedeCerrarAjena = false): ArqueoCaja
     {
         if ($arqueo->estaCerrado()) {
             throw new RuntimeException('Este arqueo ya fue cerrado.');
         }
 
-        if ($arqueo->user_id !== $userId) {
+        if ($arqueo->user_id !== $userId && ! $puedeCerrarAjena) {
             throw new RuntimeException('Solo quien abrió la caja puede cerrarla.');
         }
 
         return DB::transaction(function () use ($arqueo, $efectivoContado, $notas) {
             $sumasPorFormaPago = $arqueo->ventas()
                 ->where('estado', '!=', EstadoVenta::ANULADA)
+                // Ventas a crédito no representan efectivo/tarjeta recibido hoy: se cobran
+                // después vía CuentaPorCobrarService, no deben inflar el efectivo esperado.
+                ->where('tipo_pago', TipoPago::CONTADO)
                 ->selectRaw('forma_pago, COALESCE(SUM(total), 0) as total')
                 ->groupBy('forma_pago')
                 ->pluck('total', 'forma_pago');

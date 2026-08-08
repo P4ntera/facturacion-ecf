@@ -2,7 +2,7 @@
 
 namespace App\Filament\Resources\VentaResource\Pages;
 
-use App\Filament\Pages\PuntoDeVenta;
+use App\Filament\Pages\Caja;
 use App\Filament\Resources\VentaResource;
 use Filament\Actions\Action;
 use Filament\Resources\Pages\ListRecords;
@@ -15,9 +15,9 @@ class ListVentas extends ListRecords
     {
         return [
             Action::make('nuevaVenta')
-                ->label('Ir al Punto de Venta')
+                ->label('Ir a Caja')
                 ->icon('heroicon-o-shopping-cart')
-                ->url(PuntoDeVenta::getUrl())
+                ->url(Caja::getUrl())
                 ->visible(fn (): bool => auth()->user()?->can('pos.acceder') ?? false),
         ];
     }

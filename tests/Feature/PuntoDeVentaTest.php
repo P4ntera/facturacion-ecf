@@ -9,6 +9,8 @@ use App\Enums\TipoProducto;
 use App\Filament\Pages\PuntoDeVenta;
 use App\Models\ArqueoCaja;
 use App\Models\Cliente;
+use App\Models\Descuento;
+use App\Models\Empresa;
 use App\Models\Producto;
 use App\Models\Role;
 use App\Models\SecuenciaNcf;
@@ -29,8 +31,9 @@ class PuntoDeVentaTest extends TestCase
     private function vendedor(): User
     {
         Permission::firstOrCreate(['name' => 'pos.acceder', 'guard_name' => 'web']);
+        Permission::firstOrCreate(['name' => 'facturacion.acceder', 'guard_name' => 'web']);
         $rol = Role::firstOrCreate(['empresa_id' => $this->empresaDefault->id, 'name' => 'Vendedor', 'guard_name' => 'web']);
-        $rol->syncPermissions(['pos.acceder']);
+        $rol->syncPermissions(['pos.acceder', 'facturacion.acceder']);
 
         $usuario = User::factory()->create();
         $usuario->assignRole('Vendedor');
@@ -319,28 +322,6 @@ class PuntoDeVentaTest extends TestCase
         $this->assertSame(1, ArqueoCaja::where('user_id', $usuario->id)->count());
     }
 
-    public function test_cerrar_caja_calcula_la_diferencia_visible_en_la_pagina(): void
-    {
-        $this->habilitarSecuenciaNcfDeConsumo();
-        $producto = $this->producto();
-
-        $componente = Livewire::actingAs($this->vendedor())
-            ->test(PuntoDeVenta::class)
-            ->call('abrirCaja', '500.00')
-            ->call('agregarProducto', $producto->id)
-            ->set('tipoComprobante', TipoComprobante::FACTURA_CONSUMO->value)
-            ->call('cobrar');
-
-        $arqueo = $componente->instance()->arqueoAbierto();
-        $componente->call('cerrarCaja', '600.00', 'sobrante de prueba');
-
-        $arqueo->refresh();
-        $this->assertTrue($arqueo->estaCerrado());
-        $this->assertSame('118.00', (string) $arqueo->total_ventas_efectivo);
-        $this->assertSame('618.00', (string) $arqueo->efectivo_esperado);
-        $this->assertSame('-18.00', (string) $arqueo->diferencia);
-    }
-
     public function test_cobrar_persiste_la_forma_de_pago_elegida(): void
     {
         $this->habilitarSecuenciaNcfDeConsumo();
@@ -355,6 +336,81 @@ class PuntoDeVentaTest extends TestCase
             ->call('cobrar');
 
         $this->assertSame('tarjeta', Venta::first()->forma_pago->value);
+    }
+
+    public function test_seleccionar_un_descuento_configurado_aplica_su_porcentaje_al_subtotal(): void
+    {
+        $producto = $this->producto();
+        $descuento = Descuento::create([
+            'empresa_id' => $this->empresaDefault->id,
+            'nombre' => 'Empleado',
+            'porcentaje' => 10,
+            'activo' => true,
+        ]);
+
+        Livewire::actingAs($this->vendedor())
+            ->test(PuntoDeVenta::class)
+            ->call('agregarProducto', $producto->id)
+            ->set('descuentoId', (string) $descuento->id)
+            ->assertSet('totales.descuento', '10.00')
+            ->assertSet('totales.total', '108.00');
+    }
+
+    public function test_un_descuento_de_otra_empresa_no_se_aplica(): void
+    {
+        $otraEmpresa = Empresa::create(['razon_social' => 'Otra Empresa', 'rnc' => '131999999']);
+        $descuentoAjeno = Descuento::create([
+            'empresa_id' => $otraEmpresa->id,
+            'nombre' => 'Ajeno',
+            'porcentaje' => 50,
+            'activo' => true,
+        ]);
+        $producto = $this->producto();
+
+        Livewire::actingAs($this->vendedor())
+            ->test(PuntoDeVenta::class)
+            ->call('agregarProducto', $producto->id)
+            ->set('descuentoId', (string) $descuentoAjeno->id)
+            ->assertSet('totales.descuento', '0.00')
+            ->assertSet('totales.total', '118.00');
+    }
+
+    public function test_un_descuento_desactivado_no_se_aplica(): void
+    {
+        $producto = $this->producto();
+        $descuento = Descuento::create([
+            'empresa_id' => $this->empresaDefault->id,
+            'nombre' => 'Vencido',
+            'porcentaje' => 20,
+            'activo' => false,
+        ]);
+
+        Livewire::actingAs($this->vendedor())
+            ->test(PuntoDeVenta::class)
+            ->call('agregarProducto', $producto->id)
+            ->set('descuentoId', (string) $descuento->id)
+            ->assertSet('totales.descuento', '0.00');
+    }
+
+    public function test_cobrar_resetea_el_descuento_seleccionado(): void
+    {
+        $this->habilitarSecuenciaNcfDeConsumo();
+        $producto = $this->producto();
+        $descuento = Descuento::create([
+            'empresa_id' => $this->empresaDefault->id,
+            'nombre' => 'Empleado',
+            'porcentaje' => 10,
+            'activo' => true,
+        ]);
+
+        Livewire::actingAs($this->vendedor())
+            ->test(PuntoDeVenta::class)
+            ->call('abrirCaja', '500.00')
+            ->call('agregarProducto', $producto->id)
+            ->set('descuentoId', (string) $descuento->id)
+            ->call('cobrar')
+            ->assertSet('descuentoId', '')
+            ->assertSet('descuentoGlobal', '0.00');
     }
 
     private function habilitarSecuenciaNcfDeConsumo(): void

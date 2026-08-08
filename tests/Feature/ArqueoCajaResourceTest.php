@@ -3,10 +3,12 @@
 namespace Tests\Feature;
 
 use App\Filament\Resources\ArqueoCajaResource;
+use App\Filament\Resources\ArqueoCajaResource\Pages\ListArqueosCaja;
 use App\Models\User;
 use App\Services\ArqueoCajaService;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 class ArqueoCajaResourceTest extends TestCase
@@ -19,6 +21,16 @@ class ArqueoCajaResourceTest extends TestCase
 
         $usuario = User::factory()->create();
         $usuario->assignRole('Vendedor');
+
+        return $usuario;
+    }
+
+    private function administrador(): User
+    {
+        $this->seed(RolePermissionSeeder::class);
+
+        $usuario = User::factory()->create();
+        $usuario->assignRole('Administrador');
 
         return $usuario;
     }
@@ -75,5 +87,68 @@ class ArqueoCajaResourceTest extends TestCase
         $this->actingAs($usuario)
             ->get(route('arqueos-caja.pdf', $arqueo))
             ->assertForbidden();
+    }
+
+    public function test_cerrar_caja_desde_la_tabla_cierra_el_arqueo_y_calcula_diferencia(): void
+    {
+        $usuario = $this->usuarioConPermiso();
+        $arqueo = app(ArqueoCajaService::class)->abrir('500.00', $usuario->id, $this->empresaDefault);
+
+        Livewire::actingAs($usuario)
+            ->test(ListArqueosCaja::class)
+            ->callTableAction('cerrarCaja', $arqueo, data: [
+                'efectivo_contado' => '600.00',
+                'notas' => 'sobrante de prueba',
+            ])
+            ->assertHasNoTableActionErrors();
+
+        $arqueo->refresh();
+        $this->assertTrue($arqueo->estaCerrado());
+        $this->assertSame('600.00', (string) $arqueo->efectivo_contado);
+        $this->assertSame('100.00', (string) $arqueo->diferencia);
+    }
+
+    public function test_accion_cerrar_caja_no_visible_para_otro_usuario(): void
+    {
+        $abrio = $this->usuarioConPermiso();
+        $otro = $this->usuarioConPermiso();
+        $arqueo = app(ArqueoCajaService::class)->abrir('500.00', $abrio->id, $this->empresaDefault);
+
+        Livewire::actingAs($otro)
+            ->test(ListArqueosCaja::class)
+            ->assertTableActionHidden('cerrarCaja', $arqueo);
+    }
+
+    public function test_accion_cerrar_caja_no_visible_si_ya_esta_cerrado(): void
+    {
+        $usuario = $this->usuarioConPermiso();
+        $service = app(ArqueoCajaService::class);
+        $arqueo = $service->abrir('500.00', $usuario->id, $this->empresaDefault);
+        $arqueo = $service->cerrar($arqueo, '500.00', null, $usuario->id);
+
+        Livewire::actingAs($usuario)
+            ->test(ListArqueosCaja::class)
+            ->assertTableActionHidden('cerrarCaja', $arqueo);
+    }
+
+    /** Un Administrador (permiso arqueo.cerrar_ajeno) sí puede cerrar la caja de un cajero. */
+    public function test_administrador_puede_cerrar_la_caja_de_otro_cajero(): void
+    {
+        $cajero = $this->usuarioConPermiso();
+        $administrador = $this->administrador();
+        $arqueo = app(ArqueoCajaService::class)->abrir('500.00', $cajero->id, $this->empresaDefault);
+
+        Livewire::actingAs($administrador)
+            ->test(ListArqueosCaja::class)
+            ->assertTableActionVisible('cerrarCaja', $arqueo)
+            ->callTableAction('cerrarCaja', $arqueo, data: [
+                'efectivo_contado' => '500.00',
+                'notas' => null,
+            ])
+            ->assertHasNoTableActionErrors();
+
+        $arqueo->refresh();
+        $this->assertTrue($arqueo->estaCerrado());
+        $this->assertSame($cajero->id, $arqueo->user_id);
     }
 }

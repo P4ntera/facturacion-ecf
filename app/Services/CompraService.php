@@ -7,6 +7,8 @@ use App\Enums\OrigenMovimiento;
 use App\Enums\TasaItbis;
 use App\Enums\TipoComprobante;
 use App\Enums\TipoMovimiento;
+use App\Enums\TipoPago;
+use App\Exceptions\CuentaConPagosRegistradosException;
 use App\Models\Compra;
 use App\Models\DetalleCompra;
 use App\Models\Producto;
@@ -21,6 +23,7 @@ class CompraService
     public function __construct(
         private readonly InventarioService $inventarioService,
         private readonly SecuenciaNcfService $ncfService,
+        private readonly CuentaPorPagarService $cuentaPorPagarService,
     ) {}
 
     /**
@@ -70,6 +73,13 @@ class CompraService
                 $ncf = $datos['ncf'] ?? null;
             }
 
+            $tipoPago = $datos['tipo_pago'] ?? TipoPago::CONTADO;
+            $tipoPago = $tipoPago instanceof TipoPago ? $tipoPago : TipoPago::from((int) $tipoPago);
+
+            $fechaVencimiento = $tipoPago === TipoPago::CREDITO
+                ? ($datos['fecha_vencimiento'] ?? now()->addDays(30)->toDateString())
+                : null;
+
             $compra = Compra::create([
                 // Se deriva del proveedor (ya cargado arriba) en vez de depender de que
                 // Filament haya asociado el tenant automáticamente: este service puede
@@ -83,6 +93,8 @@ class CompraService
                 'fecha' => $datos['fecha'],
                 'itbis_incluido' => $itbisIncluido,
                 'monto_total_factura' => $datos['monto_total_factura'] ?? null,
+                'tipo_pago' => $tipoPago,
+                'fecha_vencimiento' => $fechaVencimiento,
                 'estado' => EstadoCompra::REGISTRADA,
                 ...$totales,
             ]);
@@ -127,6 +139,10 @@ class CompraService
                 }
             }
 
+            if ($tipoPago === TipoPago::CREDITO) {
+                $this->cuentaPorPagarService->crearDesdeCompra($compra);
+            }
+
             return $compra->load('detalles.producto', 'proveedor');
         });
     }
@@ -141,6 +157,16 @@ class CompraService
         }
 
         return DB::transaction(function () use ($compra, $motivo, $userId) {
+            $cuentaPorPagar = $compra->cuentaPorPagar;
+
+            if ($cuentaPorPagar !== null && (float) $cuentaPorPagar->monto_pagado > 0) {
+                throw new CuentaConPagosRegistradosException(
+                    "No se puede anular la compra #{$compra->id}: su cuenta por pagar ya tiene pagos registrados."
+                );
+            }
+
+            $cuentaPorPagar?->delete();
+
             foreach ($compra->detalles as $detalle) {
                 $producto = $detalle->producto;
                 if ($producto) {

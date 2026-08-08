@@ -19,6 +19,7 @@ class DevolucionCompraService
 {
     public function __construct(
         private readonly InventarioService $inventarioService,
+        private readonly CuentaPorPagarService $cuentaPorPagarService,
     ) {}
 
     /**
@@ -134,6 +135,10 @@ class DevolucionCompraService
                 }
             }
 
+            if ($compra->cuentaPorPagar !== null) {
+                $this->cuentaPorPagarService->reducirPorDevolucion($compra->cuentaPorPagar, (float) $totales['total']);
+            }
+
             return $devolucion->load('detalles.producto', 'compra.proveedor');
         });
     }
@@ -162,6 +167,12 @@ class DevolucionCompraService
                         "Anulación devolución #{$devolucion->id}",
                     );
                 }
+            }
+
+            $cuentaPorPagar = $devolucion->compra->cuentaPorPagar;
+
+            if ($cuentaPorPagar !== null) {
+                $this->cuentaPorPagarService->restaurarPorAnulacionDevolucion($cuentaPorPagar, (float) $devolucion->total);
             }
 
             $devolucion->update([

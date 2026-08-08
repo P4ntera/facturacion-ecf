@@ -93,6 +93,8 @@ class CreateCompra extends CreateRecord
                 'fecha'                => $data['fecha'],
                 'itbis_incluido'       => $data['itbis_incluido'] ?? false,
                 'monto_total_factura'  => $data['monto_total_factura'] ?? null,
+                'tipo_pago'            => $data['tipo_pago'] ?? null,
+                'fecha_vencimiento'    => $data['fecha_vencimiento'] ?? null,
                 'lineas'               => $data['lineas'],
             ], auth()->id());
         } catch (RuntimeException|StockInsuficienteException $e) {

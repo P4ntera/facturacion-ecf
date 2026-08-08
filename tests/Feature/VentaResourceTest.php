@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Enums\AmbienteEcf;
 use App\Enums\EstadoFiscal;
+use App\Enums\FormaPago;
 use App\Enums\TasaItbis;
 use App\Enums\TipoComprobante;
 use App\Enums\TipoProducto;
@@ -14,6 +15,7 @@ use App\Models\Producto;
 use App\Models\SecuenciaNcf;
 use App\Models\User;
 use App\Models\Venta;
+use App\Services\ArqueoCajaService;
 use App\Services\VentaService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -118,6 +120,27 @@ class VentaResourceTest extends TestCase
     {
         $venta = $this->crearVenta();
         app(VentaService::class)->anular($venta, 'motivo previo', null);
+
+        Livewire::actingAs($this->usuarioConPermisos(['ventas.ver', 'ventas.anular']))
+            ->test(ListVentas::class)
+            ->assertTableActionHidden('anular', $venta->refresh());
+    }
+
+    public function test_accion_anular_no_visible_si_el_arqueo_de_la_venta_ya_cerro(): void
+    {
+        $cajero = User::factory()->create();
+        $arqueo = app(ArqueoCajaService::class)->abrir('500.00', $cajero->id, $this->empresaDefault);
+
+        $cliente = Cliente::create(['nombre' => 'Cliente Resource', 'activo' => true]);
+        $venta = app(VentaService::class)->registrar([
+            'cliente_id' => $cliente->id,
+            'user_id' => $cajero->id,
+            'forma_pago' => FormaPago::EFECTIVO,
+            'arqueo_caja_id' => $arqueo->id,
+            'lineas' => [['producto_id' => $this->producto->id, 'cantidad' => 2]],
+        ], $this->empresaDefault);
+
+        app(ArqueoCajaService::class)->cerrar($arqueo, '736.00', null, $cajero->id);
 
         Livewire::actingAs($this->usuarioConPermisos(['ventas.ver', 'ventas.anular']))
             ->test(ListVentas::class)

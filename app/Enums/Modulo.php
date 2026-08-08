@@ -17,6 +17,7 @@ enum Modulo: string
     case MAESTROS_PROVEEDORES = 'maestros_proveedores';
     case MAESTROS_PRODUCTOS = 'maestros_productos';
     case MAESTROS_CATEGORIAS = 'maestros_categorias';
+    case MAESTROS_DESCUENTOS = 'maestros_descuentos';
 
     case VENTAS_POS = 'ventas_pos';
     case VENTAS_LISTADO = 'ventas_listado';
@@ -28,6 +29,9 @@ enum Modulo: string
     case COMPRAS_PEDIDOS = 'compras_pedidos';
     case COMPRAS_STOCK_BAJO = 'compras_stock_bajo';
     case DEVOLUCIONES = 'devoluciones';
+
+    case CUENTAS_POR_COBRAR = 'cuentas_por_cobrar';
+    case CUENTAS_POR_PAGAR = 'cuentas_por_pagar';
 
     case ECF_SECUENCIAS = 'ecf_secuencias';
     case ECF_RECIBIDOS = 'ecf_recibidos';
@@ -42,6 +46,7 @@ enum Modulo: string
             self::MAESTROS_PROVEEDORES => 'Proveedores',
             self::MAESTROS_PRODUCTOS => 'Productos',
             self::MAESTROS_CATEGORIAS => 'Categorías',
+            self::MAESTROS_DESCUENTOS => 'Descuentos',
             self::VENTAS_POS => 'Punto de Venta',
             self::VENTAS_LISTADO => 'Ventas',
             self::VENTAS_ARQUEO_CAJA => 'Arqueos de Caja',
@@ -50,6 +55,8 @@ enum Modulo: string
             self::COMPRAS_PEDIDOS => 'Pedidos de Compra',
             self::COMPRAS_STOCK_BAJO => 'Stock Bajo',
             self::DEVOLUCIONES => 'Devoluciones a Proveedor',
+            self::CUENTAS_POR_COBRAR => 'Cuentas por Cobrar',
+            self::CUENTAS_POR_PAGAR => 'Cuentas por Pagar',
             self::ECF_SECUENCIAS => 'Secuencias NCF',
             self::ECF_RECIBIDOS => 'e-CF Recibidos',
             self::IMPRESORAS => 'Impresoras',
@@ -62,7 +69,8 @@ enum Modulo: string
     {
         return match ($this) {
             self::MAESTROS_CLIENTES, self::MAESTROS_PROVEEDORES,
-            self::MAESTROS_PRODUCTOS, self::MAESTROS_CATEGORIAS => 'Maestros',
+            self::MAESTROS_PRODUCTOS, self::MAESTROS_CATEGORIAS,
+            self::MAESTROS_DESCUENTOS => 'Maestros',
 
             self::VENTAS_POS, self::VENTAS_LISTADO, self::VENTAS_ARQUEO_CAJA => 'Ventas',
 
@@ -70,6 +78,8 @@ enum Modulo: string
 
             self::COMPRAS, self::COMPRAS_PEDIDOS,
             self::COMPRAS_STOCK_BAJO, self::DEVOLUCIONES => 'Compras',
+
+            self::CUENTAS_POR_COBRAR, self::CUENTAS_POR_PAGAR => 'Cuentas',
 
             self::ECF_SECUENCIAS, self::ECF_RECIBIDOS => 'e-CF',
 
@@ -100,6 +110,8 @@ enum Modulo: string
         return match ($this) {
             self::VENTAS_POS => [self::MAESTROS_PRODUCTOS],
             self::DEVOLUCIONES => [self::COMPRAS],
+            self::CUENTAS_POR_COBRAR => [self::VENTAS_LISTADO],
+            self::CUENTAS_POR_PAGAR => [self::COMPRAS],
             default => [],
         };
     }

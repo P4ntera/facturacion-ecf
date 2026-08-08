@@ -35,6 +35,9 @@
 .pos-side{
     position:sticky;
     top:var(--space-md);
+    display:flex;
+    flex-direction:column;
+    gap:var(--space-sm);
 }
 
 @media (max-width:1024px){
@@ -43,6 +46,29 @@
     }
     .pos-side{
         position:static;
+    }
+}
+
+/*======== BUSCADORES COMPACTOS (Caja): cliente/producto chicos, arriba del carrito ========*/
+
+.pos-top-row{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:var(--space-sm);
+}
+
+.pos-buscador-compacto{
+    padding:var(--space-sm);
+}
+
+.pos-buscador-compacto .card-title{
+    margin-bottom:var(--space-xs);
+    font-size:var(--fs-small);
+}
+
+@media (max-width:640px){
+    .pos-top-row{
+        grid-template-columns:1fr;
     }
 }
 

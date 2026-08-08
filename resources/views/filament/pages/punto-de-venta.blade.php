@@ -42,34 +42,17 @@
         </div>
       </div>
     @else
-      {{-- Caja abierta: estado del turno + acción de cierre --}}
-      <div class="card pos-estado-caja" x-data="{ cerrando: false, efectivoContado: '0.00', notas: '' }">
+      {{-- Caja abierta: solo estado informativo. El cierre se hace desde Arqueos de Caja. --}}
+      <div class="card pos-estado-caja">
         <div class="flex items-center justify-between flex-wrap gap-2">
           <div>
             <span class="badge badge-success">Caja abierta</span>
             <span class="pos-muted">
-              {{ $this->arqueoAbierto()->user->name }} —
+              {{ $this->arqueoAbierto()->user?->name ?? 'Usuario' }} —
               desde {{ $this->arqueoAbierto()->abierto_en->format('d/m/Y H:i') }} —
               fondo RD$ {{ number_format((float) $this->arqueoAbierto()->fondo_inicial, 2) }}
             </span>
           </div>
-          <button type="button" class="btn btn-secondary" x-on:click="cerrando = ! cerrando">
-            Cerrar caja
-          </button>
-        </div>
-
-        <div x-show="cerrando" class="mt-3 flex flex-wrap items-end gap-2">
-          <div>
-            <label class="form-label">Efectivo contado</label>
-            <input type="number" min="0" step="0.01" class="form-input" x-model="efectivoContado" />
-          </div>
-          <div>
-            <label class="form-label">Notas (opcional)</label>
-            <input type="text" class="form-input" x-model="notas" />
-          </div>
-          <button type="button" class="btn btn-primary" x-on:click="$wire.cerrarCaja(efectivoContado, notas)">
-            Confirmar cierre
-          </button>
         </div>
       </div>
 
@@ -292,7 +275,12 @@
 
           <div class="mb-2">
             <label class="form-label">Descuento global</label>
-            <input type="number" min="0" step="0.01" class="form-input" wire:model.live.debounce.400ms="descuentoGlobal" />
+            <select class="form-select" wire:model.live="descuentoId">
+              <option value="">Sin descuento</option>
+              @foreach ($this->descuentosDisponibles() as $descuento)
+                <option value="{{ $descuento->id }}">{{ $descuento->nombre }} ({{ number_format((float) $descuento->porcentaje, 2) }}%)</option>
+              @endforeach
+            </select>
           </div>
 
           <dl>
@@ -333,6 +321,21 @@
               @endforeach
             </select>
           </div>
+
+          <div class="mt-2">
+            <label class="form-label">
+              <input type="checkbox" wire:model.live="ventaACredito" />
+              Vender a crédito (fiar al cliente)
+            </label>
+          </div>
+
+          @if ($ventaACredito)
+            <div class="mt-2">
+              <label class="form-label">Fecha límite de pago</label>
+              <input type="date" class="form-input" wire:model.live="fechaLimitePago" />
+              <p style="color:var(--text-muted);font-size:0.8125rem;margin-top:0.25rem;">Si la dejas vacía, se usan 30 días desde hoy.</p>
+            </div>
+          @endif
 
           <button
             type="button"

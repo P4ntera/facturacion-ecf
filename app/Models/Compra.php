@@ -4,10 +4,12 @@ namespace App\Models;
 
 use App\Enums\EstadoCompra;
 use App\Enums\TipoComprobante;
+use App\Enums\TipoPago;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Compra extends Model
 {
@@ -15,7 +17,7 @@ class Compra extends Model
 
     protected $fillable = [
         'empresa_id', 'proveedor_id', 'user_id', 'tipo_comprobante', 'ncf', 'fecha',
-        'itbis_incluido', 'monto_total_factura',
+        'itbis_incluido', 'monto_total_factura', 'tipo_pago', 'fecha_vencimiento',
         'subtotal', 'monto_gravado_18', 'monto_gravado_16', 'monto_gravado_0', 'monto_exento',
         'itbis_18', 'itbis_16', 'itbis', 'total',
         'estado', 'motivo_anulacion', 'anulada_en',
@@ -23,9 +25,11 @@ class Compra extends Model
 
     protected $casts = [
         'tipo_comprobante' => TipoComprobante::class,
+        'tipo_pago' => TipoPago::class,
         'estado' => EstadoCompra::class,
         'itbis_incluido' => 'boolean',
         'fecha' => 'datetime',
+        'fecha_vencimiento' => 'date',
         'anulada_en' => 'datetime',
         'monto_total_factura' => 'decimal:2',
         'subtotal' => 'decimal:2',
@@ -62,6 +66,16 @@ class Compra extends Model
     public function devoluciones(): HasMany
     {
         return $this->hasMany(DevolucionCompra::class);
+    }
+
+    public function cuentaPorPagar(): HasOne
+    {
+        return $this->hasOne(CuentaPorPagar::class);
+    }
+
+    public function esACredito(): bool
+    {
+        return $this->tipo_pago === TipoPago::CREDITO;
     }
 
     public function estaAnulada(): bool

@@ -38,7 +38,11 @@ class RolesEmpresaService
                 'guard_name' => 'web',
             ]);
             $vendedor->syncPermissions([
+                // Vendedor conserva ambas pantallas: Caja para el día a día rápido, y
+                // Facturación por si necesita emitir un comprobante con más control (a
+                // diferencia de Cajero, que un Administrador crea aparte solo con Caja).
                 'pos.acceder',
+                'facturacion.acceder',
                 'ventas.ver',
                 'ventas.imprimir',
                 'gestionar_arqueo_caja',
@@ -51,6 +55,11 @@ class RolesEmpresaService
                 // necesita poder sacarlo en PDF/Excel para el día a día (cierre de caja, etc.).
                 'reportes.ver',
                 'reportes.exportar',
+                // Cobrar facturas a crédito es parte del día a día de quien vende; corregir un
+                // pago mal registrado (cxc.anular) queda para Administrador, igual que anular
+                // ventas/compras.
+                'cxc.ver',
+                'cxc.cobrar',
             ]);
 
             $almacenista = Role::firstOrCreate([
@@ -74,6 +83,9 @@ class RolesEmpresaService
                 // Solo lectura: necesita ver el proveedor al registrar una compra, pero darlo de
                 // alta/editarlo es tarea de quien mantiene los maestros, no del almacén.
                 'proveedores.ver',
+                // Solo consulta: saber cuánto se le debe a un proveedor ayuda a decidir si
+                // comprarle de nuevo, pero pagarle es una decisión financiera de Administrador.
+                'cxp.ver',
             ]);
         });
 

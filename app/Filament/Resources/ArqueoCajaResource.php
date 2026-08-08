@@ -7,13 +7,17 @@ use App\Enums\Modulo;
 use App\Filament\Concerns\RestringidoPorModulo;
 use App\Filament\Resources\ArqueoCajaResource\Pages;
 use App\Models\ArqueoCaja;
+use App\Services\ArqueoCajaService;
 use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
 use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Infolists\Components\RepeatableEntry\TableColumn as InfolistTableColumn;
 use Filament\Infolists\Components\TextEntry;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
@@ -22,6 +26,7 @@ use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use RuntimeException;
 
 class ArqueoCajaResource extends Resource
 {
@@ -48,7 +53,8 @@ class ArqueoCajaResource extends Resource
 
     protected static ?int $navigationSort = 3;
 
-    // Solo lectura: la apertura/cierre se hace desde el Punto de Venta.
+    // No se crea a mano: un arqueo nace al abrir caja desde Caja/Facturación. El cierre sí se
+    // hace aquí (acción "Cerrar caja" en la tabla), no desde las pantallas de venta.
     public static function canCreate(): bool
     {
         return false;
@@ -179,6 +185,45 @@ class ArqueoCajaResource extends Resource
             ])
             ->recordActions([
                 ViewAction::make(),
+
+                Action::make('cerrarCaja')
+                    ->label('Cerrar caja')
+                    ->icon('heroicon-o-lock-closed')
+                    ->color('warning')
+                    ->requiresConfirmation()
+                    // Mismo criterio que exige ArqueoCajaService::cerrar(): quien abrió el turno
+                    // siempre puede cerrarlo; además, quien tiene 'arqueo.cerrar_ajeno'
+                    // (Administrador) puede cerrar la caja de cualquier cajero de su empresa.
+                    ->visible(fn (ArqueoCaja $record): bool => $record->estaAbierto()
+                        && ($record->user_id === auth()->id() || (auth()->user()?->can('arqueo.cerrar_ajeno') ?? false)))
+                    ->schema([
+                        TextInput::make('efectivo_contado')
+                            ->label('Efectivo contado')
+                            ->numeric()
+                            ->prefix('RD$')
+                            ->minValue(0)
+                            ->required(),
+                        Textarea::make('notas')
+                            ->label('Notas (opcional)')
+                            ->rows(2),
+                    ])
+                    ->action(function (ArqueoCaja $record, array $data): void {
+                        try {
+                            app(ArqueoCajaService::class)->cerrar(
+                                $record,
+                                $data['efectivo_contado'],
+                                $data['notas'] ?? null,
+                                auth()->id(),
+                                auth()->user()?->can('arqueo.cerrar_ajeno') ?? false,
+                            );
+                        } catch (RuntimeException $e) {
+                            Notification::make()->title($e->getMessage())->danger()->send();
+
+                            return;
+                        }
+
+                        Notification::make()->title('Caja cerrada')->success()->send();
+                    }),
 
                 Action::make('descargarPdf')
                     ->label('Descargar PDF')
