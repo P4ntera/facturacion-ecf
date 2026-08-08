@@ -158,17 +158,38 @@
             <ul class="pos-resultados">
               @forelse ($this->productosSugeridos() as $producto)
                 <li>
-                  <button type="button" wire:click="agregarProducto({{ $producto->id }})">
-                    <span>{{ $producto->codigo }} — {{ $producto->nombre }}</span>
-                    <span class="flex items-center gap-2 pos-muted">
-                      RD$ {{ number_format((float) $producto->precio, 2) }}
-                      @if ($producto->controla_stock)
-                        <span class="badge {{ (float) $producto->stock > 0 ? 'badge-success' : 'badge-danger' }}">
-                          stock {{ number_format((float) $producto->stock, 2) }}
+                  @if ($producto->tipo_venta === \App\Enums\TipoVenta::PESADO)
+                    <div class="flex items-center justify-between gap-2 pos-resultado-pesado" x-data="{ peso: '1.000' }">
+                      <span>
+                        {{ $producto->codigo }} — {{ $producto->nombre }}
+                        <span class="pos-muted">
+                          (RD$ {{ number_format((float) $producto->precio_por_peso, 2) }} / {{ $producto->unidad_base }})
                         </span>
-                      @endif
-                    </span>
-                  </button>
+                      </span>
+                      <span class="flex items-center gap-2">
+                        <input type="number" min="0.001" step="0.001" class="form-input pos-input-sm" x-model="peso" />
+                        <button
+                          type="button"
+                          class="btn btn-secondary pos-nowrap"
+                          x-on:click="$wire.agregarProductoPorPeso({{ $producto->id }}, peso)"
+                        >
+                          Agregar
+                        </button>
+                      </span>
+                    </div>
+                  @else
+                    <button type="button" wire:click="agregarProducto({{ $producto->id }})">
+                      <span>{{ $producto->codigo }} — {{ $producto->nombre }}</span>
+                      <span class="flex items-center gap-2 pos-muted">
+                        RD$ {{ number_format((float) $producto->precio, 2) }}
+                        @if ($producto->controla_stock)
+                          <span class="badge {{ (float) $producto->stock > 0 ? 'badge-success' : 'badge-danger' }}">
+                            stock {{ number_format((float) $producto->stock, 2) }}
+                          </span>
+                        @endif
+                      </span>
+                    </button>
+                  @endif
                 </li>
               @empty
                 <li class="pos-vacio">Sin resultados.</li>
@@ -208,11 +229,14 @@
                     <td class="pos-num">
                       <input
                         type="number"
-                        min="0.001"
-                        step="0.001"
+                        min="{{ $linea['tipo_venta'] === 'pesado' ? '0.001' : '1' }}"
+                        step="{{ $linea['tipo_venta'] === 'pesado' ? '0.001' : '1' }}"
                         class="form-input"
                         wire:model.live.debounce.400ms="carrito.{{ $indice }}.cantidad"
                       />
+                      @if ($linea['tipo_venta'] === 'pesado')
+                        <span class="pos-muted">{{ $linea['unidad_base'] }}</span>
+                      @endif
                     </td>
                     <td class="pos-num">RD$ {{ number_format((float) $linea['precio_unitario'], 2) }}</td>
                     <td class="pos-num">
