@@ -385,9 +385,8 @@ class AislamientoEntreEmpresasTest extends TestCase
         ], $adminA->id, $empresaA);
     }
 
-
-    /** 12. El POS de Empresa A no encuentra (ni agrega) una presentación de un producto de OTRA empresa. */
-    public function test_12_el_pos_no_escanea_presentaciones_de_otra_empresa(): void
+    /** 13. El POS de Empresa A no encuentra (ni agrega) una presentación de un producto de OTRA empresa. */
+    public function test_13_el_pos_no_escanea_presentaciones_de_otra_empresa(): void
     {
         ['empresa' => $empresaA, 'admin' => $adminA] = $this->crearEmpresaConDatos('Empresa A', '131000001');
         ['empresa' => $empresaTobogan, 'producto' => $productoTobogan] = $this->crearEmpresaConDatos('Tobogán', '131000002');
@@ -412,11 +411,11 @@ class AislamientoEntreEmpresasTest extends TestCase
     }
 
     /**
-     * 12b. VentaService::registrar() rechaza una presentación que no pertenece al producto de la
+     * 13b. VentaService::registrar() rechaza una presentación que no pertenece al producto de la
      * línea, incluso si ambos ids existen (uno de la empresa activa, la presentación de otra):
      * la revalidación es por producto_id, así que ninguna combinación cruzada pasa.
      */
-    public function test_12b_no_se_puede_vender_la_presentacion_de_un_producto_de_otra_empresa(): void
+    public function test_13b_no_se_puede_vender_la_presentacion_de_un_producto_de_otra_empresa(): void
     {
         ['empresa' => $empresaA, 'admin' => $adminA, 'producto' => $productoA, 'cliente' => $clienteA] =
             $this->crearEmpresaConDatos('Empresa A', '131000001');
@@ -447,8 +446,8 @@ class AislamientoEntreEmpresasTest extends TestCase
         ], $empresaA);
     }
 
-    /** 13. La búsqueda de la tabla de productos de Empresa A no encuentra por el código de barras de una presentación de OTRA empresa. */
-    public function test_13_la_busqueda_de_productos_no_encuentra_presentaciones_de_otra_empresa(): void
+    /** 14. La búsqueda de la tabla de productos de Empresa A no encuentra por el código de barras de una presentación de OTRA empresa. */
+    public function test_14_la_busqueda_de_productos_no_encuentra_presentaciones_de_otra_empresa(): void
     {
         ['empresa' => $empresaA, 'admin' => $adminA, 'producto' => $productoA] =
             $this->crearEmpresaConDatos('Empresa A', '131000001');
@@ -477,6 +476,8 @@ class AislamientoEntreEmpresasTest extends TestCase
             ->test(ListProductos::class)
             ->searchTable('888888')
             ->assertCanNotSeeTableRecords([$productoA, $productoTobogan]);
+    }
+
     /**
      * 12. Mantenimiento de Descuentos (Caja/Facturación, T-descuentos): cada empresa solo ve sus
      * propios descuentos configurados en el índice, y crear uno lo asocia a la empresa activa.
