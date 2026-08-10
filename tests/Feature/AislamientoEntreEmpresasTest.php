@@ -182,11 +182,11 @@ class AislamientoEntreEmpresasTest extends TestCase
             ->set('busquedaProducto', 'Producto de')
             ->set('busquedaCliente', 'Cliente de');
 
-        $productosSugeridos = $componente->instance()->productosSugeridos()->pluck('nombre');
+        $resultadosBusqueda = $componente->instance()->resultadosBusqueda()->pluck('etiqueta');
         $clientesSugeridos = $componente->instance()->clientesSugeridos()->pluck('nombre');
 
-        $this->assertTrue($productosSugeridos->contains($productoA->nombre));
-        $this->assertFalse($productosSugeridos->contains($productoTobogan->nombre));
+        $this->assertTrue($resultadosBusqueda->contains($productoA->nombre));
+        $this->assertFalse($resultadosBusqueda->contains($productoTobogan->nombre));
 
         $this->assertTrue($clientesSugeridos->contains($clienteA->nombre));
         $this->assertFalse($clientesSugeridos->contains($clienteTobogan->nombre));

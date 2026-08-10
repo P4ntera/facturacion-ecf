@@ -95,7 +95,7 @@ class PuntoDeVentaEscaneoTest extends TestCase
 
         $componente->assertSet('carrito', []);
         $componente->assertSet('busquedaProducto', 'ESC-PAR'); // no se limpia: no hubo escaneo
-        $this->assertCount(1, $componente->instance()->productosSugeridos()); // la búsqueda normal sigue funcionando
+        $this->assertCount(1, $componente->instance()->resultadosBusqueda()); // la búsqueda normal sigue funcionando
     }
 
     public function test_producto_inactivo_no_se_agrega_y_notifica(): void
@@ -142,8 +142,8 @@ class PuntoDeVentaEscaneoTest extends TestCase
             ->test(PuntoDeVenta::class)
             ->set('busquedaProducto', 'Leche');
 
-        $this->assertCount(1, $componente->instance()->productosSugeridos());
-        $this->assertSame($producto->id, $componente->instance()->productosSugeridos()->first()->id);
+        $this->assertCount(1, $componente->instance()->resultadosBusqueda());
+        $this->assertSame($producto->id, $componente->instance()->resultadosBusqueda()->first()['producto_id']);
     }
 
     public function test_campo_vacio_no_hace_nada_al_presionar_enter(): void

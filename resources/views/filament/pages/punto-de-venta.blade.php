@@ -151,40 +151,41 @@
             x-ref="buscadorProducto"
             placeholder="Buscar por código, nombre o escanear código de barras..."
             wire:model.live.debounce.300ms="busquedaProducto"
-            wire:keydown.enter="escanearOBuscar"
+            wire:keydown.enter="escanearOBuscar($event.target.value)"
           />
 
           @if ($busquedaProducto !== '')
             <ul class="pos-resultados">
-              @forelse ($this->productosSugeridos() as $producto)
+              @forelse ($this->resultadosBusqueda() as $fila)
                 <li>
-                  @if ($producto->tipo_venta === \App\Enums\TipoVenta::PESADO)
+                  @if ($fila['tipo'] === 'pesado')
                     <div class="flex items-center justify-between gap-2 pos-resultado-pesado" x-data="{ peso: '1.000' }">
                       <span>
-                        {{ $producto->codigo }} — {{ $producto->nombre }}
-                        <span class="pos-muted">
-                          (RD$ {{ number_format((float) $producto->precio_por_peso, 2) }} / {{ $producto->unidad_base }})
-                        </span>
+                        {{ $fila['etiqueta'] }}
+                        <span class="pos-muted">({{ $fila['precio_texto'] }})</span>
                       </span>
                       <span class="flex items-center gap-2">
                         <input type="number" min="0.001" step="0.001" class="form-input pos-input-sm" x-model="peso" />
                         <button
                           type="button"
                           class="btn btn-secondary pos-nowrap"
-                          x-on:click="$wire.agregarProductoPorPeso({{ $producto->id }}, peso)"
+                          x-on:click="$wire.agregarProductoPorPeso({{ $fila['producto_id'] }}, peso)"
                         >
                           Agregar
                         </button>
                       </span>
                     </div>
                   @else
-                    <button type="button" wire:click="agregarProducto({{ $producto->id }})">
-                      <span>{{ $producto->codigo }} — {{ $producto->nombre }}</span>
+                    <button
+                      type="button"
+                      wire:click="{{ $fila['presentacion_id'] ? 'agregarPresentacion('.$fila['presentacion_id'].')' : 'agregarProducto('.$fila['producto_id'].')' }}"
+                    >
+                      <span>{{ $fila['etiqueta'] }}</span>
                       <span class="flex items-center gap-2 pos-muted">
-                        RD$ {{ number_format((float) $producto->precio, 2) }}
-                        @if ($producto->controla_stock)
-                          <span class="badge {{ (float) $producto->stock > 0 ? 'badge-success' : 'badge-danger' }}">
-                            stock {{ number_format((float) $producto->stock, 2) }}
+                        {{ $fila['precio_texto'] }}
+                        @if ($fila['controla_stock'])
+                          <span class="badge {{ $fila['stock'] > 0 ? 'badge-success' : 'badge-danger' }}">
+                            stock {{ number_format($fila['stock'], 2) }}
                           </span>
                         @endif
                       </span>
