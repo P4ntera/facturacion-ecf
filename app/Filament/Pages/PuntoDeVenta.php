@@ -9,8 +9,8 @@ use App\Enums\Modulo;
 use App\Enums\ModuloImpresion;
 use App\Enums\TipoComprobante;
 use App\Enums\TipoDocumentoCliente;
-use App\Enums\TipoVenta;
 use App\Enums\TipoPago;
+use App\Enums\TipoVenta;
 use App\Exceptions\SecuenciaNcfAgotadaException;
 use App\Exceptions\StockInsuficienteException;
 use App\Exceptions\VentaInvalidaException;
@@ -239,36 +239,132 @@ class PuntoDeVenta extends Page
             : 'Para facturas de consumo de RD$250,000 o más, el cliente con RNC/Cédula es obligatorio. Cambia el cliente o búscalo por RNC en la DGII abajo.';
     }
 
-    /** @return Collection<int, Producto> */
-    public function productosSugeridos(): Collection
+    /**
+     * Un solo buscador para todo: nombre de producto (parcial), código interno/SKU (parcial),
+     * código de barras de cualquier presentación (exacto — así no se disparan falsos positivos
+     * mientras se teclea un código a medias) y, si el producto es CONTABLE, nombre de su
+     * presentación (parcial). Cada presentación activa de un producto CONTABLE es su propia fila
+     * (no se colapsan en una sola fila por producto): así se puede elegir "Caja" o "Six-pack"
+     * directamente desde la lista, cada una con su propio precio. PESADO solo tiene una fila (no
+     * hay presentaciones con código fijo); productos CONTABLE sin ninguna presentación cargada
+     * (compatibilidad con datos viejos) caen en una fila "suelta" que se agrega como antes.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    public function resultadosBusqueda(): Collection
     {
-        if (blank($this->busquedaProducto)) {
+        $texto = trim($this->busquedaProducto);
+
+        if ($texto === '') {
             return collect();
         }
 
-        return Producto::query()
+        $productos = Producto::query()
             ->where('empresa_id', $this->empresaId())
             ->where('activo', true)
             ->where(fn (Builder $q) => $q
-                ->where('codigo', 'ilike', "%{$this->busquedaProducto}%")
-                ->orWhere('nombre', 'ilike', "%{$this->busquedaProducto}%"))
+                ->where('nombre', 'ilike', "%{$texto}%")
+                ->orWhere('codigo', 'ilike', "%{$texto}%")
+                ->orWhereHas('presentaciones', fn (Builder $p) => $p
+                    ->where('activa', true)
+                    ->where(fn (Builder $pp) => $pp
+                        ->where('codigo_barra', 'ilike', $texto)
+                        ->orWhere('nombre', 'ilike', "%{$texto}%"))))
+            ->with(['presentaciones' => fn ($q) => $q
+                ->where('activa', true)
+                ->orderByDesc('es_base')
+                ->orderBy('nombre')])
             ->orderBy('nombre')
             ->limit(10)
             ->get();
+
+        $filas = collect();
+
+        foreach ($productos as $producto) {
+            if ($producto->tipo_venta === TipoVenta::PESADO) {
+                $filas->push($this->filaPesado($producto));
+
+                continue;
+            }
+
+            if ($producto->presentaciones->isEmpty()) {
+                $filas->push($this->filaProductoSinPresentaciones($producto));
+
+                continue;
+            }
+
+            foreach ($producto->presentaciones as $presentacion) {
+                $filas->push($this->filaPresentacion($producto, $presentacion));
+            }
+        }
+
+        return $filas->take(15);
+    }
+
+    /** @return array<string, mixed> */
+    private function filaPresentacion(Producto $producto, ProductoPresentacion $presentacion): array
+    {
+        return [
+            'tipo' => 'presentacion',
+            'producto_id' => $producto->id,
+            'presentacion_id' => $presentacion->id,
+            'etiqueta' => "{$producto->nombre} · {$presentacion->nombre}",
+            'precio_texto' => 'RD$ '.number_format((float) $presentacion->precio, 2),
+            'controla_stock' => $producto->controla_stock,
+            'stock' => (float) $producto->stock,
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function filaProductoSinPresentaciones(Producto $producto): array
+    {
+        return [
+            'tipo' => 'presentacion',
+            'producto_id' => $producto->id,
+            'presentacion_id' => null,
+            'etiqueta' => $producto->nombre,
+            'precio_texto' => 'RD$ '.number_format((float) $producto->precio, 2),
+            'controla_stock' => $producto->controla_stock,
+            'stock' => (float) $producto->stock,
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function filaPesado(Producto $producto): array
+    {
+        return [
+            'tipo' => 'pesado',
+            'producto_id' => $producto->id,
+            'presentacion_id' => null,
+            'etiqueta' => $producto->nombre,
+            'precio_texto' => 'RD$ '.number_format((float) $producto->precio_por_peso, 2).' / '.$producto->unidad_base,
+            'controla_stock' => $producto->controla_stock,
+            'stock' => (float) $producto->stock,
+        ];
     }
 
     /**
      * Un lector de código de barras funciona como un teclado: "teclea" el código muy rápido y
      * termina con Enter — no hace falta driver ni integración especial, basta con escuchar el
      * mismo evento que dispararía un cajero al terminar de escribir a mano (wire:keydown.enter
-     * en el buscador). Si el texto coincide EXACTO con el código de barras o el código de un
-     * producto, se agrega directo al carrito y el campo queda listo para el siguiente escaneo.
-     * Si no hay coincidencia exacta, no se hace nada más: la búsqueda por nombre/código de abajo
-     * ya es reactiva sola (wire:model.live) y sigue mostrando resultados sin que esto interfiera.
+     * en el buscador). Si el texto coincide EXACTO con el código de barras de una presentación o
+     * el código/código de barras del producto, se agrega directo al carrito y el campo queda
+     * listo para el siguiente escaneo. Si no hay coincidencia exacta, no se hace nada más: la
+     * búsqueda de abajo (resultadosBusqueda(), ya reactiva vía wire:model.live) sigue mostrando
+     * resultados sin que esto interfiera.
+     *
+     * $texto viaja como parámetro ($event.target.value, ver la vista) en vez de leerse siempre de
+     * $this->busquedaProducto: el input además lleva wire:model.live.debounce.300ms, y un lector
+     * de código de barras dispara el Enter casi inmediatamente después del último carácter — más
+     * rápido que el debounce. Sin el parámetro, escanearOBuscar() podía correr ANTES de que el
+     * valor debounced llegara al servidor y encontrar $busquedaProducto vacío o desactualizado
+     * ("a veces no encuentra nada" con el escáner). Sigue aceptando el caso sin parámetro (tests,
+     * o cualquier otro disparador) para no romper nada que ya llamaba a este método así.
      */
-    public function escanearOBuscar(): void
+    public function escanearOBuscar(?string $texto = null): void
     {
-        $texto = trim($this->busquedaProducto);
+        $texto = trim($texto ?? $this->busquedaProducto);
+        $this->busquedaProducto = $texto;
 
         if ($texto === '') {
             return;
@@ -330,6 +426,30 @@ class PuntoDeVenta extends Page
         }
 
         $this->agregarLineaContable($producto, $producto->presentacionBase());
+        $this->busquedaProducto = '';
+    }
+
+    /**
+     * Agrega una presentación ESPECÍFICA elegida en resultadosBusqueda() (no necesariamente la
+     * base): a diferencia de agregarProducto(), que siempre resuelve la presentación base.
+     */
+    public function agregarPresentacion(int $presentacionId): void
+    {
+        $presentacion = ProductoPresentacion::query()
+            ->where('empresa_id', $this->empresaId())
+            ->where('activa', true)
+            ->with('producto')
+            ->find($presentacionId);
+
+        if ($presentacion === null || $presentacion->producto === null) {
+            return;
+        }
+
+        if (! $this->validarProductoParaVenta($presentacion->producto)) {
+            return;
+        }
+
+        $this->agregarLineaContable($presentacion->producto, $presentacion);
         $this->busquedaProducto = '';
     }
 
