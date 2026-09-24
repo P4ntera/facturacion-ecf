@@ -13,6 +13,7 @@ use App\Models\DevolucionCompra;
 use App\Services\DevolucionCompraService;
 use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
+use Filament\Facades\Filament;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Hidden;
@@ -71,10 +72,15 @@ class DevolucionCompraResource extends Resource
                 ->schema([
                     Select::make('compra_id')
                         ->label('Compra')
+                        // Scope manual obligatorio — Filament NO aplica tenant scope dentro de
+                        // ->relationship(), ni siquiera dentro de su propio Resource.
                         ->relationship(
                             name: 'compra',
                             titleAttribute: 'ncf',
-                            modifyQueryUsing: fn (Builder $query) => $query->where('estado', EstadoCompra::REGISTRADA)->with('proveedor'),
+                            modifyQueryUsing: fn (Builder $query) => $query
+                                ->where('empresa_id', Filament::getTenant()->id)
+                                ->where('estado', EstadoCompra::REGISTRADA)
+                                ->with('proveedor'),
                         )
                         ->getOptionLabelFromRecordUsing(fn (Compra $record) => sprintf(
                             '%s — %s — %s',

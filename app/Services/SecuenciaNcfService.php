@@ -7,6 +7,7 @@ namespace App\Services;
 use App\Enums\TipoComprobante;
 use App\Exceptions\RangoNcfSolapadoException;
 use App\Exceptions\SecuenciaNcfAgotadaException;
+use App\Models\Empresa;
 use App\Models\SecuenciaNcf;
 use App\Models\User;
 use Filament\Notifications\Notification;
@@ -24,10 +25,15 @@ class SecuenciaNcfService
      * Asigna y CONSUME el siguiente e-NCF para un tipo de comprobante.
      * Debe ejecutarse DENTRO de una transacción (la abre el llamador, p. ej. VentaService):
      * usa lockForUpdate para que dos ventas simultáneas no tomen el mismo número.
+     *
+     * $empresa la resuelve el llamador explícitamente (igual que VentaService/CompraService):
+     * sin filtrar por empresa_id aquí, dos empresas con secuencias activas del mismo
+     * tipo_comprobante podrían "robarse" el contador la una a la otra.
      */
-    public function siguiente(TipoComprobante $tipo): string
+    public function siguiente(TipoComprobante $tipo, Empresa $empresa): string
     {
         $secuencia = SecuenciaNcf::query()
+            ->where('empresa_id', $empresa->id)
             ->where('tipo_comprobante', $tipo)
             ->where('activa', true)
             ->lockForUpdate()
@@ -48,7 +54,7 @@ class SecuenciaNcfService
             $secuencia->activa = false;
             $secuencia->save();
 
-            $siguiente = $this->buscarSiguienteEncolado($tipo, $secuencia);
+            $siguiente = $this->buscarSiguienteEncolado($tipo, $secuencia, $empresa);
 
             if ($siguiente === null) {
                 throw new SecuenciaNcfAgotadaException(
@@ -81,9 +87,10 @@ class SecuenciaNcfService
     }
 
     /** Muestra el próximo e-NCF SIN consumirlo (para la UI). Null si no hay disponible. */
-    public function previsualizarSiguiente(TipoComprobante $tipo): ?string
+    public function previsualizarSiguiente(TipoComprobante $tipo, Empresa $empresa): ?string
     {
         $secuencia = SecuenciaNcf::query()
+            ->where('empresa_id', $empresa->id)
             ->where('tipo_comprobante', $tipo)
             ->where('activa', true)
             ->first();
@@ -98,7 +105,7 @@ class SecuenciaNcfService
 
         // El activo está agotado/vencido: si ya hay un rango consecutivo encolado, el próximo
         // e-NCF real saldrá de ahí en cuanto se consuma (ver siguiente()).
-        $siguiente = $this->buscarSiguienteEncolado($tipo, $secuencia);
+        $siguiente = $this->buscarSiguienteEncolado($tipo, $secuencia, $empresa);
 
         if ($siguiente === null || ! $this->tieneDisponibles($siguiente)) {
             return null;
@@ -146,9 +153,10 @@ class SecuenciaNcfService
      * Sugiere la próxima "secuencia_desde" para un tipo/prefijo: continúa después del rango
      * cargado más alto, o 1 si todavía no hay ninguno.
      */
-    public function sugerirSecuenciaDesde(TipoComprobante $tipo, string $prefijo): int
+    public function sugerirSecuenciaDesde(TipoComprobante $tipo, string $prefijo, Empresa $empresa): int
     {
         $maximoHasta = SecuenciaNcf::query()
+            ->where('empresa_id', $empresa->id)
             ->where('tipo_comprobante', $tipo)
             ->where('prefijo', $prefijo)
             ->max('secuencia_hasta');
@@ -160,9 +168,10 @@ class SecuenciaNcfService
      * true si ya existe un rango activo para ese tipo de comprobante (excluyendo, si aplica,
      * el propio registro que se está editando).
      */
-    public function existeRangoActivo(TipoComprobante $tipo, ?int $ignorarId = null): bool
+    public function existeRangoActivo(TipoComprobante $tipo, Empresa $empresa, ?int $ignorarId = null): bool
     {
         return SecuenciaNcf::query()
+            ->where('empresa_id', $empresa->id)
             ->where('tipo_comprobante', $tipo)
             ->where('activa', true)
             ->when($ignorarId, fn ($query) => $query->whereKeyNot($ignorarId))
@@ -178,9 +187,11 @@ class SecuenciaNcfService
         string $prefijo,
         int $desde,
         int $hasta,
+        Empresa $empresa,
         ?int $ignorarId = null,
     ): void {
         $rangos = SecuenciaNcf::query()
+            ->where('empresa_id', $empresa->id)
             ->where('tipo_comprobante', $tipo)
             ->where('prefijo', $prefijo)
             ->when($ignorarId, fn ($query) => $query->whereKeyNot($ignorarId))
@@ -206,9 +217,16 @@ class SecuenciaNcfService
      */
     public function activarManualmente(SecuenciaNcf $secuencia): void
     {
-        $secuencia = SecuenciaNcf::query()->whereKey($secuencia->getKey())->lockForUpdate()->firstOrFail();
+        // empresa_id se deriva del propio $secuencia (entidad ya validada), no de un parámetro
+        // separado ni de Filament::getTenant(): este método puede invocarse fuera del ciclo de
+        // vida de una request de panel.
+        $secuencia = SecuenciaNcf::query()
+            ->where('empresa_id', $secuencia->empresa_id)
+            ->whereKey($secuencia->getKey())
+            ->lockForUpdate()
+            ->firstOrFail();
 
-        if ($this->existeRangoActivo($secuencia->tipo_comprobante, ignorarId: $secuencia->id)) {
+        if ($this->existeRangoActivo($secuencia->tipo_comprobante, $secuencia->empresa, ignorarId: $secuencia->id)) {
             throw new RangoNcfSolapadoException(
                 "Ya hay una secuencia activa para el comprobante {$secuencia->tipo_comprobante->value}; "
                 .'desactívala antes de activar este rango.'
@@ -220,13 +238,14 @@ class SecuenciaNcfService
     }
 
     /** Busca el rango encolado consecutivo (secuencia_desde = hasta_agotado + 1) del mismo tipo. */
-    private function buscarSiguienteEncolado(TipoComprobante $tipo, SecuenciaNcf $agotado): ?SecuenciaNcf
+    private function buscarSiguienteEncolado(TipoComprobante $tipo, SecuenciaNcf $agotado, Empresa $empresa): ?SecuenciaNcf
     {
         if ($agotado->secuencia_hasta === null) {
             return null;
         }
 
         return SecuenciaNcf::query()
+            ->where('empresa_id', $empresa->id)
             ->where('tipo_comprobante', $tipo)
             ->where('activa', false)
             ->where('secuencia_desde', (int) $agotado->secuencia_hasta + 1)

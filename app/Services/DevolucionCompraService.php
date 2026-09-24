@@ -10,6 +10,7 @@ use App\Models\Compra;
 use App\Models\DetalleCompra;
 use App\Models\DetalleDevolucionCompra;
 use App\Models\DevolucionCompra;
+use App\Models\Empresa;
 use App\Models\Producto;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -37,7 +38,7 @@ class DevolucionCompraService
      *   }>
      * } $datos
      */
-    public function crear(array $datos, int $userId): DevolucionCompra
+    public function crear(array $datos, int $userId, Empresa $empresa): DevolucionCompra
     {
         // Descarta líneas incompletas (p. ej. una fila del repeater sin producto seleccionado)
         // en vez de dejar que revienten más abajo con un ModelNotFoundException.
@@ -50,8 +51,8 @@ class DevolucionCompraService
             throw new RuntimeException('La devolución debe tener al menos una línea.');
         }
 
-        return DB::transaction(function () use ($datos, $userId) {
-            $compra = Compra::findOrFail($datos['compra_id']);
+        return DB::transaction(function () use ($datos, $userId, $empresa) {
+            $compra = Compra::where('empresa_id', $empresa->id)->findOrFail($datos['compra_id']);
 
             if ($compra->estaAnulada()) {
                 throw new RuntimeException('No se puede devolver mercancía de una compra anulada.');
@@ -120,7 +121,7 @@ class DevolucionCompraService
                     'subtotal' => $linea['subtotal'],
                 ]);
 
-                $producto = Producto::find($linea['producto_id']);
+                $producto = Producto::where('empresa_id', $empresa->id)->find($linea['producto_id']);
 
                 if ($producto) {
                     $this->inventarioService->registrarMovimiento(

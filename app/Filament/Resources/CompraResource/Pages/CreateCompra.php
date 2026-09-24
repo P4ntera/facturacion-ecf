@@ -7,6 +7,7 @@ use App\Exceptions\StockInsuficienteException;
 use App\Filament\Resources\CompraResource;
 use App\Services\CompraService;
 use Filament\Actions\Action;
+use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Support\Exceptions\Halt;
@@ -96,7 +97,7 @@ class CreateCompra extends CreateRecord
                 'tipo_pago'            => $data['tipo_pago'] ?? null,
                 'fecha_vencimiento'    => $data['fecha_vencimiento'] ?? null,
                 'lineas'               => $data['lineas'],
-            ], auth()->id());
+            ], auth()->id(), Filament::getTenant());
         } catch (RuntimeException|StockInsuficienteException $e) {
             Notification::make()->title($e->getMessage())->danger()->send();
 

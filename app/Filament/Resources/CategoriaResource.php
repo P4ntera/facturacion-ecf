@@ -6,6 +6,7 @@ use App\Enums\Modulo;
 use App\Filament\Concerns\RestringidoPorModulo;
 use App\Filament\Resources\CategoriaResource\Pages;
 use App\Models\Categoria;
+use Filament\Facades\Filament;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -45,6 +46,7 @@ class CategoriaResource extends Resource
             TextInput::make('nombre')
                 ->label('Nombre')
                 ->required()
+                ->unique(ignoreRecord: true, modifyRuleUsing: fn ($rule) => $rule->where('empresa_id', Filament::getTenant()->id))
                 ->maxLength(255)
                 ->columnSpanFull(),
 

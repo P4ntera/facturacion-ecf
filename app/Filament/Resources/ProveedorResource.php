@@ -11,6 +11,7 @@ use App\Models\Proveedor;
 use App\Services\DgiiRncService;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
+use Filament\Facades\Filament;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -62,7 +63,7 @@ class ProveedorResource extends Resource
                     TextInput::make('rnc')
                         ->label('RNC / Cédula')
                         ->required()
-                        ->unique(ignoreRecord: true)
+                        ->unique(ignoreRecord: true, modifyRuleUsing: fn ($rule) => $rule->where('empresa_id', Filament::getTenant()->id))
                         ->maxLength(11)
                         ->minLength(9)
                         ->numeric()

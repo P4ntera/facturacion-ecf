@@ -78,7 +78,7 @@ class VentaService
                 throw new VentaInvalidaException('La venta debe tener al menos una línea.');
             }
 
-            $cliente = Cliente::find($datos['cliente_id'] ?? null);
+            $cliente = Cliente::where('empresa_id', $empresa->id)->find($datos['cliente_id'] ?? null);
 
             if ($cliente === null || ! $cliente->activo) {
                 throw new VentaInvalidaException('El cliente indicado no existe o está inactivo.');
@@ -88,7 +88,7 @@ class VentaService
             $estrategia = $config->precio_incluye_itbis ? new ConItbisIncluido : new SinItbisIncluido;
             $descuentoGlobal = $this->aMoneda($datos['descuento_global'] ?? '0');
 
-            [$detalles, $productosLineas, $acumulado] = $this->procesarLineas($lineas, $config, $estrategia);
+            [$detalles, $productosLineas, $acumulado] = $this->procesarLineas($lineas, $config, $estrategia, $empresa);
 
             $total = $this->calcularTotalFinal($acumulado, $descuentoGlobal);
 
@@ -104,7 +104,7 @@ class VentaService
             // Se asigna DESPUÉS de validar: si algo más falla y la transacción hace rollback, el
             // e-NCF no se "quema" (el contador también se revierte). Sin e-CF activo, la venta no
             // consume secuencia ni lleva NCF.
-            $ncf = $usaEcf ? $this->ncfService->siguiente($tipoComprobante) : null;
+            $ncf = $usaEcf ? $this->ncfService->siguiente($tipoComprobante, $empresa) : null;
 
             $tipoPago = $datos['tipo_pago'] ?? TipoPago::CONTADO;
             $tipoPago = $tipoPago instanceof TipoPago ? $tipoPago : TipoPago::from((int) $tipoPago);
@@ -197,7 +197,7 @@ class VentaService
         $estrategia = $config->precio_incluye_itbis ? new ConItbisIncluido : new SinItbisIncluido;
         $descuentoGlobal = $this->aMoneda($datos['descuento_global'] ?? '0');
 
-        [, , $acumulado] = $this->procesarLineas($lineas, $config, $estrategia);
+        [, , $acumulado] = $this->procesarLineas($lineas, $config, $estrategia, $empresa);
 
         return [
             ...$acumulado,
@@ -305,7 +305,7 @@ class VentaService
      *
      * @throws VentaInvalidaException
      */
-    private function procesarLineas(array $lineas, EmpresaConfiguracion $config, ImpuestoStrategy $estrategia): array
+    private function procesarLineas(array $lineas, EmpresaConfiguracion $config, ImpuestoStrategy $estrategia, Empresa $empresa): array
     {
         $detalles = [];
         $productosLineas = [];
@@ -326,7 +326,7 @@ class VentaService
                 throw new VentaInvalidaException('La cantidad de cada línea debe ser mayor que cero.');
             }
 
-            $producto = Producto::find($linea['producto_id'] ?? null);
+            $producto = Producto::where('empresa_id', $empresa->id)->find($linea['producto_id'] ?? null);
 
             if ($producto === null || ! $producto->activo) {
                 $idProducto = $linea['producto_id'] ?? 'desconocido';

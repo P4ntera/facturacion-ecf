@@ -21,6 +21,7 @@ use App\Services\Impresion\ImpresionService;
 use App\Services\VentaService;
 use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
+use Filament\Facades\Filament;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Textarea;
 use Filament\Infolists\Components\RepeatableEntry;
@@ -252,7 +253,9 @@ class VentaResource extends Resource
 
                 SelectFilter::make('cliente_id')
                     ->label('Cliente')
-                    ->relationship('cliente', 'nombre')
+                    // Scope manual obligatorio — Filament NO aplica tenant scope dentro de
+                    // ->relationship(), ni siquiera dentro de su propio Resource.
+                    ->relationship('cliente', 'nombre', modifyQueryUsing: fn (Builder $query) => $query->where('empresa_id', Filament::getTenant()->id))
                     ->searchable(),
 
                 Filter::make('fecha')

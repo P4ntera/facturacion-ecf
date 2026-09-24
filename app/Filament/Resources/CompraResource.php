@@ -20,6 +20,7 @@ use App\Services\CompraService;
 use App\Services\DgiiRncService;
 use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
+use Filament\Facades\Filament;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Hidden;
@@ -78,7 +79,9 @@ class CompraResource extends Resource
                 ->schema([
                     Select::make('proveedor_id')
                         ->label('Proveedor')
-                        ->relationship('proveedor', 'nombre')
+                        // Scope manual obligatorio — Filament NO aplica tenant scope dentro de
+                        // ->relationship(), ni siquiera dentro de su propio Resource.
+                        ->relationship('proveedor', 'nombre', modifyQueryUsing: fn (Builder $query) => $query->where('empresa_id', Filament::getTenant()->id))
                         ->searchable()
                         ->preload()
                         ->live()
@@ -87,7 +90,7 @@ class CompraResource extends Resource
                             TextInput::make('rnc')
                                 ->label('RNC / Cédula')
                                 ->required()
-                                ->unique(table: 'proveedores', ignoreRecord: true)
+                                ->unique(table: 'proveedores', ignoreRecord: true, modifyRuleUsing: fn ($rule) => $rule->where('empresa_id', Filament::getTenant()->id))
                                 ->maxLength(11)
                                 ->minLength(9)
                                 ->numeric()
@@ -240,7 +243,7 @@ class CompraResource extends Resource
                             }
 
                             $service = app(CompraService::class);
-                            $calc = $service->calcularLineas($lineas, (bool) $get('itbis_incluido'));
+                            $calc = $service->calcularLineas($lineas, (bool) $get('itbis_incluido'), Filament::getTenant());
                             $totales = $service->calcularTotales($calc);
 
                             $diferencia = round((float) $montoFactura - $totales['total'], 2);
@@ -267,12 +270,12 @@ class CompraResource extends Resource
                         ->hiddenLabel()
                         ->placeholder('Selecciona un producto…')
                         ->actionSchemaModel(Producto::class)
-                        // Producto::query() ya sale filtrado a la empresa actual: Filament
-                        // registra un global scope sobre el modelo en cuanto ProductoResource
-                        // existe (BelongsToTenant::registerTenancyModelGlobalScope), así que
-                        // aplica sin importar si la consulta viene de un ->relationship() o,
-                        // como aquí, de un ->options() manual.
-                        ->options(fn () => Producto::query()->activos()->pluck('nombre', 'id'))
+                        // Scope manual obligatorio — Filament NO aplica tenant scope en queries
+                        // dentro de options().
+                        ->options(fn () => Producto::query()
+                            ->where('empresa_id', Filament::getTenant()->id)
+                            ->activos()
+                            ->pluck('nombre', 'id'))
                         ->searchable()
                         ->preload()
                         ->live()
@@ -285,7 +288,7 @@ class CompraResource extends Resource
                             TextInput::make('codigo')
                                 ->label('Código')
                                 ->required()
-                                ->unique(table: 'productos', ignoreRecord: true)
+                                ->unique(table: 'productos', ignoreRecord: true, modifyRuleUsing: fn ($rule) => $rule->where('empresa_id', Filament::getTenant()->id))
                                 ->maxLength(50),
                             TextInput::make('nombre')
                                 ->label('Nombre')
@@ -412,7 +415,7 @@ class CompraResource extends Resource
                             }
 
                             $service = app(CompraService::class);
-                            $calc = $service->calcularLineas($lineas, (bool) $get('itbis_incluido'));
+                            $calc = $service->calcularLineas($lineas, (bool) $get('itbis_incluido'), Filament::getTenant());
                             $totales = $service->calcularTotales($calc);
 
                             return sprintf(
@@ -570,7 +573,9 @@ class CompraResource extends Resource
             ->filters([
                 SelectFilter::make('proveedor_id')
                     ->label('Proveedor')
-                    ->relationship('proveedor', 'nombre')
+                    // Scope manual obligatorio — Filament NO aplica tenant scope dentro de
+                    // ->relationship(), ni siquiera dentro de su propio Resource.
+                    ->relationship('proveedor', 'nombre', modifyQueryUsing: fn (Builder $query) => $query->where('empresa_id', Filament::getTenant()->id))
                     ->searchable()
                     ->preload(),
 

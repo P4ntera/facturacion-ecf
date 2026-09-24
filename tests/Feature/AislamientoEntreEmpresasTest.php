@@ -2,7 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Enums\EstadoFiscal;
+use App\Enums\EstadoVenta;
 use App\Enums\TasaItbis;
+use App\Enums\TipoComprobante;
 use App\Enums\TipoDocumentoCliente;
 use App\Enums\TipoProducto;
 use App\Enums\TipoProveedor;
@@ -22,13 +25,19 @@ use App\Models\Descuento;
 use App\Models\Empresa;
 use App\Models\Producto;
 use App\Models\Proveedor;
+use App\Models\SecuenciaNcf;
 use App\Models\User;
+use App\Models\Venta;
 use App\Services\ArqueoCajaService;
+use App\Services\CompraService;
+use App\Services\DevolucionCompraService;
 use App\Services\PedidoCompraService;
 use App\Services\RolesEmpresaService;
+use App\Services\SecuenciaNcfService;
 use App\Services\VentaService;
 use Database\Seeders\RolePermissionSeeder;
 use Filament\Facades\Filament;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use RuntimeException;
@@ -518,5 +527,241 @@ class AislamientoEntreEmpresasTest extends TestCase
             ->assertHasNoFormErrors();
 
         $this->assertDatabaseHas('descuentos', ['nombre' => 'Nuevo descuento', 'empresa_id' => $empresaA->id]);
+    }
+
+    /**
+     * 15. VentaService::registrar() rechaza un cliente de OTRA empresa aunque el id exista.
+     * A diferencia de CompraService/DevolucionCompraService (que usan findOrFail y dejan que
+     * ModelNotFoundException se propague), VentaService valida con find() + null-check propio
+     * y lanza VentaInvalidaException — mismo resultado (rechaza el cruce), excepción distinta.
+     */
+    public function test_15_venta_no_permite_cliente_de_otra_empresa(): void
+    {
+        ['empresa' => $empresaA, 'producto' => $productoA] = $this->crearEmpresaConDatos('Empresa A', '131000001');
+        ['cliente' => $clienteTobogan] = $this->crearEmpresaConDatos('Tobogán', '131000002');
+
+        $empresaA->refresh();
+        $this->comoEmpresa($empresaA);
+
+        $this->expectException(VentaInvalidaException::class);
+        $this->expectExceptionMessage('El cliente indicado no existe o está inactivo.');
+
+        app(VentaService::class)->registrar([
+            'cliente_id' => $clienteTobogan->id,
+            'lineas' => [['producto_id' => $productoA->id, 'cantidad' => 1]],
+        ], $empresaA);
+    }
+
+    /** 16. VentaService::registrar() rechaza un producto de OTRA empresa aunque el id exista. */
+    public function test_16_venta_no_permite_producto_de_otra_empresa(): void
+    {
+        ['empresa' => $empresaA, 'cliente' => $clienteA] = $this->crearEmpresaConDatos('Empresa A', '131000001');
+        ['producto' => $productoTobogan] = $this->crearEmpresaConDatos('Tobogán', '131000002');
+
+        $empresaA->refresh();
+        $this->comoEmpresa($empresaA);
+
+        $this->expectException(VentaInvalidaException::class);
+
+        app(VentaService::class)->registrar([
+            'cliente_id' => $clienteA->id,
+            'lineas' => [['producto_id' => $productoTobogan->id, 'cantidad' => 1]],
+        ], $empresaA);
+    }
+
+    /** 17. CompraService::crear() rechaza un proveedor de OTRA empresa aunque el id exista. */
+    public function test_17_compra_no_permite_proveedor_de_otra_empresa(): void
+    {
+        ['empresa' => $empresaA, 'admin' => $adminA, 'producto' => $productoA] =
+            $this->crearEmpresaConDatos('Empresa A', '131000001');
+        ['proveedor' => $proveedorTobogan] = $this->crearEmpresaConDatos('Tobogán', '131000002');
+
+        $this->comoEmpresa($empresaA);
+
+        $this->expectException(ModelNotFoundException::class);
+
+        app(CompraService::class)->crear([
+            'proveedor_id' => $proveedorTobogan->id,
+            'tipo_comprobante' => TipoComprobante::COMPRAS,
+            'ncf' => null,
+            'fecha' => now(),
+            'itbis_incluido' => false,
+            'lineas' => [
+                ['producto_id' => $productoA->id, 'cantidad' => 1, 'costo_unitario' => 10],
+            ],
+        ], $adminA->id, $empresaA);
+    }
+
+    /** 18. CompraService::crear() rechaza un producto de OTRA empresa aunque el id exista. */
+    public function test_18_compra_no_permite_producto_de_otra_empresa(): void
+    {
+        ['empresa' => $empresaA, 'admin' => $adminA, 'proveedor' => $proveedorA] =
+            $this->crearEmpresaConDatos('Empresa A', '131000001');
+        ['producto' => $productoTobogan] = $this->crearEmpresaConDatos('Tobogán', '131000002');
+
+        $this->comoEmpresa($empresaA);
+
+        $this->expectException(ModelNotFoundException::class);
+
+        app(CompraService::class)->crear([
+            'proveedor_id' => $proveedorA->id,
+            'tipo_comprobante' => TipoComprobante::COMPRAS,
+            'ncf' => null,
+            'fecha' => now(),
+            'itbis_incluido' => false,
+            'lineas' => [
+                ['producto_id' => $productoTobogan->id, 'cantidad' => 1, 'costo_unitario' => 10],
+            ],
+        ], $adminA->id, $empresaA);
+    }
+
+    /** 19. DevolucionCompraService::crear() rechaza una compra de OTRA empresa aunque el id exista. */
+    public function test_19_devolucion_no_permite_compra_de_otra_empresa(): void
+    {
+        ['empresa' => $empresaA, 'admin' => $adminA] = $this->crearEmpresaConDatos('Empresa A', '131000001');
+        ['empresa' => $empresaTobogan, 'admin' => $adminTobogan, 'producto' => $productoTobogan, 'proveedor' => $proveedorTobogan] =
+            $this->crearEmpresaConDatos('Tobogán', '131000002');
+
+        $this->comoEmpresa($empresaTobogan);
+        $compraTobogan = app(CompraService::class)->crear([
+            'proveedor_id' => $proveedorTobogan->id,
+            'tipo_comprobante' => TipoComprobante::COMPRAS,
+            'ncf' => null,
+            'fecha' => now(),
+            'itbis_incluido' => false,
+            'lineas' => [
+                ['producto_id' => $productoTobogan->id, 'cantidad' => 5, 'costo_unitario' => 10],
+            ],
+        ], $adminTobogan->id, $empresaTobogan);
+        $detalleTobogan = $compraTobogan->detalles()->first();
+
+        $this->comoEmpresa($empresaA);
+
+        $this->expectException(ModelNotFoundException::class);
+
+        app(DevolucionCompraService::class)->crear([
+            'compra_id' => $compraTobogan->id,
+            'fecha' => now(),
+            'motivo' => 'Intento cruzado',
+            'lineas' => [
+                ['detalle_compra_id' => $detalleTobogan->id, 'cantidad' => 1],
+            ],
+        ], $adminA->id, $empresaA);
+    }
+
+    /**
+     * 20. SecuenciaNcfService::siguiente() nunca consume el contador de la secuencia activa de
+     * OTRA empresa, aunque ambas tengan una secuencia activa del mismo tipo_comprobante (bug real
+     * detectado y corregido en F3.5: antes de la corrección, esto podía "robarle" el NCF a otra
+     * empresa).
+     */
+    public function test_20_secuencia_ncf_no_consume_secuencia_de_otra_empresa(): void
+    {
+        ['empresa' => $empresaA] = $this->crearEmpresaConDatos('Empresa A', '131000001');
+        ['empresa' => $empresaTobogan] = $this->crearEmpresaConDatos('Tobogán', '131000002');
+
+        $secuenciaA = SecuenciaNcf::create([
+            'empresa_id' => $empresaA->id,
+            'tipo_comprobante' => TipoComprobante::FACTURA_CREDITO_FISCAL->value,
+            'prefijo' => 'E31',
+            'secuencia_desde' => 1,
+            'secuencia_actual' => 1,
+            'secuencia_hasta' => 100,
+            'vencimiento' => today()->addYear(),
+            'activa' => true,
+        ]);
+
+        $secuenciaTobogan = SecuenciaNcf::create([
+            'empresa_id' => $empresaTobogan->id,
+            'tipo_comprobante' => TipoComprobante::FACTURA_CREDITO_FISCAL->value,
+            'prefijo' => 'E31',
+            'secuencia_desde' => 500,
+            'secuencia_actual' => 500,
+            'secuencia_hasta' => 600,
+            'vencimiento' => today()->addYear(),
+            'activa' => true,
+        ]);
+
+        $this->comoEmpresa($empresaA);
+
+        $ncf = app(SecuenciaNcfService::class)->siguiente(TipoComprobante::FACTURA_CREDITO_FISCAL, $empresaA);
+
+        $this->assertSame('E310000000001', $ncf);
+        $this->assertEquals(2, $secuenciaA->fresh()->secuencia_actual);
+        $this->assertEquals(500, $secuenciaTobogan->fresh()->secuencia_actual);
+    }
+
+    /** 21. El código de producto es único POR EMPRESA (F2): dos empresas pueden compartir el mismo código. */
+    public function test_21_unicidad_codigo_producto_es_por_empresa(): void
+    {
+        ['empresa' => $empresaA] = $this->crearEmpresaConDatos('Empresa A', '131000001');
+        ['empresa' => $empresaTobogan] = $this->crearEmpresaConDatos('Tobogán', '131000002');
+
+        $productoA = Producto::create([
+            'empresa_id' => $empresaA->id,
+            'codigo' => 'PROD-001',
+            'nombre' => 'Producto compartido A',
+            'tipo' => TipoProducto::PRODUCTO,
+            'costo' => 10,
+            'precio' => 20,
+            'tasa_itbis' => TasaItbis::DIECIOCHO,
+            'controla_stock' => false,
+            'stock' => 0,
+            'stock_minimo' => 0,
+            'activo' => true,
+        ]);
+
+        $productoTobogan = Producto::create([
+            'empresa_id' => $empresaTobogan->id,
+            'codigo' => 'PROD-001',
+            'nombre' => 'Producto compartido Tobogán',
+            'tipo' => TipoProducto::PRODUCTO,
+            'costo' => 10,
+            'precio' => 20,
+            'tasa_itbis' => TasaItbis::DIECIOCHO,
+            'controla_stock' => false,
+            'stock' => 0,
+            'stock_minimo' => 0,
+            'activo' => true,
+        ]);
+
+        $this->assertDatabaseHas('productos', ['id' => $productoA->id, 'codigo' => 'PROD-001', 'empresa_id' => $empresaA->id]);
+        $this->assertDatabaseHas('productos', ['id' => $productoTobogan->id, 'codigo' => 'PROD-001', 'empresa_id' => $empresaTobogan->id]);
+    }
+
+    /** 22. El NCF de una venta es único POR EMPRESA (F2): dos empresas pueden emitir el mismo NCF. */
+    public function test_22_unicidad_ncf_es_por_empresa(): void
+    {
+        ['empresa' => $empresaA, 'cliente' => $clienteA] = $this->crearEmpresaConDatos('Empresa A', '131000001');
+        ['empresa' => $empresaTobogan, 'cliente' => $clienteTobogan] = $this->crearEmpresaConDatos('Tobogán', '131000002');
+
+        $ventaA = Venta::create([
+            'empresa_id' => $empresaA->id,
+            'cliente_id' => $clienteA->id,
+            'tipo_comprobante' => TipoComprobante::FACTURA_CONSUMO,
+            'ncf' => 'B0100000001',
+            'fecha' => now(),
+            'subtotal' => '100.00',
+            'total_itbis' => '18.00',
+            'total' => '118.00',
+            'estado' => EstadoVenta::EMITIDA,
+            'estado_fiscal' => EstadoFiscal::NO_APLICA,
+        ]);
+
+        $ventaTobogan = Venta::create([
+            'empresa_id' => $empresaTobogan->id,
+            'cliente_id' => $clienteTobogan->id,
+            'tipo_comprobante' => TipoComprobante::FACTURA_CONSUMO,
+            'ncf' => 'B0100000001',
+            'fecha' => now(),
+            'subtotal' => '200.00',
+            'total_itbis' => '36.00',
+            'total' => '236.00',
+            'estado' => EstadoVenta::EMITIDA,
+            'estado_fiscal' => EstadoFiscal::NO_APLICA,
+        ]);
+
+        $this->assertDatabaseHas('ventas', ['id' => $ventaA->id, 'ncf' => 'B0100000001', 'empresa_id' => $empresaA->id]);
+        $this->assertDatabaseHas('ventas', ['id' => $ventaTobogan->id, 'ncf' => 'B0100000001', 'empresa_id' => $empresaTobogan->id]);
     }
 }

@@ -6,6 +6,7 @@ use App\Enums\TipoComprobante;
 use App\Exceptions\RangoNcfSolapadoException;
 use App\Filament\Resources\SecuenciaNcfResource;
 use App\Services\SecuenciaNcfService;
+use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Support\Exceptions\Halt;
@@ -30,6 +31,7 @@ class EditSecuenciaNcf extends EditRecord
                 $data['prefijo'],
                 (int) $data['secuencia_desde'],
                 (int) $data['secuencia_hasta'],
+                Filament::getTenant(),
                 ignorarId: $this->record->id,
             );
         } catch (RangoNcfSolapadoException $e) {

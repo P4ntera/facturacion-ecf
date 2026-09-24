@@ -67,7 +67,7 @@ class CuentaPorPagarServiceTest extends TestCase
             'lineas' => [
                 ['producto_id' => $this->producto()->id, 'cantidad' => 10, 'costo_unitario' => 100],
             ],
-        ], $user->id);
+        ], $user->id, $this->empresaDefault);
     }
 
     public function test_compra_a_credito_crea_cuenta_por_pagar(): void
@@ -92,7 +92,7 @@ class CuentaPorPagarServiceTest extends TestCase
             'lineas' => [
                 ['producto_id' => $this->producto('CXP-CONTADO')->id, 'cantidad' => 1, 'costo_unitario' => 100],
             ],
-        ], $user->id);
+        ], $user->id, $this->empresaDefault);
 
         $this->assertNull($compra->cuentaPorPagar);
     }
@@ -171,7 +171,7 @@ class CuentaPorPagarServiceTest extends TestCase
             'lineas' => [
                 ['detalle_compra_id' => $detalle->id, 'cantidad' => 2],
             ],
-        ], $user->id);
+        ], $user->id, $this->empresaDefault);
 
         $this->assertEqualsWithDelta(944.00, (float) $compra->cuentaPorPagar->fresh()->monto_total, 0.01);
     }
@@ -189,7 +189,7 @@ class CuentaPorPagarServiceTest extends TestCase
             'lineas' => [
                 ['detalle_compra_id' => $detalle->id, 'cantidad' => 2],
             ],
-        ], $user->id);
+        ], $user->id, $this->empresaDefault);
 
         app(DevolucionCompraService::class)->anular($devolucion, 'Se recuperó la mercancía', $user->id);
 
@@ -219,6 +219,6 @@ class CuentaPorPagarServiceTest extends TestCase
             'lineas' => [
                 ['detalle_compra_id' => $detalle->id, 'cantidad' => 2],
             ],
-        ], $user->id);
+        ], $user->id, $this->empresaDefault);
     }
 }

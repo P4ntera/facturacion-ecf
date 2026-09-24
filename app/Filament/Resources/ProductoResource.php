@@ -66,14 +66,14 @@ class ProductoResource extends Resource
                         TextInput::make('codigo')
                             ->label('Código')
                             ->required()
-                            ->unique(ignoreRecord: true)
+                            ->unique(ignoreRecord: true, modifyRuleUsing: fn ($rule) => $rule->where('empresa_id', Filament::getTenant()->id))
                             ->validationMessages(['unique' => 'Ya existe un producto con este código.'])
                             ->maxLength(50),
 
                         TextInput::make('codigo_barra')
                             ->label('Código de barras')
                             ->helperText('Escanea o escribe el código de barras.')
-                            ->unique(ignoreRecord: true)
+                            ->unique(ignoreRecord: true, modifyRuleUsing: fn ($rule) => $rule->where('empresa_id', Filament::getTenant()->id))
                             ->validationMessages(['unique' => 'Ya existe un producto con este código de barras.'])
                             ->maxLength(50),
 
@@ -123,7 +123,9 @@ class ProductoResource extends Resource
 
                         Select::make('categoria_id')
                             ->label('Categoría')
-                            ->relationship('categoria', 'nombre')
+                            // Scope manual obligatorio — Filament NO aplica tenant scope dentro de
+                            // ->relationship(), ni siquiera dentro de su propio Resource.
+                            ->relationship('categoria', 'nombre', modifyQueryUsing: fn (Builder $query) => $query->where('empresa_id', Filament::getTenant()->id))
                             ->searchable()
                             ->preload()
                             ->nullable(),
@@ -375,7 +377,9 @@ class ProductoResource extends Resource
                     ]),
                 SelectFilter::make('categoria_id')
                     ->label('Categoría')
-                    ->relationship('categoria', 'nombre'),
+                    // Scope manual obligatorio — Filament NO aplica tenant scope dentro de
+                    // ->relationship(), ni siquiera dentro de su propio Resource.
+                    ->relationship('categoria', 'nombre', modifyQueryUsing: fn (Builder $query) => $query->where('empresa_id', Filament::getTenant()->id)),
                 TernaryFilter::make('activo')->label('Activo')->default(true),
             ])
             ->recordActions([

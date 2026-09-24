@@ -11,6 +11,7 @@ use App\Enums\TipoPago;
 use App\Exceptions\CuentaConPagosRegistradosException;
 use App\Models\Compra;
 use App\Models\DetalleCompra;
+use App\Models\Empresa;
 use App\Models\Producto;
 use App\Models\ProductoProveedor;
 use App\Models\Proveedor;
@@ -42,7 +43,7 @@ class CompraService
      *   }>
      * } $datos  tipo_comprobante/ncf se ignoran y se autogeneran si el proveedor es informal.
      */
-    public function crear(array $datos, int $userId): Compra
+    public function crear(array $datos, int $userId, Empresa $empresa): Compra
     {
         // Descarta líneas incompletas (p. ej. una fila del repeater sin producto seleccionado)
         // en vez de dejar que revienten más abajo con un ModelNotFoundException.
@@ -55,11 +56,11 @@ class CompraService
             throw new RuntimeException('La compra debe tener al menos una línea.');
         }
 
-        return DB::transaction(function () use ($datos, $userId) {
-            $proveedor = Proveedor::findOrFail($datos['proveedor_id']);
+        return DB::transaction(function () use ($datos, $userId, $empresa) {
+            $proveedor = Proveedor::where('empresa_id', $empresa->id)->findOrFail($datos['proveedor_id']);
             $itbisIncluido = (bool) ($datos['itbis_incluido'] ?? false);
 
-            $detallesCalc = $this->calcularLineas($datos['lineas'], $itbisIncluido);
+            $detallesCalc = $this->calcularLineas($datos['lineas'], $itbisIncluido, $empresa);
             $totales = $this->calcularTotales($detallesCalc);
 
             // Proveedor informal: no emite comprobante fiscal propio, el sistema le genera
@@ -67,7 +68,7 @@ class CompraService
             // se registra el comprobante que el proveedor entregó, tal cual lo digitó el usuario.
             if ($proveedor->esInformal()) {
                 $tipoComprobante = TipoComprobante::COMPRAS;
-                $ncf = $this->ncfService->siguiente(TipoComprobante::COMPRAS);
+                $ncf = $this->ncfService->siguiente(TipoComprobante::COMPRAS, $empresa);
             } else {
                 $tipoComprobante = $datos['tipo_comprobante'] ?? TipoComprobante::COMPRAS;
                 $ncf = $datos['ncf'] ?? null;
@@ -110,7 +111,7 @@ class CompraService
                     'subtotal' => $linea['subtotal'],
                 ]);
 
-                $producto = Producto::find($linea['producto_id']);
+                $producto = Producto::where('empresa_id', $empresa->id)->find($linea['producto_id']);
                 if ($producto) {
                     $this->inventarioService->registrarMovimiento(
                         $producto,
@@ -203,10 +204,10 @@ class CompraService
      *
      * Público porque CompraResource lo reutiliza para previsualizar totales en vivo.
      */
-    public function calcularLineas(array $lineas, bool $itbisIncluido): array
+    public function calcularLineas(array $lineas, bool $itbisIncluido, Empresa $empresa): array
     {
-        return array_map(function (array $l) use ($itbisIncluido) {
-            $producto = Producto::findOrFail($l['producto_id']);
+        return array_map(function (array $l) use ($itbisIncluido, $empresa) {
+            $producto = Producto::where('empresa_id', $empresa->id)->findOrFail($l['producto_id']);
             $tasa = $producto->tasa_itbis;
             $porcentaje = $tasa->porcentaje();
             $cantidad = (float) $l['cantidad'];

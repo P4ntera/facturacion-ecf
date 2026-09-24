@@ -81,7 +81,12 @@ class UserResource extends Resource
             Select::make('impresora_facturacion_id')
                 ->label('Impresora de facturación')
                 ->helperText('Si el usuario tiene una asignada, se usa en vez de la predeterminada del módulo al imprimir tickets de venta.')
-                ->relationship('impresoraFacturacion', 'nombre', fn (Builder $query) => $query->activas()->porModulo(ModuloImpresion::FACTURACION))
+                // Scope manual obligatorio — Filament NO aplica tenant scope dentro de
+                // ->relationship(), ni siquiera dentro de su propio Resource.
+                ->relationship('impresoraFacturacion', 'nombre', fn (Builder $query) => $query
+                    ->where('empresa_id', Filament::getTenant()?->id)
+                    ->activas()
+                    ->porModulo(ModuloImpresion::FACTURACION))
                 ->preload()
                 ->native(false)
                 ->visible(fn (): bool => auth()->user()?->can('usuarios.gestionar') ?? false),

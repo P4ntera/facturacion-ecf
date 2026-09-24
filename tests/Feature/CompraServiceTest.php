@@ -51,7 +51,7 @@ class CompraServiceTest extends TestCase
             'lineas' => [
                 ['producto_id' => $producto->id, 'cantidad' => 5, 'costo_unitario' => 60],
             ],
-        ], $user->id);
+        ], $user->id, $this->empresaDefault);
 
         $this->assertEquals(EstadoCompra::REGISTRADA, $compra->estado);
         $this->assertEquals(300.00, (float) $compra->subtotal);
@@ -89,7 +89,7 @@ class CompraServiceTest extends TestCase
             'lineas' => [
                 ['producto_id' => $producto->id, 'cantidad' => 5, 'costo_unitario' => 60],
             ],
-        ], $user->id);
+        ], $user->id, $this->empresaDefault);
 
         $this->assertDatabaseHas('producto_proveedor', [
             'producto_id'      => $producto->id,
@@ -116,14 +116,14 @@ class CompraServiceTest extends TestCase
 
         $service->crear($datosCompra + ['lineas' => [
             ['producto_id' => $producto->id, 'cantidad' => 1, 'costo_unitario' => 60],
-        ]], $user->id);
+        ]], $user->id, $this->empresaDefault);
 
         // El usuario marca a mano este vínculo como no-principal antes de la segunda compra.
         $producto->proveedores()->updateExistingPivot($proveedor->id, ['es_principal' => false]);
 
         $service->crear($datosCompra + ['lineas' => [
             ['producto_id' => $producto->id, 'cantidad' => 1, 'costo_unitario' => 75],
-        ]], $user->id);
+        ]], $user->id, $this->empresaDefault);
 
         $this->assertDatabaseHas('producto_proveedor', [
             'producto_id'      => $producto->id,
@@ -148,7 +148,7 @@ class CompraServiceTest extends TestCase
             'lineas' => [
                 ['producto_id' => $producto->id, 'cantidad' => 1, 'costo_unitario' => 118],
             ],
-        ], $user->id);
+        ], $user->id, $this->empresaDefault);
 
         $detalle = $compra->detalles()->first();
         $this->assertEqualsWithDelta(100.00, (float) $detalle->costo_unitario, 0.01);
@@ -173,7 +173,7 @@ class CompraServiceTest extends TestCase
             'lineas' => [
                 ['producto_id' => $producto->id, 'cantidad' => 2, 'costo_unitario' => 40],
             ],
-        ], $user->id);
+        ], $user->id, $this->empresaDefault);
 
         $this->assertEquals(0.0, (float) $compra->itbis);
         $this->assertEquals(80.00, (float) $compra->total);
@@ -195,7 +195,7 @@ class CompraServiceTest extends TestCase
             'lineas' => [
                 ['producto_id' => $producto->id, 'cantidad' => 5, 'costo_unitario' => 60],
             ],
-        ], $user->id);
+        ], $user->id, $this->empresaDefault);
 
         $this->assertEquals(15, (float) $producto->fresh()->stock);
 
@@ -229,7 +229,7 @@ class CompraServiceTest extends TestCase
             'lineas' => [
                 ['producto_id' => $producto->id, 'cantidad' => 1, 'costo_unitario' => 10],
             ],
-        ], $user->id);
+        ], $user->id, $this->empresaDefault);
 
         $service->anular($compra, 'Motivo', $user->id);
 
@@ -253,7 +253,7 @@ class CompraServiceTest extends TestCase
                 ['producto_id' => $producto->id, 'cantidad' => 1, 'costo_unitario' => 55],
                 ['producto_id' => $producto->id, 'cantidad' => 1, 'costo_unitario' => 70],
             ],
-        ], $user->id);
+        ], $user->id, $this->empresaDefault);
 
         $this->assertEquals(70.00, (float) $producto->fresh()->costo);
     }
@@ -282,7 +282,7 @@ class CompraServiceTest extends TestCase
             'lineas' => [
                 ['producto_id' => $producto->id, 'cantidad' => 1, 'costo_unitario' => 10],
             ],
-        ], $user->id);
+        ], $user->id, $this->empresaDefault);
 
         $this->assertEquals(TipoComprobante::COMPRAS, $compra->tipo_comprobante);
         $this->assertEquals('B410000000001', $compra->ncf);
@@ -303,7 +303,7 @@ class CompraServiceTest extends TestCase
             'lineas' => [
                 ['producto_id' => $producto->id, 'cantidad' => 1, 'costo_unitario' => 10],
             ],
-        ], $user->id);
+        ], $user->id, $this->empresaDefault);
 
         $this->assertEquals(TipoComprobante::FACTURA_CREDITO_FISCAL, $compra->tipo_comprobante);
         $this->assertEquals('B0100000001', $compra->ncf);
@@ -327,7 +327,7 @@ class CompraServiceTest extends TestCase
             'lineas' => [
                 ['producto_id' => $producto->id, 'cantidad' => 5, 'costo_unitario' => 60],
             ],
-        ], $user->id);
+        ], $user->id, $this->empresaDefault);
 
         $this->assertEqualsWithDelta(354.00, (float) $compra->total, 0.01);
         $this->assertEqualsWithDelta(400.00, (float) $compra->monto_total_factura, 0.01);

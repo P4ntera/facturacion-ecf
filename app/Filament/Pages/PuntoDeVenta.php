@@ -622,7 +622,7 @@ class PuntoDeVenta extends Page
             return null;
         }
 
-        return app(SecuenciaNcfService::class)->previsualizarSiguiente(TipoComprobante::from($this->tipoComprobante));
+        return app(SecuenciaNcfService::class)->previsualizarSiguiente(TipoComprobante::from($this->tipoComprobante), $this->empresa());
     }
 
     /** @return array<string, string> */

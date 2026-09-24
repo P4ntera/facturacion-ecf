@@ -74,7 +74,7 @@ class DevolucionCompraResourceTest extends TestCase
             'lineas' => [
                 ['producto_id' => $producto->id, 'cantidad' => 5, 'costo_unitario' => 60],
             ],
-        ], $usuario->id);
+        ], $usuario->id, $this->empresaDefault);
 
         Livewire::actingAs($usuario)
             ->withQueryParams(['compra_id' => $compra->id])

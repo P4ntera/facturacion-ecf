@@ -214,7 +214,7 @@ class PedidoCompraResource extends Resource
                             }
 
                             $service = app(PedidoCompraService::class);
-                            $calc = $service->calcularLineas($lineas);
+                            $calc = $service->calcularLineas($lineas, Filament::getTenant());
                             $totales = $service->calcularTotales($calc);
 
                             return sprintf(

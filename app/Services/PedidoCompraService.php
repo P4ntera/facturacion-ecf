@@ -62,7 +62,7 @@ class PedidoCompraService
                 throw new RuntimeException('Uno o más productos del pedido no existen o no pertenecen a esta empresa.');
             }
 
-            $detallesCalc = $this->calcularLineas($datos['lineas']);
+            $detallesCalc = $this->calcularLineas($datos['lineas'], $empresa);
             $totales = $this->calcularTotales($detallesCalc);
 
             $pedido = PedidoCompra::create([
@@ -124,9 +124,9 @@ class PedidoCompraService
     }
 
     /** Reutiliza CompraService::calcularLineas() para que la tasa de ITBIS nunca se desincronice. */
-    public function calcularLineas(array $lineas): array
+    public function calcularLineas(array $lineas, Empresa $empresa): array
     {
-        return $this->compraService->calcularLineas($lineas, itbisIncluido: false);
+        return $this->compraService->calcularLineas($lineas, itbisIncluido: false, empresa: $empresa);
     }
 
     /** Reutiliza CompraService::calcularTotales(). */
