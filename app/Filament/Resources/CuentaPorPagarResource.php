@@ -52,7 +52,9 @@ class CuentaPorPagarResource extends Resource
 
     protected static ?string $slug = 'cuentas-por-pagar';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Cuentas';
+    protected static string|\UnitEnum|null $navigationGroup = 'Operaciones';
+
+    protected static ?int $navigationSort = 13;
 
     // Nace automáticamente al comprar a crédito (CompraService::crear()); no se crea a mano.
     public static function canCreate(): bool

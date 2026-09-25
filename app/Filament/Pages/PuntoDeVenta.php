@@ -46,8 +46,6 @@ class PuntoDeVenta extends Page
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedShoppingCart;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Ventas';
-
     protected static ?int $navigationSort = 2;
 
     protected static ?string $navigationLabel = 'Facturación';
@@ -96,7 +94,7 @@ class PuntoDeVenta extends Page
 
     public function mount(): void
     {
-        $this->tipoComprobante = $this->empresa()->config()->tipo_comprobante_defecto;
+        $this->tipoComprobante = TipoComprobante::defectoParaEmpresa($this->empresa()->config(), $this->usaEcf())->value;
         $this->clienteId = $this->clienteConsumidorFinal()->id;
         $this->recalcularTotales();
     }
@@ -212,7 +210,9 @@ class PuntoDeVenta extends Page
      */
     public function requiereRncComprador(): bool
     {
-        if (blank($this->tipoComprobante) || ! $this->usaEcf()) {
+        // La regla de RNC obligatorio es del TIPO de comprobante (Crédito Fiscal siempre; Consumo
+        // desde el umbral), no una particularidad del e-CF: aplica igual a un B01/B02 físico.
+        if (blank($this->tipoComprobante)) {
             return false;
         }
 
@@ -618,17 +618,27 @@ class PuntoDeVenta extends Page
 
     public function proximoNcf(): ?string
     {
-        if (blank($this->tipoComprobante) || ! $this->usaEcf()) {
+        if (blank($this->tipoComprobante)) {
             return null;
         }
 
+        // Un comprobante físico (tipo B) también tiene un próximo NCF real, solo que nunca se
+        // transmite al PAC — la previsualización aplica igual que para uno electrónico.
         return app(SecuenciaNcfService::class)->previsualizarSiguiente(TipoComprobante::from($this->tipoComprobante), $this->empresa());
     }
 
-    /** @return array<string, string> */
+    /**
+     * Tipos seleccionables en el POS: nunca los de Compras (no son de venta), y los electrónicos
+     * solo si la empresa tiene e-CF habilitado — sin esto, el selector ofrecería un tipo que
+     * VentaService::registrar() rechazaría al cobrar.
+     *
+     * @return array<string, string>
+     */
     public function tiposComprobante(): array
     {
         return collect(TipoComprobante::cases())
+            ->filter(fn (TipoComprobante $tipo) => $tipo->esDeVenta())
+            ->filter(fn (TipoComprobante $tipo) => $tipo->esFisico() || $this->usaEcf())
             ->mapWithKeys(fn (TipoComprobante $tipo) => [$tipo->value => "{$tipo->value} — {$tipo->etiqueta()}"])
             ->all();
     }

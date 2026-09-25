@@ -290,4 +290,48 @@ class EcfBuilderTest extends TestCase
         $this->assertSame('130987654', $comprador['RNCComprador']);
         $this->assertSame('Comercial Grande SRL', $comprador['RazonSocialComprador']);
     }
+
+    /** Una Nota de Crédito debe declarar NCFModificado en IdDoc (norma DGII). */
+    public function test_nota_de_credito_incluye_ncf_modificado_en_iddoc(): void
+    {
+        $this->secuencia(TipoComprobante::FACTURA_CONSUMO, 'E32');
+        $this->secuencia(TipoComprobante::NOTA_CREDITO, 'E34');
+
+        $producto = $this->producto('PCF-NC', TasaItbis::DIECIOCHO);
+        $cliente = Cliente::create(['nombre' => 'Cliente NC', 'activo' => true]);
+
+        $ventaOriginal = app(VentaService::class)->registrar([
+            'cliente_id' => $cliente->id,
+            'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
+        ], $this->empresaDefault);
+
+        $notaCredito = app(VentaService::class)->registrar([
+            'cliente_id' => $cliente->id,
+            'tipo_comprobante' => TipoComprobante::NOTA_CREDITO->value,
+            'ncf_modifica' => $ventaOriginal->ncf,
+            'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
+        ], $this->empresaDefault)->refresh();
+
+        $idDoc = app(EcfBuilder::class)->construir($notaCredito)['ECF']['Encabezado']['IdDoc'];
+
+        $this->assertSame($ventaOriginal->ncf, $idDoc['NCFModificado']);
+    }
+
+    /** Una venta normal (sin ncf_modifica) no debe llevar NCFModificado en el XML/JSON. */
+    public function test_venta_normal_no_incluye_ncf_modificado(): void
+    {
+        $this->secuencia(TipoComprobante::FACTURA_CONSUMO, 'E32');
+
+        $producto = $this->producto('PCF-SIN-NC', TasaItbis::DIECIOCHO);
+        $cliente = Cliente::create(['nombre' => 'Consumidor Final', 'activo' => true]);
+
+        $venta = app(VentaService::class)->registrar([
+            'cliente_id' => $cliente->id,
+            'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
+        ], $this->empresaDefault)->refresh();
+
+        $idDoc = app(EcfBuilder::class)->construir($venta)['ECF']['Encabezado']['IdDoc'];
+
+        $this->assertArrayNotHasKey('NCFModificado', $idDoc);
+    }
 }

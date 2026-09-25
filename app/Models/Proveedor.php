@@ -4,17 +4,17 @@ namespace App\Models;
 
 use App\Enums\TipoProveedor;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 
 class Proveedor extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory;
     use LogsActivity;
 
     protected $table = 'proveedores';
@@ -37,6 +37,11 @@ class Proveedor extends Model
         'tipo' => TipoProveedor::class,
         'activo' => 'boolean',
     ];
+
+    public function scopeActivos(Builder $query): Builder
+    {
+        return $query->where('activo', true);
+    }
 
     public function getActivitylogOptions(): LogOptions
     {

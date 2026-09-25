@@ -125,21 +125,329 @@
     color:var(--text-muted);
 }
 
-/*======== SIDEBAR: separado del contenido, ítem activo con tinte primary ========
+/*======== SIDEBAR: riel navy, independiente del resto del panel (claro) ========
    Filament deja el sidebar transparente en escritorio (`lg:bg-transparent`), así que hoy hereda
-   el fondo de `.fi-body` (--fondo-pagina) sin querer — se ve "pegado" al contenido. Se fuerza un
-   fondo casi blanco (--fondo-sidebar, un pelín distinto del blanco puro de las tarjetas) y un
-   borde derecho para separarlo. El ítem activo ya sale con texto/ícono primary por defecto de
-   Filament (ring-primary-700): solo hacía falta que el fondo detrás fuera un tinte de primary en
-   vez del gris genérico (bg-gray-100) que trae por defecto. */
+   el fondo de `.fi-body` sin querer. Se fuerza el navy del diseño aprobado (--fondo-sidebar) y se
+   recolorea texto/íconos/activo a mano: Filament pinta el ítem activo con su color 'primary'
+   (azul #5D87FF, pensado para fondo claro), que no combina con navy — por eso el color activo
+   sale de --sidebar-item-activo-texto/fondo en vez de dejarlo en manos de Filament. */
 
-.fi-sidebar{
+.fi-sidebar,
+.fi-sidebar-header-ctn,
+.fi-sidebar-header{
     background-color:var(--fondo-sidebar);
-    border-inline-end:1px solid var(--borde-tarjeta);
+    border-color:var(--sidebar-borde);
+}
+
+.fi-sidebar-header-ctn{
+    border-block-end:1px solid var(--sidebar-borde);
+}
+
+/* Texto/ícono de cada ítem: gris azulado por defecto, azul claro sobre fondo tintado si está
+   activo. El ícono hereda color via `currentColor` (así generan sus SVG los heroicons de
+   Filament), por eso alcanza con colorear el botón contenedor. */
+.fi-sidebar-item-btn{
+    color:var(--sidebar-item-texto);
+    border-radius:8px;
+    padding-block:10px;
+    padding-inline:12px;
+}
+
+.fi-sidebar-item-btn:hover{
+    background-color:var(--sidebar-hover-fondo);
+    color:var(--sidebar-usuario-nombre);
+}
+
+.fi-sidebar-item-icon{
+    height:18px;
+    width:18px;
 }
 
 .fi-sidebar-item.fi-active > .fi-sidebar-item-btn{
-    background-color:var(--primary-100);
+    background-color:var(--sidebar-item-activo-fondo) !important;
+    color:var(--sidebar-item-activo-texto) !important;
+}
+
+.fi-sidebar-item.fi-active > .fi-sidebar-item-btn .fi-sidebar-item-icon,
+.fi-sidebar-item.fi-active > .fi-sidebar-item-btn .fi-sidebar-item-label{
+    color:inherit !important;
+}
+
+.fi-sidebar-item.fi-active > .fi-sidebar-item-btn:hover{
+    background-color:var(--sidebar-item-activo-fondo) !important;
+}
+
+/* Labels de sección (Operaciones, Fiscal...): mayúsculas, tracking amplio, tenues — como
+   separador de contenido, no como otro nivel de navegación. */
+.fi-sidebar-group-label{
+    color:var(--sidebar-grupo-label);
+    text-transform:uppercase;
+    font-size:11px;
+    letter-spacing:0.05em;
+    font-weight:600;
+}
+
+.fi-sidebar-group-btn .fi-icon{
+    display:none;
+}
+
+.fi-sidebar-group-collapse-btn{
+    color:var(--sidebar-item-texto);
+}
+
+/* Quitar los dots/conectores de sub-items agrupados */
+.fi-sidebar-item-grouped-border{
+    display:none !important;
+}
+
+/* Spacing compacto */
+.fi-sidebar-item{
+    margin-bottom:0;
+}
+
+.fi-sidebar-group{
+    padding-block:4px;
+}
+
+/* Bloque de marca (logo): ver resources/views/vendor/filament-panels/components/logo.blade.php
+   —el override que arma el ícono "F" + nombre + empresa activa que pide el diseño. El mismo
+   componente se reusa en el topbar (mobile) y en las páginas "simple" (login...), ambas sobre
+   fondo claro: los colores de texto por defecto son para fondo claro, y solo se invierten a
+   blanco/slate DENTRO del sidebar (.fi-sidebar-header), que es navy. El ícono no necesita este
+   escalonado: el chip azul sólido se lee bien sobre cualquier fondo. */
+.sidebar-brand{
+    display:flex;
+    align-items:center;
+    gap:0.75rem;
+    min-width:0;
+}
+
+.sidebar-brand-icono{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    flex-shrink:0;
+    width:2.25rem;
+    height:2.25rem;
+    border-radius:8px;
+    background-color:var(--sidebar-brand-icono-fondo);
+    color:#FFFFFF;
+    font-family:var(--font-headline);
+    font-weight:700;
+    font-size:1.0625rem;
+}
+
+.sidebar-brand-texto{
+    display:flex;
+    flex-direction:column;
+    min-width:0;
+    line-height:1.25;
+}
+
+.sidebar-brand-nombre{
+    color:var(--neutral-900);
+    font-family:var(--font-headline);
+    font-weight:700;
+    font-size:0.9375rem;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+}
+
+.sidebar-brand-subtitulo{
+    color:var(--text-muted);
+    font-size:0.75rem;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+}
+
+.fi-sidebar-header .sidebar-brand-nombre{
+    color:var(--sidebar-brand-nombre);
+}
+
+.fi-sidebar-header .sidebar-brand-subtitulo{
+    color:var(--sidebar-brand-subtitulo);
+}
+
+/* Bloque de usuario al pie del sidebar (->userMenu(position: Sidebar) en AdminPanelProvider):
+   avatar (circular por defecto vía UiAvatarsProvider) + nombre + rol, en vez del nombre suelto
+   que trae Filament de fábrica — ver el mismo vendor override de arriba, user-menu.blade.php. */
+.fi-sidebar-footer{
+    border-block-start:1px solid var(--sidebar-borde);
+}
+
+.fi-user-menu-trigger{
+    border-radius:8px;
+    padding-block:10px;
+    padding-inline:12px;
+}
+
+.fi-user-menu-trigger:hover{
+    background-color:var(--sidebar-hover-fondo);
+}
+
+.fi-user-menu-trigger-text-ctn{
+    display:flex;
+    flex-direction:column;
+    align-items:flex-start;
+    min-width:0;
+    line-height:1.3;
+}
+
+.fi-user-menu-trigger-text{
+    color:var(--sidebar-usuario-nombre);
+    font-size:0.8125rem;
+    font-weight:500;
+}
+
+.fi-user-menu-trigger-role{
+    color:var(--sidebar-usuario-rol);
+    font-size:0.75rem;
+}
+
+/*======== DASHBOARD: tipografía de las KPI cards, ver diseño aprobado ========
+   Filament ya trae label/valor/descripción en fi-wi-stats-overview-stat-*; esto solo ajusta
+   tamaños/tracking al spec (label 12px uppercase, valor 28px bold, descripción 12px con el color
+   que le da ->color()). Aplica a TODOS los StatsOverviewWidget del panel (no solo los nuevos del
+   dashboard) para que las tarjetas de KPI se vean iguales en todos lados. */
+
+.fi-wi-stats-overview-stat-label{
+    font-size:0.75rem;
+    text-transform:uppercase;
+    letter-spacing:0.04em;
+    font-weight:600;
+}
+
+.fi-wi-stats-overview-stat-value{
+    font-family:var(--font-headline);
+    font-size:1.75rem;
+    font-weight:700;
+    color:var(--neutral-900);
+}
+
+.fi-wi-stats-overview-stat-description{
+    font-size:0.75rem;
+}
+
+/*======== DASHBOARD: "Últimas ventas" y "Alertas del sistema" (columnas inferiores) ========
+   Widgets custom (app/Filament/Widgets/UltimasVentasWidget.php y AlertasWidget.php), cada uno
+   dentro de un <x-filament::section> para heredar el mismo fondo/borde/sombra que el resto de
+   tarjetas del panel (regla de la sección "CAPAS DE SUPERFICIE" más arriba). Solo se estiliza acá
+   lo que es propio de su contenido (lista, badges, dots de alerta). */
+
+.dashboard-widget-link{
+    font-size:0.8125rem;
+    font-weight:500;
+    color:var(--primary-600);
+}
+
+.dashboard-widget-link:hover{
+    text-decoration:underline;
+}
+
+.dashboard-widget-empty{
+    color:var(--text-muted);
+    font-size:0.8125rem;
+}
+
+.ultimas-ventas-list,
+.alertas-list{
+    display:flex;
+    flex-direction:column;
+    gap:0.875rem;
+}
+
+.ultimas-ventas-item{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:0.75rem;
+}
+
+.ultimas-ventas-item-info,
+.ultimas-ventas-item-monto{
+    display:flex;
+    flex-direction:column;
+    gap:0.125rem;
+}
+
+.ultimas-ventas-item-monto{
+    align-items:flex-end;
+    flex-shrink:0;
+}
+
+.ultimas-ventas-ncf{
+    font-size:0.8125rem;
+    font-weight:500;
+    color:var(--neutral-900);
+}
+
+.ultimas-ventas-detalle{
+    font-size:0.75rem;
+    color:var(--text-muted);
+}
+
+.ultimas-ventas-monto{
+    font-size:0.8125rem;
+    font-weight:600;
+    color:var(--neutral-900);
+}
+
+/* Badges de estado fiscal: colores literales del diseño aprobado, independientes de los slots
+   'success'/'warning'/'gray' de Filament (que ya están tomados por la paleta Stitch del panel y
+   no calzan con los pares bg/texto exactos que pide el diseño para esta lista compacta). */
+.badge-estado{
+    display:inline-flex;
+    align-items:center;
+    padding-block:0.125rem;
+    padding-inline:0.5rem;
+    border-radius:9999px;
+    font-size:0.6875rem;
+    font-weight:600;
+    white-space:nowrap;
+}
+
+.badge-estado-aceptada{ background-color:#DCFCE7; color:#166534; }
+.badge-estado-pendiente{ background-color:#FEF3C7; color:#92400E; }
+.badge-estado-rechazada{ background-color:#FEE2E2; color:#991B1B; }
+.badge-estado-no-aplica{ background-color:#F1F5F9; color:#64748B; }
+
+.alertas-item{
+    display:flex;
+    align-items:flex-start;
+    gap:0.625rem;
+}
+
+.alertas-dot{
+    flex-shrink:0;
+    width:0.5rem;
+    height:0.5rem;
+    border-radius:9999px;
+    margin-block-start:0.375rem;
+}
+
+.alertas-dot-rojo{ background-color:#DC2626; }
+.alertas-dot-naranja{ background-color:#EA580C; }
+.alertas-dot-amarillo{ background-color:#F59E0B; }
+.alertas-dot-azul{ background-color:#2563EB; }
+
+.alertas-item-texto{
+    display:flex;
+    flex-direction:column;
+    gap:0.125rem;
+    min-width:0;
+}
+
+.alertas-item-titulo{
+    font-size:0.8125rem;
+    font-weight:500;
+    color:var(--neutral-900);
+}
+
+.alertas-item-detalle{
+    font-size:0.75rem;
+    color:var(--text-muted);
 }
 
 /*======== REMATE: paneles flotantes (menú de usuario, notificaciones...) con el mismo

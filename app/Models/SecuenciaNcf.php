@@ -18,13 +18,14 @@ class SecuenciaNcf extends Model
 
     protected $fillable = [
         'empresa_id', 'tipo_comprobante', 'prefijo', 'secuencia_desde', 'secuencia_actual',
-        'secuencia_hasta', 'vencimiento', 'activa',
+        'secuencia_hasta', 'vencimiento', 'activa', 'alerta_agotamiento_enviada_en',
     ];
 
     protected $casts = [
         'tipo_comprobante' => TipoComprobante::class,
         'vencimiento' => 'date',
         'activa' => 'boolean',
+        'alerta_agotamiento_enviada_en' => 'datetime',
     ];
 
     public function empresa(): BelongsTo

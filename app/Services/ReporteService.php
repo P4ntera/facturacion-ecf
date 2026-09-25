@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Enums\EstadoVenta;
+use App\Enums\TipoComprobante;
 use App\Enums\TipoDocumentoCliente;
 use App\Models\Producto;
 use App\Models\Venta;
@@ -171,6 +172,25 @@ class ReporteService
             'ticket_promedio' => $cantidadVentas > 0
                 ? bcdiv($totalVendido, (string) $cantidadVentas, 2)
                 : '0.00',
+        ];
+    }
+
+    /**
+     * Desglose de comprobantes emitidos en el rango: cuántos son electrónicos (e-CF, pasaron
+     * por el PAC) vs. físicos (tipo B, nunca se transmiten). Para el widget del dashboard.
+     *
+     * @return array{electronicos: int, fisicos: int}
+     */
+    public function desgloseComprobantes(Carbon $desde, Carbon $hasta): array
+    {
+        $tiposElectronicos = collect(TipoComprobante::cases())->filter->esElectronico()->map->value->all();
+        $tiposFisicos = collect(TipoComprobante::cases())->filter->esFisico()->map->value->all();
+
+        $base = $this->ventasEmitidasEnRango($desde, $hasta)->whereNotNull('ncf');
+
+        return [
+            'electronicos' => (clone $base)->whereIn('tipo_comprobante', $tiposElectronicos)->count(),
+            'fisicos' => (clone $base)->whereIn('tipo_comprobante', $tiposFisicos)->count(),
         ];
     }
 

@@ -8,6 +8,7 @@ use Filament\Models\Contracts\FilamentUser;
 use Filament\Models\Contracts\HasDefaultTenant;
 use Filament\Models\Contracts\HasTenants;
 use Filament\Panel;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -33,6 +34,7 @@ class User extends Authenticatable implements FilamentUser, HasDefaultTenant, Ha
         'email',
         'password',
         'impresora_facturacion_id',
+        'activo',
     ];
 
     protected $hidden = [
@@ -45,6 +47,7 @@ class User extends Authenticatable implements FilamentUser, HasDefaultTenant, Ha
     // rompiendo el tipo bool que exige EmpresaPolicy::viewAny() (mismo patrón que Impresora).
     protected $attributes = [
         'es_super_admin' => false,
+        'activo' => true,
     ];
 
     protected function casts(): array
@@ -53,7 +56,13 @@ class User extends Authenticatable implements FilamentUser, HasDefaultTenant, Ha
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'es_super_admin' => 'boolean',
+            'activo' => 'boolean',
         ];
+    }
+
+    public function scopeActivos(Builder $query): Builder
+    {
+        return $query->where('activo', true);
     }
 
     /**

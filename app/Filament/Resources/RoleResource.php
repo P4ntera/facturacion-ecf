@@ -41,7 +41,7 @@ class RoleResource extends Resource
 
     protected static string|\UnitEnum|null $navigationGroup = 'Configuración';
 
-    protected static ?int $navigationSort = 63;
+    protected static ?int $navigationSort = 61;
 
     /**
      * Nombre del rol que ningún usuario puede dejar sin el permiso 'roles.gestionar' ni

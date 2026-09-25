@@ -60,9 +60,9 @@ class PedidoCompraResource extends Resource
 
     protected static ?string $slug = 'pedidos-compra';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Compras';
+    protected static string|\UnitEnum|null $navigationGroup = 'Operaciones';
 
-    protected static ?int $navigationSort = 31;
+    protected static ?int $navigationSort = 15;
 
     public static function form(Schema $schema): Schema
     {

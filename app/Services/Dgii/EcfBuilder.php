@@ -59,6 +59,12 @@ class EcfBuilder
             'eNCF' => $venta->ncf,
         ];
 
+        // Nota de Crédito (34) / Nota de Débito (33): la norma DGII exige declarar el e-NCF que
+        // se está modificando. VentaService::registrar() ya lo exige y valida al crear la venta.
+        if (filled($venta->ncf_modifica)) {
+            $idDoc['NCFModificado'] = $venta->ncf_modifica;
+        }
+
         if ($venta->empresa->config()->precio_incluye_itbis) {
             $idDoc['IndicadorServicioTodoIncluido'] = '1';
         }

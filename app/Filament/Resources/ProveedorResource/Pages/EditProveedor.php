@@ -3,7 +3,7 @@
 namespace App\Filament\Resources\ProveedorResource\Pages;
 
 use App\Filament\Resources\ProveedorResource;
-use Filament\Actions;
+use Filament\Actions\Action;
 use Filament\Resources\Pages\EditRecord;
 
 class EditProveedor extends EditRecord
@@ -13,9 +13,12 @@ class EditProveedor extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\DeleteAction::make(),
-            Actions\RestoreAction::make(),
-            Actions\ForceDeleteAction::make(),
+            Action::make('toggleActivo')
+                ->label(fn () => $this->record->activo ? 'Desactivar' : 'Activar')
+                ->icon(fn () => $this->record->activo ? 'heroicon-o-x-circle' : 'heroicon-o-check-circle')
+                ->color(fn () => $this->record->activo ? 'danger' : 'success')
+                ->requiresConfirmation()
+                ->action(fn () => $this->record->update(['activo' => ! $this->record->activo])),
         ];
     }
 

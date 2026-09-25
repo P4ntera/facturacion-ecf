@@ -52,7 +52,9 @@ class CuentaPorCobrarResource extends Resource
 
     protected static ?string $slug = 'cuentas-por-cobrar';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Cuentas';
+    protected static string|\UnitEnum|null $navigationGroup = 'Operaciones';
+
+    protected static ?int $navigationSort = 12;
 
     // Nace automáticamente al facturar a crédito (VentaService::registrar()); no se crea a mano.
     public static function canCreate(): bool

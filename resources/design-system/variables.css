@@ -118,11 +118,29 @@
        theme.css lo lee directo de este token (no del slot 'gray' de Filament). */
     --fondo-tarjeta:#FFFFFF;  /* fondo de tarjetas/secciones: Sections, stat cards, modales,
        tablas y las tarjetas del POS. */
-    --fondo-sidebar:#F7F7F8;  /* fondo del menú lateral. */
-    --borde-tarjeta:#E5E7EB;  /* borde de tarjetas/secciones; el sidebar y los paneles flotantes
-       (menú de usuario, notificaciones) reusan el mismo valor para su borde. */
+    --borde-tarjeta:#E5E7EB;  /* borde de tarjetas/secciones y paneles flotantes (menú de usuario,
+       notificaciones). */
     --sombra-tarjeta:0 1px 3px rgb(16 24 40 / 0.06), 0 1px 2px rgb(16 24 40 / 0.04); /* sombra de
        tarjetas/secciones y paneles flotantes. */
+
+    /*======== SIDEBAR (navy) ========
+       Único rincón "oscuro" del panel, a propósito: el resto del design-system se queda claro
+       (--darkMode(false) en AdminPanelProvider) — esto es un riel de navegación con su propio
+       color de marca, no un modo oscuro real, así que no necesita variantes .dark en ningún otro
+       componente. Valores del diseño aprobado (ver tarea "Dashboard y Sidebar del diseño UI"). */
+
+    --fondo-sidebar:#0F172A;
+    --sidebar-item-texto:#94A3B8;          /* ítem inactivo */
+    --sidebar-item-activo-fondo:#1E3A5F;
+    --sidebar-item-activo-texto:#E0F2FE;
+    --sidebar-grupo-label:#475569;         /* labels de sección: Operaciones, Fiscal... */
+    --sidebar-borde:rgb(255 255 255 / 0.06);
+    --sidebar-hover-fondo:rgb(255 255 255 / 0.04);
+    --sidebar-brand-icono-fondo:#3B82F6;
+    --sidebar-brand-nombre:#FFFFFF;
+    --sidebar-brand-subtitulo:#64748B;     /* nombre de la empresa activa, bajo el brand */
+    --sidebar-usuario-nombre:#E2E8F0;
+    --sidebar-usuario-rol:#64748B;
 
     /*======== FORMAS ========*/
 

@@ -3,7 +3,7 @@
 namespace App\Filament\Resources\DescuentoResource\Pages;
 
 use App\Filament\Resources\DescuentoResource;
-use Filament\Actions\DeleteAction;
+use Filament\Actions\Action;
 use Filament\Resources\Pages\EditRecord;
 
 class EditDescuento extends EditRecord
@@ -12,6 +12,13 @@ class EditDescuento extends EditRecord
 
     protected function getHeaderActions(): array
     {
-        return [DeleteAction::make()];
+        return [
+            Action::make('toggleActivo')
+                ->label(fn () => $this->record->activo ? 'Desactivar' : 'Activar')
+                ->icon(fn () => $this->record->activo ? 'heroicon-o-x-circle' : 'heroicon-o-check-circle')
+                ->color(fn () => $this->record->activo ? 'danger' : 'success')
+                ->requiresConfirmation()
+                ->action(fn () => $this->record->update(['activo' => ! $this->record->activo])),
+        ];
     }
 }

@@ -69,7 +69,10 @@ class SecuenciaNcfResource extends Resource
                         }
 
                         if (blank($get('prefijo'))) {
-                            $set('prefijo', 'E'.$state);
+                            $tipo = TipoComprobante::from($state);
+                            // Electrónico: el prefijo es "E" + el código DGII desnudo (31, 32...).
+                            // Físico: el propio valor del enum YA es el prefijo completo (B01, B02...).
+                            $set('prefijo', $tipo->esElectronico() ? 'E'.$state : $tipo->value);
                         }
 
                         if ($operation === 'create') {
@@ -85,8 +88,8 @@ class SecuenciaNcfResource extends Resource
                     ->label('Prefijo')
                     ->required()
                     ->maxLength(3)
-                    ->regex('/^E\d{2}$/')
-                    ->validationMessages(['regex' => 'El prefijo debe tener el formato "E" seguido de 2 dígitos (ej. E31).'])
+                    ->regex('/^(E\d{2}|B\d{2})$/')
+                    ->validationMessages(['regex' => 'El prefijo debe ser "E" (electrónico) o "B" (físico) seguido de 2 dígitos (ej. E31, B01).'])
                     ->live(onBlur: true)
                     ->afterStateUpdated(function (?string $state, Set $set, Get $get, string $operation): void {
                         $state = strtoupper((string) $state);
@@ -94,7 +97,7 @@ class SecuenciaNcfResource extends Resource
 
                         $tipo = $get('tipo_comprobante');
 
-                        if ($operation === 'create' && $tipo !== null && preg_match('/^E\d{2}$/', $state) === 1) {
+                        if ($operation === 'create' && $tipo !== null && preg_match('/^(E\d{2}|B\d{2})$/', $state) === 1) {
                             $set('secuencia_desde', app(SecuenciaNcfService::class)->sugerirSecuenciaDesde(
                                 TipoComprobante::from($tipo),
                                 $state,

@@ -52,9 +52,7 @@ class ProductoResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Productos';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Maestros';
-
-    protected static ?int $navigationSort = 10;
+    protected static ?int $navigationSort = 3;
 
     public static function form(Schema $schema): Schema
     {
@@ -203,10 +201,15 @@ class ProductoResource extends Resource
                                     ->label('Código de barras')
                                     ->maxLength(50)
                                     ->distinct()
-                                    ->unique(table: 'producto_presentaciones', column: 'codigo_barra', ignoreRecord: true)
+                                    ->unique(
+                                        table: 'producto_presentaciones',
+                                        column: 'codigo_barra',
+                                        ignoreRecord: true,
+                                        modifyRuleUsing: fn ($rule) => $rule->where('empresa_id', Filament::getTenant()->id),
+                                    )
                                     ->validationMessages([
                                         'distinct' => 'Este código de barras ya se usó en otra presentación de este producto.',
-                                        'unique' => 'Ya existe otra presentación (de cualquier producto) con este código de barras.',
+                                        'unique' => 'Ya existe otra presentación (de cualquier producto de esta empresa) con este código de barras.',
                                     ]),
 
                                 TextInput::make('precio')

@@ -57,9 +57,7 @@ class VentaResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Ventas';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Ventas';
-
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 5;
 
     // Las ventas se crean únicamente desde el Punto de Venta (VentaService::registrar).
     public static function canCreate(): bool
@@ -74,10 +72,12 @@ class VentaResource extends Resource
                 ->columns(3)
                 ->schema([
                     TextEntry::make('fecha')->label('Fecha')->dateTime('d/m/Y H:i'),
-                    TextEntry::make('ncf')->label('e-NCF'),
+                    TextEntry::make('ncf')->label('NCF'),
                     TextEntry::make('tipo_comprobante')
                         ->label('Tipo')
-                        ->formatStateUsing(fn (TipoComprobante $state) => $state->etiqueta()),
+                        ->badge()
+                        ->formatStateUsing(fn (TipoComprobante $state) => "{$state->value} — {$state->etiqueta()}")
+                        ->color(fn (TipoComprobante $state) => $state->esElectronico() ? 'info' : 'gray'),
                     TextEntry::make('cliente.nombre')->label('Cliente'),
                     TextEntry::make('estado')
                         ->label('Estado')
@@ -204,7 +204,9 @@ class VentaResource extends Resource
 
                 TextColumn::make('tipo_comprobante')
                     ->label('Tipo')
-                    ->formatStateUsing(fn (TipoComprobante $state) => $state->etiqueta())
+                    ->badge()
+                    ->formatStateUsing(fn (TipoComprobante $state) => "{$state->value} — {$state->etiqueta()}")
+                    ->color(fn (TipoComprobante $state) => $state->esElectronico() ? 'info' : 'gray')
                     ->toggleable(isToggledHiddenByDefault: true)
                     ->sortable(),
 

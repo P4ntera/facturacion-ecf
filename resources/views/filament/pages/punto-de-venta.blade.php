@@ -128,11 +128,9 @@
               </select>
             </div>
             <div>
-              <label class="form-label">Próximo e-NCF</label>
+              <label class="form-label">Próximo NCF</label>
               <div>
-                @if (! $this->usaEcf())
-                  <span class="badge badge-success">No aplica (empresa sin e-CF)</span>
-                @elseif ($this->proximoNcf())
+                @if ($this->proximoNcf())
                   <span class="badge badge-success">{{ $this->proximoNcf() }}</span>
                 @else
                   <span class="badge badge-danger">No disponible: carga un rango de NCF</span>

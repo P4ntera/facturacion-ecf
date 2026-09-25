@@ -16,7 +16,10 @@ use Throwable;
 class SecuenciaNcfService
 {
     /** Longitud del secuencial en el e-NCF (E + tipo(2) + secuencial(10) = 13). */
-    private const LONGITUD_SECUENCIAL = 10;
+    private const LONGITUD_SECUENCIAL_ELECTRONICA = 10;
+
+    /** Longitud del secuencial en el NCF físico (B + tipo(2) + secuencial(8) = 11). */
+    private const LONGITUD_SECUENCIAL_FISICA = 8;
 
     /** Umbral de comprobantes restantes para alertar "rango por agotarse". */
     public const UMBRAL_ALERTA = 50;
@@ -74,13 +77,16 @@ class SecuenciaNcfService
         }
 
         $numero = (int) $secuencia->secuencia_actual;
-        $ncf = $this->formatear($secuencia->prefijo, $numero);
+        $ncf = $this->formatear($secuencia->prefijo, $numero, $tipo);
 
         $secuencia->secuencia_actual = $numero + 1;
         $secuencia->save();
 
-        if ($this->restantes($secuencia) <= self::UMBRAL_ALERTA) {
+        // alerta_agotamiento_enviada_en deduplica: sin esto, cada consumo bajo el umbral (podrían
+        // ser decenas por hora en un negocio con volumen) generaría una notificación nueva.
+        if ($this->restantes($secuencia) <= self::UMBRAL_ALERTA && $secuencia->alerta_agotamiento_enviada_en === null) {
             $this->alertarPorAgotarse($secuencia);
+            $secuencia->update(['alerta_agotamiento_enviada_en' => now()]);
         }
 
         return $ncf;
@@ -100,7 +106,7 @@ class SecuenciaNcfService
         }
 
         if ($this->tieneDisponibles($secuencia)) {
-            return $this->formatear($secuencia->prefijo, (int) $secuencia->secuencia_actual);
+            return $this->formatear($secuencia->prefijo, (int) $secuencia->secuencia_actual, $tipo);
         }
 
         // El activo está agotado/vencido: si ya hay un rango consecutivo encolado, el próximo
@@ -111,7 +117,7 @@ class SecuenciaNcfService
             return null;
         }
 
-        return $this->formatear($siguiente->prefijo, (int) $siguiente->secuencia_actual);
+        return $this->formatear($siguiente->prefijo, (int) $siguiente->secuencia_actual, $tipo);
     }
 
     public function restantes(SecuenciaNcf $secuencia): int
@@ -254,9 +260,11 @@ class SecuenciaNcfService
             ->first();
     }
 
-    private function formatear(string $prefijo, int $numero): string
+    private function formatear(string $prefijo, int $numero, TipoComprobante $tipo): string
     {
-        return $prefijo.str_pad((string) $numero, self::LONGITUD_SECUENCIAL, '0', STR_PAD_LEFT);
+        $longitud = $tipo->esElectronico() ? self::LONGITUD_SECUENCIAL_ELECTRONICA : self::LONGITUD_SECUENCIAL_FISICA;
+
+        return $prefijo.str_pad((string) $numero, $longitud, '0', STR_PAD_LEFT);
     }
 
     private function alertarPorAgotarse(SecuenciaNcf $secuencia): void

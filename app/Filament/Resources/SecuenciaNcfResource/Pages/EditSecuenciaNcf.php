@@ -40,6 +40,12 @@ class EditSecuenciaNcf extends EditRecord
             throw new Halt;
         }
 
+        // Si el rango se extiende (se "recarga" con más números), la alerta de "por agotarse" ya
+        // enviada deja de ser válida: puede volver a acercarse al nuevo límite más adelante.
+        if ((int) $data['secuencia_hasta'] > (int) $this->record->secuencia_hasta) {
+            $data['alerta_agotamiento_enviada_en'] = null;
+        }
+
         return $data;
     }
 }

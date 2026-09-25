@@ -24,7 +24,6 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\ToggleColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
-use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 
 class ProveedorResource extends Resource
@@ -48,9 +47,9 @@ class ProveedorResource extends Resource
 
     protected static ?string $slug = 'proveedores';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Maestros';
+    protected static string|\UnitEnum|null $navigationGroup = 'Operaciones';
 
-    protected static ?int $navigationSort = 13;
+    protected static ?int $navigationSort = 11;
 
     public static function form(Schema $schema): Schema
     {
@@ -260,8 +259,6 @@ class ProveedorResource extends Resource
                     ]),
 
                 TernaryFilter::make('activo')->label('Activo en sistema')->default(true),
-
-                TrashedFilter::make(),
             ])
             ->recordActions([
                 EditAction::make(),

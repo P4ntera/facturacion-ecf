@@ -5,6 +5,7 @@ namespace App\Providers\Filament;
 use App\Filament\Pages\Auth\EditProfile;
 use App\Http\Middleware\EstablecerEmpresaPermisos;
 use App\Models\Empresa;
+use Filament\Enums\UserMenuPosition;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -15,7 +16,9 @@ use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
 use Filament\Support\Enums\Width;
+use Filament\View\PanelsRenderHook;
 use Filament\Widgets\AccountWidget;
+use Illuminate\Support\HtmlString;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
@@ -44,35 +47,16 @@ class AdminPanelProvider extends PanelProvider
             // normal con una sola empresa entra directo (getDefaultTenant) y no lo necesita, pero
             // no le estorba dejarlo visible.
             ->tenantMenu()
-            // Orden = orden en el sidebar (ver NavigationManager::get()); por eso Ventas va
-            // primero (el diario del negocio) y Super Admin al final (solo lo ve el super-admin,
-            // ver EmpresaResource). Todos colapsados por defecto salvo Ventas: menos ruido visual
-            // al entrar, sin esconder lo que se usa a diario.
+            // Orden = orden en el sidebar (ver NavigationManager::get()). Dashboard, Caja,
+            // Facturación, Productos, Clientes y Ventas quedan SIN grupo (uso diario, sin la
+            // fricción de un header colapsable) — ver el diseño aprobado en la tarea de
+            // sidebar/dashboard. El resto se agrupa en 4 secciones; Super Admin al final porque
+            // solo la ve el super-admin (ver EmpresaResource).
             ->navigationGroups([
-                NavigationGroup::make('Ventas')
-                    ->icon('heroicon-o-shopping-bag')
-                    ->collapsed(false),
-                NavigationGroup::make('Maestros')
-                    ->icon('heroicon-o-rectangle-stack')
-                    ->collapsed(),
-                NavigationGroup::make('Inventario')
-                    ->icon('heroicon-o-archive-box')
-                    ->collapsed(),
-                NavigationGroup::make('Compras')
-                    ->icon('heroicon-o-shopping-cart')
-                    ->collapsed(),
-                NavigationGroup::make('Fiscal')
-                    ->icon('heroicon-o-document-text')
-                    ->collapsed(),
-                NavigationGroup::make('Reportes')
-                    ->icon('heroicon-o-chart-bar')
-                    ->collapsed(),
-                NavigationGroup::make('Configuración')
-                    ->icon('heroicon-o-cog-6-tooth')
-                    ->collapsed(),
-                NavigationGroup::make('Super Admin')
-                    ->icon('heroicon-o-building-office-2')
-                    ->collapsed(),
+                NavigationGroup::make('Operaciones'),
+                NavigationGroup::make('Fiscal'),
+                NavigationGroup::make('Configuración'),
+                NavigationGroup::make('Super Admin'),
             ])
             ->colors([
                 'primary' => Color::hex('#5D87FF'), // --primary
@@ -111,12 +95,21 @@ class AdminPanelProvider extends PanelProvider
             ->darkMode(false)
             ->databaseNotifications()
             ->maxContentWidth(Width::Full)
-            ->sidebarCollapsibleOnDesktop()
+            ->sidebarCollapsibleOnDesktop(false)
+            ->renderHook(
+                PanelsRenderHook::BODY_END,
+                fn () => new HtmlString('<script>try{let k="_x_collapsedGroups",v=localStorage.getItem(k);if(v&&v!=="[]"){localStorage.removeItem(k)}}catch(e){}</script>'),
+            )
             // Cuerpo de texto (--font-body). Filament no permite una segunda familia solo para
             // titulares vía este método: Manrope (--font-headline) se aplica en theme.css sobre
             // las hook classes de heading de Filament (fi-header-heading y similares).
             ->font('Inter')
-            ->brandName('Facturación e-CF')
+            ->brandName('FesrSoft ERP')
+            // El bloque de usuario (avatar + nombre + rol) va al pie del sidebar, no en el
+            // topbar, para calzar con el diseño aprobado — ver
+            // resources/views/vendor/filament-panels/components/user-menu.blade.php (override
+            // que agrega el rol debajo del nombre; Filament no lo trae de fábrica).
+            ->userMenu(position: UserMenuPosition::Sidebar)
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')
             ->pages([

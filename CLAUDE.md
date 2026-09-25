@@ -9,10 +9,31 @@ corriendo sobre Laravel Sail (WSL). Todo comando de artisan/npm/composer se ejec
 - Autorización: spatie/laravel-permission (roles y permisos) + Policies de Laravel por modelo
   (`app/Policies`), autodescubiertas por convención de nombres (Laravel 12, sin registro manual).
   Filament oculta del menú los Resources cuyo `viewAny()` sea `false`.
-- Roles seed en `database/seeders/RolePermissionSeeder.php`: Administrador (todos los permisos),
-  Vendedor (`registrar_ventas`, `gestionar_maestros`, `ver_reportes`), Almacenista
-  (`gestionar_inventario`, `gestionar_compras`, `gestionar_maestros`).
-- `User::canAccessPanel()` exige tener uno de esos roles.
+- La mayoría de las Policies devuelven `false` fijo en `delete()`: es deliberado (nada se borra
+  físicamente, los maestros/transacciones se desactivan o anulan en su lugar), no un permiso
+  pendiente — no crear un permiso `*.eliminar` para "arreglarlo". La única excepción real es
+  `UserPolicy::delete()`, gateada por `usuarios.gestionar`.
+
+### Permisos
+
+El sistema usa un catálogo granular por pantalla/acción, definido en `App\Support\Permisos`
+(única fuente de verdad). Cada permiso sigue el formato `modulo.accion` (ej. `productos.crear`,
+`ventas.anular`, `secuencias.administrar`). Reemplazó a un esquema anterior de permisos gruesos
+(`gestionar_maestros`, `registrar_ventas`, etc.) que `RolePermissionSeeder` borra activamente de
+la base de datos si los encuentra, para que no queden huérfanos.
+
+- Los ROLES son **por empresa** (spatie/laravel-permission con `'teams' => true`, `empresa_id`
+  como `team_foreign_key`): no existe un "Vendedor" global, cada empresa tiene el suyo. Se siembran
+  vía `App\Services\RolesEmpresaService::sembrarRolesBase()` (llamado al crear una empresa nueva
+  desde `EmpresaResource`, y desde `RolePermissionSeeder` para instalaciones/tests con empresas
+  preexistentes) — roles base: Administrador (todos los permisos), Vendedor, Almacenista.
+- Cualquier consulta/asignación de roles o permisos fuera del ciclo normal de una request de panel
+  (seeders, tests, comandos) necesita `setPermissionsTeamId($empresa->id)` primero, o
+  `Role::firstOrCreate()`/`hasRole()`/`can()` no encuentran nada.
+- Gotcha conocido: `gestionar_arqueo_caja` es un permiso real en uso (Administrador y Vendedor lo
+  tienen) que quedó fuera de `Permisos::catalogo()` — al tocar el catálogo, no asumir que
+  `Permisos::todos()` es la lista completa de permisos que existen en la base de datos.
+- `User::canAccessPanel()` exige tener al menos un rol.
 - El login de Filament trae rate limiting nativo (5 intentos antes de bloqueo temporal).
 
 ### Hardening para producción

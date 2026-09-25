@@ -25,8 +25,6 @@ class Caja extends PuntoDeVenta
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedCalculator;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Ventas';
-
     protected static ?int $navigationSort = 1;
 
     protected static ?string $navigationLabel = 'Caja';

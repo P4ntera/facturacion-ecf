@@ -11,6 +11,8 @@ use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\ToggleColumn;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Hash;
@@ -31,7 +33,7 @@ class UserResource extends Resource
 
     protected static string|\UnitEnum|null $navigationGroup = 'Configuración';
 
-    protected static ?int $navigationSort = 62;
+    protected static ?int $navigationSort = 60;
 
     public static function form(Schema $schema): Schema
     {
@@ -111,11 +113,17 @@ class UserResource extends Resource
                 ->badge()
                 ->placeholder('—'),
 
+            ToggleColumn::make('activo')
+                ->label('Activo'),
+
             TextColumn::make('created_at')
                 ->label('Creado')
                 ->dateTime('d/m/Y H:i')
                 ->sortable()
                 ->toggleable(isToggledHiddenByDefault: true),
+        ])
+        ->filters([
+            TernaryFilter::make('activo')->label('Activo')->default(true),
         ]);
     }
 

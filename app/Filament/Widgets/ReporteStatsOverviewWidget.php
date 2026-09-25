@@ -12,7 +12,7 @@ use Illuminate\Support\Number;
 
 class ReporteStatsOverviewWidget extends StatsOverviewWidget
 {
-    protected static ?int $sort = -2;
+    protected static ?int $sort = 1;
 
     public static function canView(): bool
     {
@@ -26,6 +26,7 @@ class ReporteStatsOverviewWidget extends StatsOverviewWidget
         $hoy = $servicio->ventasPorRango(Carbon::today(), Carbon::today());
         $mes = $servicio->ventasPorRango(Carbon::today()->startOfMonth(), Carbon::today()->endOfMonth());
         $productosBajoMinimo = $servicio->productosBajoMinimo()->count();
+        $desglose = $servicio->desgloseComprobantes(Carbon::today()->startOfMonth(), Carbon::today()->endOfMonth());
 
         return [
             Stat::make('Ventas de hoy', Number::currency((float) $hoy['total_vendido'], 'DOP'))
@@ -47,6 +48,12 @@ class ReporteStatsOverviewWidget extends StatsOverviewWidget
             Stat::make('Valor del inventario', Number::currency((float) $servicio->valorInventario(), 'DOP'))
                 ->icon('heroicon-o-archive-box')
                 ->color('gray'),
+
+            Stat::make('Comprobantes del mes', "{$desglose['electronicos']} e-CF / {$desglose['fisicos']} tipo B")
+                ->description('Electrónicos vs. físicos')
+                ->descriptionIcon('heroicon-o-document-text')
+                ->icon('heroicon-o-document-text')
+                ->color('info'),
 
             Stat::make('Productos bajo mínimo', (string) $productosBajoMinimo)
                 ->description($productosBajoMinimo > 0 ? 'Requieren reposición' : 'Todo en orden')

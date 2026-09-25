@@ -25,7 +25,7 @@ class ManageFacturacion extends Page
 
     protected static string|UnitEnum|null $navigationGroup = 'Configuración';
 
-    protected static ?int $navigationSort = 61;
+    protected static ?int $navigationSort = 64;
 
     protected static ?string $navigationLabel = 'Facturación';
 
@@ -76,9 +76,11 @@ class ManageFacturacion extends Page
 
                 Select::make('tipo_comprobante_defecto')
                     ->label('Tipo de comprobante por defecto')
-                    ->options(collect(TipoComprobante::cases())->mapWithKeys(
-                        fn (TipoComprobante $tipo) => [$tipo->value => "{$tipo->value} — {$tipo->etiqueta()}"]
-                    ))
+                    ->helperText('Solo tipos de venta. Los electrónicos (e-CF) solo aparecen si la empresa tiene e-CF habilitado.')
+                    ->options(fn () => collect(TipoComprobante::cases())
+                        ->filter(fn (TipoComprobante $tipo) => $tipo->esDeVenta())
+                        ->filter(fn (TipoComprobante $tipo) => $tipo->esFisico() || $this->empresa()->usaEcf())
+                        ->mapWithKeys(fn (TipoComprobante $tipo) => [$tipo->value => "{$tipo->value} — {$tipo->etiqueta()}"]))
                     ->required(),
 
                 Select::make('moneda')

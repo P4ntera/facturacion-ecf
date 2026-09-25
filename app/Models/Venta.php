@@ -110,21 +110,28 @@ class Venta extends Model
         return $this->estado === EstadoVenta::ANULADA;
     }
 
+    /**
+     * true si el tipo de comprobante es electrónico (e-CF, pasa por el PAC/DGII); false si es
+     * NCF físico (tipo B). Determinado por el tipo, no por si tiene ncf asignado — un comprobante
+     * físico también lleva un NCF real (ver VentaService::registrar()), solo que nunca se
+     * transmite.
+     */
     public function esElectronica(): bool
     {
-        return $this->ncf !== null;
+        return $this->tipo_comprobante->esElectronico();
     }
 
     /**
      * true si este comprobante exige RNC/razón social del comprador: siempre para Crédito Fiscal
-     * (31); para Consumo (32) solo si el total alcanza UMBRAL_CONSUMO. Los demás tipos no forman
-     * parte de esta regla.
+     * (31/B01); para Consumo (32/B02) solo si el total alcanza UMBRAL_CONSUMO. La regla es la
+     * misma para el físico y el electrónico (Norma DGII, no una particularidad del e-CF). Los
+     * demás tipos no forman parte de esta regla.
      */
     public function requiereComprador(): bool
     {
         return match ($this->tipo_comprobante) {
-            TipoComprobante::FACTURA_CREDITO_FISCAL => true,
-            TipoComprobante::FACTURA_CONSUMO => bccomp((string) $this->total, self::UMBRAL_CONSUMO, 2) >= 0,
+            TipoComprobante::FACTURA_CREDITO_FISCAL, TipoComprobante::FACTURA_CREDITO_FISCAL_FISICA => true,
+            TipoComprobante::FACTURA_CONSUMO, TipoComprobante::FACTURA_CONSUMO_FISICA => bccomp((string) $this->total, self::UMBRAL_CONSUMO, 2) >= 0,
             default => false,
         };
     }

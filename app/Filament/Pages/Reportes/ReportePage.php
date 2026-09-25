@@ -20,7 +20,7 @@ abstract class ReportePage extends Page implements HasTable
 {
     use InteractsWithTable;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Reportes';
+    protected static string|UnitEnum|null $navigationGroup = 'Fiscal';
 
     public static function canAccess(): bool
     {

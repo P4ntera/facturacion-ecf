@@ -41,9 +41,9 @@ class MovimientoInventarioResource extends Resource
 
     protected static ?string $slug = 'kardex';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Inventario';
+    protected static string|\UnitEnum|null $navigationGroup = 'Operaciones';
 
-    protected static ?int $navigationSort = 20;
+    protected static ?int $navigationSort = 14;
 
     // Kardex: solo lectura, no se crea ni edita a mano.
     public static function canCreate(): bool

@@ -34,9 +34,9 @@ class DescuentoResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Descuentos';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Maestros';
+    protected static string|\UnitEnum|null $navigationGroup = 'Configuración';
 
-    protected static ?int $navigationSort = 13;
+    protected static ?int $navigationSort = 19;
 
     public static function form(Schema $schema): Schema
     {

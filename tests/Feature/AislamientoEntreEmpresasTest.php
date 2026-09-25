@@ -764,4 +764,34 @@ class AislamientoEntreEmpresasTest extends TestCase
         $this->assertDatabaseHas('ventas', ['id' => $ventaA->id, 'ncf' => 'B0100000001', 'empresa_id' => $empresaA->id]);
         $this->assertDatabaseHas('ventas', ['id' => $ventaTobogan->id, 'ncf' => 'B0100000001', 'empresa_id' => $empresaTobogan->id]);
     }
+
+    /** 23. El código de barras de una presentación es único POR EMPRESA (corrección pendiente de F2). */
+    public function test_23_unicidad_codigo_barra_de_presentacion_es_por_empresa(): void
+    {
+        ['empresa' => $empresaA, 'producto' => $productoA] = $this->crearEmpresaConDatos('Empresa A', '131000001');
+        ['empresa' => $empresaTobogan, 'producto' => $productoTobogan] = $this->crearEmpresaConDatos('Tobogán', '131000002');
+
+        $presentacionA = $productoA->presentaciones()->create([
+            'empresa_id' => $empresaA->id,
+            'nombre' => 'Caja',
+            'factor' => 24,
+            'codigo_barra' => 'CB-COMPARTIDO',
+            'precio' => 500,
+            'es_base' => false,
+            'activa' => true,
+        ]);
+
+        $presentacionTobogan = $productoTobogan->presentaciones()->create([
+            'empresa_id' => $empresaTobogan->id,
+            'nombre' => 'Caja',
+            'factor' => 24,
+            'codigo_barra' => 'CB-COMPARTIDO',
+            'precio' => 500,
+            'es_base' => false,
+            'activa' => true,
+        ]);
+
+        $this->assertDatabaseHas('producto_presentaciones', ['id' => $presentacionA->id, 'codigo_barra' => 'CB-COMPARTIDO', 'empresa_id' => $empresaA->id]);
+        $this->assertDatabaseHas('producto_presentaciones', ['id' => $presentacionTobogan->id, 'codigo_barra' => 'CB-COMPARTIDO', 'empresa_id' => $empresaTobogan->id]);
+    }
 }

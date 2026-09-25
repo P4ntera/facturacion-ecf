@@ -19,6 +19,7 @@ use App\Exceptions\StockInsuficienteException;
 use App\Exceptions\VentaInvalidaException;
 use App\Exceptions\VentaYaAnuladaException;
 use App\Models\Cliente;
+use App\Models\Descuento;
 use App\Models\Empresa;
 use App\Models\EmpresaConfiguracion;
 use App\Models\Producto;
@@ -45,9 +46,12 @@ class VentaService
      *   cliente_id: int,
      *   user_id?: int|null,
      *   tipo_comprobante?: TipoComprobante|string|null,
+     *   ncf_modifica?: string|null,
      *   descuento_global?: string|float|int|null,
+     *   descuento_id?: int|null,
      *   forma_pago?: FormaPago|string|null,
      *   arqueo_caja_id?: int|null,
+     *   permite_precio_cero?: bool,
      *   lineas: array<int, array{
      *     producto_id: int,
      *     presentacion_id?: int|null,
@@ -84,27 +88,80 @@ class VentaService
                 throw new VentaInvalidaException('El cliente indicado no existe o está inactivo.');
             }
 
-            $tipoComprobante = $this->resolverTipoComprobante($datos['tipo_comprobante'] ?? null, $config);
-            $estrategia = $config->precio_incluye_itbis ? new ConItbisIncluido : new SinItbisIncluido;
-            $descuentoGlobal = $this->aMoneda($datos['descuento_global'] ?? '0');
+            $tipoComprobante = $this->resolverTipoComprobante($datos['tipo_comprobante'] ?? null, $config, $usaEcf);
 
-            [$detalles, $productosLineas, $acumulado] = $this->procesarLineas($lineas, $config, $estrategia, $empresa);
+            // Defensa en profundidad: tipo_comprobante puede venir de una propiedad Livewire
+            // pública (PuntoDeVenta::$tipoComprobante) o de una futura API — nunca confiar en que
+            // el cliente solo mande tipos de venta. Sin esto, una venta podría consumir (y
+            // "quemar") la secuencia NCF de Compras (41), Gastos Menores (43) o Pagos al
+            // Exterior (47/B17), que le pertenece a un flujo completamente distinto.
+            if (! $tipoComprobante->esDeVenta()) {
+                throw new VentaInvalidaException(
+                    "El tipo de comprobante {$tipoComprobante->value} ({$tipoComprobante->etiqueta()}) no es válido para una venta."
+                );
+            }
+
+            // Una empresa sin e-CF habilitado no puede transmitir nada al PAC: solo puede emitir
+            // comprobantes físicos (tipo B). El selector del POS/la config ya filtran esto (ver
+            // PuntoDeVenta::tiposComprobante()); esta es la defensa de última línea si igual
+            // llega un tipo electrónico explícito (Livewire público, API futura).
+            if ($tipoComprobante->esElectronico() && ! $usaEcf) {
+                throw new VentaInvalidaException(
+                    "Esta empresa no tiene facturación electrónica habilitada; usa un comprobante físico (tipo B) en vez de {$tipoComprobante->value} ({$tipoComprobante->etiqueta()})."
+                );
+            }
+
+            // Nota de Crédito (34) y Nota de Débito (33) existen para MODIFICAR un e-CF ya
+            // emitido: la norma DGII exige declarar cuál (NCFModificado en el XML/JSON, ver
+            // EcfBuilder::idDoc()). Se valida contra una venta real de esta misma empresa —igual
+            // que cliente_id/producto_id, ncf_modifica viene del formulario y es client-controllable.
+            $ncfModifica = $datos['ncf_modifica'] ?? null;
+
+            if (in_array($tipoComprobante, [TipoComprobante::NOTA_CREDITO, TipoComprobante::NOTA_DEBITO], true)) {
+                if (blank($ncfModifica)) {
+                    throw new VentaInvalidaException(
+                        "El tipo de comprobante {$tipoComprobante->value} ({$tipoComprobante->etiqueta()}) requiere indicar el NCF que modifica."
+                    );
+                }
+
+                $existeNcfOriginal = Venta::where('empresa_id', $empresa->id)
+                    ->where('ncf', $ncfModifica)
+                    ->exists();
+
+                if (! $existeNcfOriginal) {
+                    throw new VentaInvalidaException(
+                        "El NCF {$ncfModifica} que se pretende modificar no existe en una venta de esta empresa."
+                    );
+                }
+            }
+
+            $estrategia = $config->precio_incluye_itbis ? new ConItbisIncluido : new SinItbisIncluido;
+            $permitePrecioCero = (bool) ($datos['permite_precio_cero'] ?? false);
+
+            [$detalles, $productosLineas, $acumulado] = $this->procesarLineas($lineas, $config, $estrategia, $empresa, $permitePrecioCero);
+
+            // El % de descuento_id se aplica sobre el subtotal ya calculado (con descuentos de
+            // línea aplicados, antes de ITBIS) — mismo cálculo que hacía PuntoDeVenta en el
+            // frontend antes de esta corrección, ahora centralizado aquí para que cualquier
+            // llamador (POS, una futura API, un import batch) obtenga el mismo resultado sin
+            // tener que reimplementarlo.
+            $descuentoGlobal = $this->resolverDescuentoGlobal($datos, $acumulado['subtotal'], $empresa);
 
             $total = $this->calcularTotalFinal($acumulado, $descuentoGlobal);
 
-            // Las reglas de RNC obligatorio son de e-CF (DGII); una empresa sin e-CF activo no
-            // transmite nada, así que no tiene sentido exigirlas.
-            if ($usaEcf) {
-                // Antes de consumir el e-NCF: si el comprobante exige RNC del comprador (Crédito
-                // Fiscal siempre; Consumo desde Venta::UMBRAL_CONSUMO) y el cliente no lo tiene,
-                // no tiene sentido "quemar" un número que el PAC rechazaría de todas formas.
-                $this->validarComprador($tipoComprobante, $cliente, $total);
-            }
+            // La regla de RNC obligatorio (Crédito Fiscal siempre; Consumo desde
+            // Venta::UMBRAL_CONSUMO) es de la NORMA DGII sobre el TIPO de comprobante, no una
+            // particularidad del e-CF: aplica igual a un B01/B02 físico. Antes de consumir el
+            // NCF: si el comprador falta, no tiene sentido "quemarlo" (el PAC lo rechazaría en
+            // el caso electrónico; en el físico, sería un comprobante mal emitido igual).
+            $this->validarComprador($tipoComprobante, $cliente, $total);
 
             // Se asigna DESPUÉS de validar: si algo más falla y la transacción hace rollback, el
-            // e-NCF no se "quema" (el contador también se revierte). Sin e-CF activo, la venta no
-            // consume secuencia ni lleva NCF.
-            $ncf = $usaEcf ? $this->ncfService->siguiente($tipoComprobante, $empresa) : null;
+            // NCF no se "quema" (el contador también se revierte). Todo tipo_comprobante de venta
+            // —físico o electrónico— consume una secuencia real: la diferencia entre B y E es
+            // solo si el comprobante se transmite al PAC (ver VentaObserver, que dispara
+            // EnviarEcfJob únicamente cuando esElectronica()).
+            $ncf = $this->ncfService->siguiente($tipoComprobante, $empresa);
 
             $tipoPago = $datos['tipo_pago'] ?? TipoPago::CONTADO;
             $tipoPago = $tipoPago instanceof TipoPago ? $tipoPago : TipoPago::from((int) $tipoPago);
@@ -122,6 +179,7 @@ class VentaService
                 'user_id' => $datos['user_id'] ?? null,
                 'tipo_comprobante' => $tipoComprobante,
                 'ncf' => $ncf,
+                'ncf_modifica' => $ncfModifica,
                 'forma_pago' => $datos['forma_pago'] ?? FormaPago::EFECTIVO,
                 'arqueo_caja_id' => $datos['arqueo_caja_id'] ?? null,
                 'tipo_pago' => $tipoPago,
@@ -139,10 +197,11 @@ class VentaService
                 'total_itbis' => $acumulado['total_itbis'],
                 'total' => $total,
                 'estado' => EstadoVenta::EMITIDA,
-                // Toda venta con e-NCF asignado debe transmitirse como e-CF: queda PENDIENTE y
-                // VentaObserver dispara EnviarEcfJob (a cola, sin bloquear el cobro). Sin e-CF
-                // activo en la empresa, no hay nada que transmitir.
-                'estado_fiscal' => $usaEcf ? EstadoFiscal::PENDIENTE : EstadoFiscal::NO_APLICA,
+                // Todo tipo_comprobante ELECTRÓNICO queda PENDIENTE de transmitir: VentaObserver
+                // dispara EnviarEcfJob (a cola, sin bloquear el cobro) al ver esElectronica() +
+                // PENDIENTE. Un comprobante FÍSICO (tipo B) nunca se transmite al PAC, así que su
+                // estado fiscal no aplica — independientemente de si la empresa usa e-CF.
+                'estado_fiscal' => $tipoComprobante->esElectronico() ? EstadoFiscal::PENDIENTE : EstadoFiscal::NO_APLICA,
             ]);
 
             $venta->detalles()->createMany($detalles);
@@ -173,6 +232,8 @@ class VentaService
      *
      * @param  array{
      *   descuento_global?: string|float|int|null,
+     *   descuento_id?: int|null,
+     *   permite_precio_cero?: bool,
      *   lineas: array<int, array{
      *     producto_id: int,
      *     presentacion_id?: int|null,
@@ -195,9 +256,11 @@ class VentaService
         }
 
         $estrategia = $config->precio_incluye_itbis ? new ConItbisIncluido : new SinItbisIncluido;
-        $descuentoGlobal = $this->aMoneda($datos['descuento_global'] ?? '0');
+        $permitePrecioCero = (bool) ($datos['permite_precio_cero'] ?? false);
 
-        [, , $acumulado] = $this->procesarLineas($lineas, $config, $estrategia, $empresa);
+        [, , $acumulado] = $this->procesarLineas($lineas, $config, $estrategia, $empresa, $permitePrecioCero);
+
+        $descuentoGlobal = $this->resolverDescuentoGlobal($datos, $acumulado['subtotal'], $empresa);
 
         return [
             ...$acumulado,
@@ -276,20 +339,26 @@ class VentaService
             return;
         }
 
-        $mensaje = $tipoComprobante === TipoComprobante::FACTURA_CONSUMO
-            ? 'Para facturas de consumo de RD$250,000 o más, el cliente con RNC/Cédula es obligatorio.'
-            : 'La Factura de Crédito Fiscal (e-CF 31) requiere un cliente con RNC/Cédula.';
+        $mensaje = match (true) {
+            $tipoComprobante->esConsumo() => 'Para facturas de consumo de RD$250,000 o más, el cliente con RNC/Cédula es obligatorio.',
+            $tipoComprobante->esElectronico() => "La Factura de Crédito Fiscal (e-CF {$tipoComprobante->value}) requiere un cliente con RNC/Cédula.",
+            default => "La Factura de Crédito Fiscal ({$tipoComprobante->value}) requiere un cliente con RNC/Cédula.",
+        };
 
         throw new VentaInvalidaException($mensaje);
     }
 
-    private function resolverTipoComprobante(TipoComprobante|string|null $valor, EmpresaConfiguracion $config): TipoComprobante
+    private function resolverTipoComprobante(TipoComprobante|string|null $valor, EmpresaConfiguracion $config, bool $usaEcf): TipoComprobante
     {
         if ($valor instanceof TipoComprobante) {
             return $valor;
         }
 
-        return TipoComprobante::from($valor ?? $config->tipo_comprobante_defecto);
+        if ($valor !== null) {
+            return TipoComprobante::from($valor);
+        }
+
+        return TipoComprobante::defectoParaEmpresa($config, $usaEcf);
     }
 
     /**
@@ -305,7 +374,7 @@ class VentaService
      *
      * @throws VentaInvalidaException
      */
-    private function procesarLineas(array $lineas, EmpresaConfiguracion $config, ImpuestoStrategy $estrategia, Empresa $empresa): array
+    private function procesarLineas(array $lineas, EmpresaConfiguracion $config, ImpuestoStrategy $estrategia, Empresa $empresa, bool $permitePrecioCero = false): array
     {
         $detalles = [];
         $productosLineas = [];
@@ -355,6 +424,15 @@ class VentaService
             }
 
             $precioUnitario = $this->aMoneda($linea['precio_unitario'] ?? $presentacion?->precio ?? $producto->precio);
+
+            // Guardrail contra ventas a $0 (línea vacía en el POS, error de captura, o un precio
+            // de producto/presentación mal configurado): consumen NCF y mueven stock igual que
+            // una venta real. El vendedor debe activar permite_precio_cero a propósito (promos,
+            // regalos) para saltarse este bloqueo — nunca es el comportamiento por defecto.
+            if (! $permitePrecioCero && bccomp($precioUnitario, '0.00', 2) <= 0) {
+                throw new VentaInvalidaException("El precio unitario de «{$descripcion}» debe ser mayor que cero.");
+            }
+
             $descuentoLinea = $this->aMoneda($linea['descuento'] ?? '0');
             $tasaEfectiva = $config->aplica_itbis ? $producto->tasa_itbis : TasaItbis::CERO;
 
@@ -400,6 +478,31 @@ class VentaService
     private function aMoneda(string|int|float $valor): string
     {
         return bcadd((string) $valor, '0', 2);
+    }
+
+    /**
+     * Resuelve el descuento global en pesos: si viene descuento_id, se valida que el Descuento
+     * pertenezca a esta empresa y esté activo (igual que cliente_id/producto_id, es
+     * client-controllable) y se calcula el monto a partir de su porcentaje sobre $subtotal. Si
+     * no, se usa descuento_global tal cual (monto fijo, comportamiento previo).
+     *
+     * @throws VentaInvalidaException
+     */
+    private function resolverDescuentoGlobal(array $datos, string $subtotal, Empresa $empresa): string
+    {
+        if (blank($datos['descuento_id'] ?? null)) {
+            return $this->aMoneda($datos['descuento_global'] ?? '0');
+        }
+
+        $descuento = Descuento::where('empresa_id', $empresa->id)
+            ->where('activo', true)
+            ->find($datos['descuento_id']);
+
+        if ($descuento === null) {
+            throw new VentaInvalidaException('El descuento indicado no existe, está inactivo, o no pertenece a esta empresa.');
+        }
+
+        return bcdiv(bcmul($subtotal, (string) $descuento->porcentaje, 4), '100', 2);
     }
 
     /** @param  array<string, string>  $acumulado */

@@ -49,9 +49,9 @@ class ArqueoCajaResource extends Resource
 
     protected static ?string $slug = 'arqueos-caja';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Ventas';
+    protected static string|\UnitEnum|null $navigationGroup = 'Operaciones';
 
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 17;
 
     // No se crea a mano: un arqueo nace al abrir caja desde Caja/Facturación. El cierre sí se
     // hace aquí (acción "Cerrar caja" en la tabla), no desde las pantallas de venta.
