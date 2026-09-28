@@ -45,6 +45,7 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Validation\Rules\Unique;
+use App\Services\ReporteService;
 use RuntimeException;
 
 class CompraResource extends Resource
@@ -215,6 +216,19 @@ class CompraResource extends Resource
                         ->default(now()->addDays(30))
                         ->visible(fn (Get $get) => (int) $get('tipo_pago') === TipoPago::CREDITO->value)
                         ->required(fn (Get $get) => (int) $get('tipo_pago') === TipoPago::CREDITO->value),
+
+                    // ── Campos para el Reporte 606 ──
+                    Select::make('tipo_bienes_servicios_606')
+                        ->label('Tipo bienes/servicios (606)')
+                        ->options(ReporteService::TIPO_BIENES_SERVICIOS_606)
+                        ->default('09')
+                        ->helperText('Clasificación DGII para el Formato 606'),
+
+                    Select::make('forma_pago_606')
+                        ->label('Forma de pago (606)')
+                        ->options(ReporteService::FORMA_PAGO_606)
+                        ->default('01')
+                        ->helperText('Catálogo DGII de forma de pago'),
 
                     TextInput::make('monto_total_factura')
                         ->label('Monto total de la factura')

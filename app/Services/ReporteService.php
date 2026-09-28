@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Enums\EstadoCompra;
 use App\Enums\EstadoVenta;
 use App\Enums\TipoComprobante;
 use App\Enums\TipoDocumentoCliente;
+use App\Models\Compra;
 use App\Models\Producto;
 use App\Models\Venta;
 use Illuminate\Database\Eloquent\Builder;
@@ -166,6 +168,177 @@ class ReporteService
             2 => 'Cédula',
             default => '—',
         };
+    }
+
+    // ──────────────────────────────────────────────────────────────────────
+    // Formato 606 — Envío de Compras de Bienes y Servicios
+    // ──────────────────────────────────────────────────────────────────────
+
+    /**
+     * Catálogo DGII de "Tipo de bienes y servicios" para el 606.
+     */
+    public const TIPO_BIENES_SERVICIOS_606 = [
+        '01' => 'Gastos de personal',
+        '02' => 'Gastos por trabajos, suministros y servicios',
+        '03' => 'Arrendamientos',
+        '04' => 'Gastos de activos fijos',
+        '05' => 'Gastos de representación',
+        '06' => 'Otras deducciones admitidas',
+        '07' => 'Gastos financieros',
+        '08' => 'Gastos extraordinarios',
+        '09' => 'Compras y gastos que formarán parte del costo de venta',
+        '10' => 'Adquisiciones de activos',
+        '11' => 'Gastos de seguros',
+    ];
+
+    /**
+     * Catálogo DGII de "Forma de pago" para el 606 (y 608).
+     */
+    public const FORMA_PAGO_606 = [
+        '01' => 'Efectivo',
+        '02' => 'Cheque / Transferencia / Depósito',
+        '03' => 'Tarjeta de crédito / débito',
+        '04' => 'Compra a crédito',
+        '05' => 'Permuta',
+        '06' => 'Nota de crédito',
+        '07' => 'Mixto',
+    ];
+
+    /**
+     * Query base del 606: compras no anuladas con NCF de proveedor en el rango.
+     * Solo compras con NCF entran al 606 — las informales (sin NCF) se excluyen.
+     */
+    public function reporte606Query(Carbon $desde, Carbon $hasta, ?int $empresaId = null): Builder
+    {
+        return Compra::query()
+            ->whereBetween('fecha', [$desde->copy()->startOfDay(), $hasta->copy()->endOfDay()])
+            ->where('estado', '!=', EstadoCompra::ANULADA)
+            ->whereNotNull('ncf')
+            ->where('ncf', '!=', '')
+            ->when($empresaId, fn (Builder $query, int $id) => $query->where('empresa_id', $id))
+            ->with('proveedor');
+    }
+
+    /**
+     * Una fila por compra con NCF en el rango, con el mapeo de columnas del 606.
+     *
+     * @return Collection<int, array{
+     *   rnc_cedula: ?string,
+     *   tipo_identificacion: ?int,
+     *   tipo_bienes_servicios: string,
+     *   ncf: string,
+     *   ncf_modificado: string,
+     *   fecha_comprobante: Carbon,
+     *   fecha_pago: ?string,
+     *   monto_servicios: string,
+     *   monto_bienes: string,
+     *   total_facturado: string,
+     *   itbis_retenido: string,
+     *   itbis_facturado: string,
+     *   forma_pago: string,
+     * }>
+     */
+    public function reporte606(Carbon $desde, Carbon $hasta, ?int $empresaId = null): Collection
+    {
+        return $this->reporte606Query($desde, $hasta, $empresaId)
+            ->orderBy('fecha')
+            ->get()
+            ->map(fn (Compra $compra) => [
+                'rnc_cedula' => $compra->proveedor?->rnc,
+                'tipo_identificacion' => $this->tipoIdentificacion606($compra->proveedor?->rnc),
+                'tipo_bienes_servicios' => $compra->tipo_bienes_servicios_606 ?? '09',
+                'ncf' => $compra->ncf,
+                'ncf_modificado' => '',
+                'fecha_comprobante' => $compra->fecha,
+                'fecha_pago' => $compra->fecha_pago?->format('Ymd'),
+                'monto_servicios' => '0.00',
+                'monto_bienes' => number_format((float) $compra->subtotal, 2, '.', ''),
+                'total_facturado' => number_format((float) $compra->total, 2, '.', ''),
+                'itbis_retenido' => number_format((float) ($compra->retencion_itbis ?? 0), 2, '.', ''),
+                'itbis_facturado' => number_format((float) $compra->itbis, 2, '.', ''),
+                'itbis_proporcionalidad' => '0.00',
+                'itbis_costo' => '0.00',
+                'itbis_adelantado' => '0.00',
+                'itbis_percibido' => '0.00',
+                'tipo_retencion_isr' => $compra->tipo_retencion_isr ?? '',
+                'monto_retencion_renta' => number_format((float) ($compra->retencion_isr ?? 0), 2, '.', ''),
+                'isr_percibido' => '0.00',
+                'impuesto_selectivo' => '0.00',
+                'otros_impuestos' => '0.00',
+                'monto_propina' => '0.00',
+                'forma_pago' => $compra->forma_pago_606 ?? '01',
+            ]);
+    }
+
+    /**
+     * Tipo de identificación del proveedor para el 606: 1=RNC (9 dígitos), 2=Cédula (11 dígitos).
+     */
+    public function tipoIdentificacion606(?string $rnc): ?int
+    {
+        if ($rnc === null || $rnc === '') {
+            return null;
+        }
+
+        $limpio = preg_replace('/\D/', '', $rnc);
+
+        return strlen($limpio) === 9 ? 1 : 2;
+    }
+
+    /**
+     * Etiqueta legible del tipo de identificación del proveedor.
+     */
+    public function etiquetaTipoIdentificacion606(?int $codigo): string
+    {
+        return match ($codigo) {
+            1 => 'RNC',
+            2 => 'Cédula',
+            default => '—',
+        };
+    }
+
+    /**
+     * Generar el TXT del 606 en formato DGII (pipe-delimited).
+     */
+    public function exportar606Txt(string $rncEmpresa, Carbon $desde, Carbon $hasta, ?int $empresaId = null): string
+    {
+        $registros = $this->reporte606($desde, $hasta, $empresaId);
+        $periodo = $desde->format('Ym');
+
+        $lineas = [];
+
+        // Encabezado
+        $lineas[] = implode('|', ['606', $rncEmpresa, $periodo, (string) $registros->count()]);
+
+        // Registros
+        foreach ($registros as $reg) {
+            $lineas[] = implode('|', [
+                $reg['rnc_cedula'] ?? '',
+                (string) ($reg['tipo_identificacion'] ?? ''),
+                $reg['tipo_bienes_servicios'],
+                $reg['ncf'],
+                $reg['ncf_modificado'],
+                $reg['fecha_comprobante']->format('Ymd'),
+                $reg['fecha_pago'] ?? '',
+                $reg['monto_servicios'],
+                $reg['monto_bienes'],
+                $reg['total_facturado'],
+                $reg['itbis_retenido'],
+                $reg['itbis_facturado'],
+                $reg['itbis_proporcionalidad'],
+                $reg['itbis_costo'],
+                $reg['itbis_adelantado'],
+                $reg['itbis_percibido'],
+                $reg['tipo_retencion_isr'],
+                $reg['monto_retencion_renta'],
+                $reg['isr_percibido'],
+                $reg['impuesto_selectivo'],
+                $reg['otros_impuestos'],
+                $reg['monto_propina'],
+                $reg['forma_pago'],
+            ]);
+        }
+
+        return implode("\n", $lineas);
     }
 
     /**

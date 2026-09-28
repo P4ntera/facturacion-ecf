@@ -21,6 +21,9 @@ class Compra extends Model
         'subtotal', 'monto_gravado_18', 'monto_gravado_16', 'monto_gravado_0', 'monto_exento',
         'itbis_18', 'itbis_16', 'itbis', 'total',
         'estado', 'motivo_anulacion', 'anulada_en',
+        // Campos 606
+        'tipo_bienes_servicios_606', 'forma_pago_606', 'fecha_pago',
+        'retencion_itbis', 'retencion_isr', 'tipo_retencion_isr',
     ];
 
     protected $casts = [
@@ -31,7 +34,10 @@ class Compra extends Model
         'fecha' => 'datetime',
         'fecha_vencimiento' => 'date',
         'anulada_en' => 'datetime',
+        'fecha_pago' => 'date',
         'monto_total_factura' => 'decimal:2',
+        'retencion_itbis' => 'decimal:2',
+        'retencion_isr' => 'decimal:2',
         'subtotal' => 'decimal:2',
         'monto_gravado_18' => 'decimal:2',
         'monto_gravado_16' => 'decimal:2',
