@@ -336,15 +336,32 @@ class VentaResource extends Resource
                         $record->esElectronica() && $record->estado_fiscal->esAceptado() => "La DGII ya aceptó el e-CF {$record->ncf}: se emitirá una Nota de Crédito electrónica (e-CF 34) que lo anula, y se repondrá el stock.",
                         default => 'Se repondrá el stock y la venta quedará anulada. No se emite Nota de Crédito (el comprobante no fue aceptado por la DGII).',
                     })
-                    ->schema([
-                        Textarea::make('motivo')
-                            ->label('Motivo de la anulación')
-                            ->required()
-                            ->rows(3),
-                    ])
+                    ->schema(function (Venta $record): array {
+                        $campos = [
+                            Textarea::make('motivo')
+                                ->label('Motivo de la anulación')
+                                ->required()
+                                ->rows(3),
+                        ];
+
+                        // Comprobantes físicos (tipo B) requieren tipo de anulación para el 608
+                        if ($record->tipo_comprobante?->esFisico()) {
+                            $campos[] = \Filament\Forms\Components\Select::make('tipo_anulacion_608')
+                                ->label('Tipo de anulación (608)')
+                                ->options(
+                                    collect(\App\Services\ReporteService::TIPO_ANULACION_608)
+                                        ->mapWithKeys(fn (string $label, string $code) => [$code => "{$code} - {$label}"])
+                                        ->all()
+                                )
+                                ->required()
+                                ->helperText('Requerido para el reporte 608 de la DGII');
+                        }
+
+                        return $campos;
+                    })
                     ->action(function (Venta $record, array $data): void {
                         try {
-                            $venta = app(VentaService::class)->anular($record, $data['motivo'], auth()->id());
+                            $venta = app(VentaService::class)->anular($record, $data['motivo'], auth()->id(), $data['tipo_anulacion_608'] ?? null);
                         } catch (VentaYaAnuladaException|ArqueoCajaCerradoException|VentaInvalidaException|SecuenciaNcfAgotadaException|CuentaConPagosRegistradosException $e) {
                             Notification::make()->title($e->getMessage())->danger()->send();
 

@@ -311,7 +311,7 @@ class VentaService
      * @throws CuentaConPagosRegistradosException
      * @throws SecuenciaNcfAgotadaException si hace falta Nota de Crédito y no hay secuencia 34
      */
-    public function anular(Venta $venta, string $motivo, ?int $userId = null): Venta
+    public function anular(Venta $venta, string $motivo, ?int $userId = null, ?string $tipoAnulacion608 = null): Venta
     {
         // Queda en motivo_anulacion (608, auditoría) y, si hay Nota de Crédito, viaja a la DGII
         // como RazonModificacion: nunca en blanco.
@@ -380,10 +380,20 @@ class VentaService
                 }
             }
 
+            // Para comprobantes físicos (tipo B), el tipo de anulación es obligatorio
+            // porque va al Formato 608 de la DGII. Los e-CF no van al 608 (se anulan
+            // vía Nota de Crédito E34), así que no lo necesitan.
+            if ($venta->tipo_comprobante?->esFisico() && blank($tipoAnulacion608)) {
+                throw new VentaInvalidaException(
+                    'Debe seleccionar el tipo de anulación para el reporte 608 (comprobante físico).'
+                );
+            }
+
             $venta->update([
                 'estado' => EstadoVenta::ANULADA,
                 'motivo_anulacion' => $motivo,
                 'anulada_en' => now(),
+                'tipo_anulacion_608' => $venta->tipo_comprobante?->esFisico() ? $tipoAnulacion608 : null,
             ]);
 
             return $venta->refresh();
