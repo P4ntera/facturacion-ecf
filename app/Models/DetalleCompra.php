@@ -42,16 +42,20 @@ class DetalleCompra extends Model
     }
 
     /** Suma de lo devuelto en devoluciones NO anuladas de esta línea. */
-    public function cantidadDevuelta(): float
+    public function cantidadDevuelta(): string
     {
-        return (float) $this->devoluciones()
+        $sum = $this->devoluciones()
             ->whereHas('devolucion', fn ($q) => $q->where('estado', '!=', EstadoDevolucion::ANULADA))
             ->sum('cantidad');
+
+        return bcmul((string) $sum, '1', 3);
     }
 
     /** Cuánto de lo comprado en esta línea aún puede devolverse. */
     public function cantidadDisponibleParaDevolver(): float
     {
-        return max(0, (float) $this->cantidad - $this->cantidadDevuelta());
+        $disponible = bcsub((string) $this->cantidad, $this->cantidadDevuelta(), 3);
+
+        return max(0, (float) $disponible);
     }
 }
