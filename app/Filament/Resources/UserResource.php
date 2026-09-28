@@ -8,9 +8,12 @@ use App\Models\User;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\ToggleColumn;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Hash;
@@ -31,7 +34,7 @@ class UserResource extends Resource
 
     protected static string|\UnitEnum|null $navigationGroup = 'Configuración';
 
-    protected static ?int $navigationSort = 62;
+    protected static ?int $navigationSort = 1;
 
     public static function form(Schema $schema): Schema
     {
@@ -81,9 +84,19 @@ class UserResource extends Resource
             Select::make('impresora_facturacion_id')
                 ->label('Impresora de facturación')
                 ->helperText('Si el usuario tiene una asignada, se usa en vez de la predeterminada del módulo al imprimir tickets de venta.')
-                ->relationship('impresoraFacturacion', 'nombre', fn (Builder $query) => $query->activas()->porModulo(ModuloImpresion::FACTURACION))
+                // Scope manual obligatorio — Filament NO aplica tenant scope dentro de
+                // ->relationship(), ni siquiera dentro de su propio Resource.
+                ->relationship('impresoraFacturacion', 'nombre', fn (Builder $query) => $query
+                    ->where('empresa_id', Filament::getTenant()?->id)
+                    ->activas()
+                    ->porModulo(ModuloImpresion::FACTURACION))
                 ->preload()
                 ->native(false)
+                ->visible(fn (): bool => auth()->user()?->can('usuarios.gestionar') ?? false),
+
+            Toggle::make('activo')
+                ->label('Activo')
+                ->default(true)
                 ->visible(fn (): bool => auth()->user()?->can('usuarios.gestionar') ?? false),
         ]);
     }
@@ -106,12 +119,18 @@ class UserResource extends Resource
                 ->badge()
                 ->placeholder('—'),
 
+            ToggleColumn::make('activo')
+                ->label('Activo'),
+
             TextColumn::make('created_at')
                 ->label('Creado')
                 ->dateTime('d/m/Y H:i')
                 ->sortable()
                 ->toggleable(isToggledHiddenByDefault: true),
-        ]);
+        ])
+            ->filters([
+                TernaryFilter::make('activo')->label('Activo')->default(true),
+            ]);
     }
 
     public static function getPages(): array

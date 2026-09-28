@@ -25,7 +25,7 @@ class ManageFacturacion extends Page
 
     protected static string|UnitEnum|null $navigationGroup = 'Configuración';
 
-    protected static ?int $navigationSort = 61;
+    protected static ?int $navigationSort = 4;
 
     protected static ?string $navigationLabel = 'Facturación';
 
@@ -48,6 +48,7 @@ class ManageFacturacion extends Page
             'precio_incluye_itbis' => $config->precio_incluye_itbis,
             'tasa_itbis_defecto' => $config->tasa_itbis_defecto,
             'tipo_comprobante_defecto' => $config->tipo_comprobante_defecto,
+            'permite_ventas_sin_comprobante' => $config->permite_ventas_sin_comprobante,
             'moneda' => $config->moneda,
         ]);
     }
@@ -76,10 +77,17 @@ class ManageFacturacion extends Page
 
                 Select::make('tipo_comprobante_defecto')
                     ->label('Tipo de comprobante por defecto')
-                    ->options(collect(TipoComprobante::cases())->mapWithKeys(
-                        fn (TipoComprobante $tipo) => [$tipo->value => "{$tipo->value} — {$tipo->etiqueta()}"]
-                    ))
+                    ->helperText('Solo tipos de venta. Los electrónicos (e-CF) solo aparecen si la empresa tiene e-CF habilitado.')
+                    ->options(fn () => collect(TipoComprobante::cases())
+                        ->filter(fn (TipoComprobante $tipo) => $tipo->esDeVenta())
+                        ->filter(fn (TipoComprobante $tipo) => $tipo->esFisico() || $this->empresa()->usaEcf())
+                        ->mapWithKeys(fn (TipoComprobante $tipo) => [$tipo->value => "{$tipo->value} — {$tipo->etiqueta()}"]))
                     ->required(),
+
+                Toggle::make('permite_ventas_sin_comprobante')
+                    ->label('Permitir ventas sin comprobante fiscal')
+                    ->helperText('Agrega "Sin comprobante" al POS (y lo usa por defecto en el POS táctil): la venta se registra sin NCF y no aparece en el 607. Solo para negocios NO obligados a emitir NCF — un contribuyente de ITBIS debe emitir comprobante en cada venta (Decreto 254-06).')
+                    ->columnSpanFull(),
 
                 Select::make('moneda')
                     ->label('Moneda')

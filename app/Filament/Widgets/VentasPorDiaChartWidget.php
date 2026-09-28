@@ -10,7 +10,7 @@ use Illuminate\Support\Carbon;
 
 class VentasPorDiaChartWidget extends ChartWidget
 {
-    protected static ?int $sort = -1;
+    protected static ?int $sort = 2;
 
     protected ?string $heading = 'Ventas por día (últimos 30 días)';
 

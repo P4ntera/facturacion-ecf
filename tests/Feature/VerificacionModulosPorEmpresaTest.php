@@ -153,8 +153,13 @@ class VerificacionModulosPorEmpresaTest extends TestCase
             ->assertForbidden();
     }
 
-    /** 4. usa_ecf=false oculta los módulos ECF_* aunque sus toggles sigan encendidos. */
-    public function test_4_usa_ecf_false_oculta_los_modulos_ecf_pese_al_toggle_encendido(): void
+    /**
+     * 4. usa_ecf=false oculta ECF_RECIBIDOS (recepción electrónica de proveedores) aunque su
+     * toggle siga encendido. ECF_SECUENCIAS (Secuencias NCF) YA NO depende de usa_ecf desde el
+     * soporte de comprobantes físicos (tipo B): sin e-CF, la empresa sigue necesitando gestionar
+     * su propio rango B0X, así que debe seguir accesible.
+     */
+    public function test_4_usa_ecf_false_oculta_ecf_recibidos_pero_no_secuencias_ncf(): void
     {
         [$empresa, $admin] = $this->empresaConAdmin('Empresa e-CF SRL');
 
@@ -163,7 +168,7 @@ class VerificacionModulosPorEmpresaTest extends TestCase
         $empresa->update(['usa_ecf' => false]);
 
         $this->visitar($admin, $empresa, SecuenciaNcfResource::getUrl('index', tenant: $empresa))
-            ->assertForbidden();
+            ->assertOk();
 
         $this->visitar($admin, $empresa, DocumentoRecibidoResource::getUrl('index', tenant: $empresa))
             ->assertForbidden();

@@ -25,8 +25,8 @@ class Venta extends Model
     use LogsActivity;
 
     protected $fillable = [
-        'cliente_id', 'user_id', 'tipo_comprobante', 'ncf', 'ncf_modifica',
-        'tipo_pago', 'fecha_limite_pago', 'forma_pago', 'arqueo_caja_id',
+        'cliente_id', 'user_id', 'tipo_comprobante', 'ncf', 'ncf_modifica', 'venta_modificada_id',
+        'tipo_pago', 'fecha_limite_pago', 'forma_pago', 'arqueo_caja_id', 'caja_id',
         'empresa_id', 'cliente_id', 'user_id', 'tipo_comprobante', 'ncf', 'ncf_modifica',
         'tipo_pago', 'fecha_limite_pago',
         'fecha', 'moneda', 'tasa_cambio',
@@ -89,9 +89,32 @@ class Venta extends Model
         return $this->belongsTo(ArqueoCaja::class);
     }
 
+    public function caja(): BelongsTo
+    {
+        return $this->belongsTo(Caja::class);
+    }
+
     public function cuentaPorCobrar(): HasOne
     {
         return $this->hasOne(CuentaPorCobrar::class);
+    }
+
+    /** Para una Nota de Crédito de anulación: la venta que anula. */
+    public function ventaModificada(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'venta_modificada_id');
+    }
+
+    /** Notas de Crédito emitidas para anular esta venta (a lo sumo una hoy). */
+    public function notasCredito(): HasMany
+    {
+        return $this->hasMany(self::class, 'venta_modificada_id');
+    }
+
+    /** true si esta fila es una Nota de Crédito emitida para anular otra venta (no una venta). */
+    public function esNotaCreditoDeAnulacion(): bool
+    {
+        return $this->venta_modificada_id !== null;
     }
 
     public function esACredito(): bool
@@ -105,26 +128,80 @@ class Venta extends Model
      */
     public const UMBRAL_CONSUMO = '250000.00';
 
+    public const ETIQUETA_AL_PORTADOR = 'Al portador';
+
+    public const ETIQUETA_SIN_COMPROBANTE = 'Sin comprobante';
+
     public function estaAnulada(): bool
     {
         return $this->estado === EstadoVenta::ANULADA;
     }
 
+    /**
+     * true si el tipo de comprobante es electrónico (e-CF, pasa por el PAC/DGII); false si es
+     * NCF físico (tipo B). Determinado por el tipo, no por si tiene ncf asignado — un comprobante
+     * físico también lleva un NCF real (ver VentaService::registrar()), solo que nunca se
+     * transmite.
+     */
     public function esElectronica(): bool
     {
-        return $this->ncf !== null;
+        return $this->tipo_comprobante?->esElectronico() ?? false;
+    }
+
+    /**
+     * Base imponible neta (sin ITBIS, ya descontado el descuento global) = suma de las líneas:
+     * subtotal es BRUTO y el descuento global se prorratea en las líneas antes del ITBIS (ver
+     * VentaService::calcularLineas()). Es el "Monto facturado" del 607 y el subtotal que imprimen
+     * el ticket y el PDF (para que las líneas sumen lo que dice el pie).
+     */
+    public function subtotalNeto(): string
+    {
+        return bcsub((string) $this->subtotal, (string) $this->descuento, 2);
+    }
+
+    /** true si la venta se registró sin comprobante fiscal (sin NCF, fuera del 607). */
+    public function esSinComprobante(): bool
+    {
+        return $this->tipo_comprobante === null;
+    }
+
+    /** Etiqueta del tipo de comprobante para tickets, PDFs y listados. */
+    public function etiquetaComprobante(): string
+    {
+        return $this->tipo_comprobante?->etiqueta() ?? self::ETIQUETA_SIN_COMPROBANTE;
+    }
+
+    /** Nombre del cliente para tickets, PDFs y listados; "Al portador" si la venta no tiene. */
+    public function nombreCliente(): string
+    {
+        return $this->cliente?->nombre ?? self::ETIQUETA_AL_PORTADOR;
+    }
+
+    /**
+     * true si el tipo de comprobante exige que la venta tenga un cliente asociado (aunque no
+     * necesariamente con documento — eso lo decide requiereComprador()): los que siempre
+     * identifican al comprador (Crédito Fiscal, Regímenes Especiales, Gubernamental) y Consumo
+     * desde el umbral.
+     */
+    public function requiereCliente(): bool
+    {
+        return $this->requiereComprador() || in_array($this->tipo_comprobante, [
+            TipoComprobante::REGIMENES_ESPECIALES, TipoComprobante::REGIMENES_ESPECIALES_FISICA,
+            TipoComprobante::GUBERNAMENTAL, TipoComprobante::GUBERNAMENTAL_FISICA,
+        ], true);
     }
 
     /**
      * true si este comprobante exige RNC/razón social del comprador: siempre para Crédito Fiscal
-     * (31); para Consumo (32) solo si el total alcanza UMBRAL_CONSUMO. Los demás tipos no forman
-     * parte de esta regla.
+     * (31/B01); para Consumo (32/B02) solo si el total alcanza UMBRAL_CONSUMO. La regla es la
+     * misma para el físico y el electrónico (Norma DGII, no una particularidad del e-CF). Los
+     * demás tipos no forman parte de esta regla.
      */
     public function requiereComprador(): bool
     {
         return match ($this->tipo_comprobante) {
-            TipoComprobante::FACTURA_CREDITO_FISCAL => true,
-            TipoComprobante::FACTURA_CONSUMO => bccomp((string) $this->total, self::UMBRAL_CONSUMO, 2) >= 0,
+            TipoComprobante::FACTURA_CREDITO_FISCAL, TipoComprobante::FACTURA_CREDITO_FISCAL_FISICA => true,
+            TipoComprobante::FACTURA_CONSUMO, TipoComprobante::FACTURA_CONSUMO_FISICA => bccomp((string) $this->total, self::UMBRAL_CONSUMO, 2) >= 0,
             default => false,
         };
     }

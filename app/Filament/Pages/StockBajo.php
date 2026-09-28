@@ -23,9 +23,9 @@ class StockBajo extends Page
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedExclamationTriangle;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Compras';
+    protected static string|UnitEnum|null $navigationGroup = 'Inventario';
 
-    protected static ?int $navigationSort = 32;
+    protected static ?int $navigationSort = 4;
 
     protected static ?string $navigationLabel = 'Stock Bajo';
 

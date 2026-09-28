@@ -66,7 +66,7 @@ class CuentaPorPagarResourceTest extends TestCase
             'itbis_incluido' => false,
             'tipo_pago' => TipoPago::CREDITO->value,
             'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1, 'costo_unitario' => 100]],
-        ], User::factory()->create()->id);
+        ], User::factory()->create()->id, $this->empresaDefault);
     }
 
     public function test_la_pagina_indice_carga_para_quien_tiene_permiso(): void

@@ -6,6 +6,7 @@ use App\Enums\TipoComprobante;
 use App\Exceptions\RangoNcfSolapadoException;
 use App\Filament\Resources\SecuenciaNcfResource;
 use App\Services\SecuenciaNcfService;
+use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Support\Exceptions\Halt;
@@ -29,6 +30,7 @@ class CreateSecuenciaNcf extends CreateRecord
                 $data['prefijo'],
                 (int) $data['secuencia_desde'],
                 (int) $data['secuencia_hasta'],
+                Filament::getTenant(),
             );
         } catch (RangoNcfSolapadoException $e) {
             Notification::make()->title($e->getMessage())->danger()->send();
@@ -39,7 +41,7 @@ class CreateSecuenciaNcf extends CreateRecord
         // Encolado automático: si ya hay un rango activo para este tipo de comprobante, el nuevo
         // rango se guarda inactivo sin importar lo que haya elegido el usuario en el toggle;
         // se activará solo cuando el activo actual se agote (ver SecuenciaNcfService::siguiente()).
-        if (($data['activa'] ?? false) && $servicio->existeRangoActivo($tipo)) {
+        if (($data['activa'] ?? false) && $servicio->existeRangoActivo($tipo, Filament::getTenant())) {
             $data['activa'] = false;
         }
 

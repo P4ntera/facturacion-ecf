@@ -26,13 +26,13 @@
 
         <div class="separador"></div>
 
-        <p class="centro negrita">{{ $venta->tipo_comprobante->etiqueta() }}</p>
+        <p class="centro negrita">{{ $venta->etiquetaComprobante() }}</p>
         @if ($venta->ncf)
             <p class="centro negrita">{{ $venta->ncf }}</p>
         @endif
         <p>Fecha: {{ $venta->fecha->format('d/m/Y H:i') }}</p>
-        <p>Cliente: {{ \Illuminate\Support\Str::limit($venta->cliente->nombre, $anchoPapel->columnas() - 9) }}</p>
-        @if ($venta->cliente->documento)
+        <p>Cliente: {{ \Illuminate\Support\Str::limit($venta->nombreCliente(), $anchoPapel->columnas() - 9) }}</p>
+        @if ($venta->cliente?->documento)
             <p>Doc: {{ $venta->cliente->documento }}</p>
         @endif
 
@@ -45,15 +45,30 @@
                     <td>{{ rtrim(rtrim(number_format((float) $detalle->cantidad, 3, '.', ''), '0'), '.') }} x {{ number_format((float) $detalle->precio_unitario, 2) }}</td>
                     <td class="derecha">{{ number_format((float) $detalle->subtotal, 2) }}</td>
                 </tr>
+                @if ((float) $detalle->descuento > 0)
+                    <tr class="itbis-linea">
+                        <td>Desc.</td>
+                        <td class="derecha">-{{ number_format((float) $detalle->descuento, 2) }}</td>
+                    </tr>
+                @endif
+                {{-- itbis_monto ya es el ITBIS de toda la línea (no el unitario); los exentos no lo muestran. --}}
+                @if ((float) $detalle->itbis_monto > 0)
+                    <tr class="itbis-linea">
+                        <td>ITBIS {{ $detalle->tasa_itbis->value }}%</td>
+                        <td class="derecha">{{ number_format((float) $detalle->itbis_monto, 2) }}</td>
+                    </tr>
+                @endif
             </table>
         @endforeach
 
         <div class="separador"></div>
 
         <table>
+            {{-- Subtotal NETO: el descuento ya va dentro de cada línea (prorrateado antes del
+                 ITBIS), así las líneas suman el subtotal y subtotal + ITBIS = TOTAL. --}}
             <tr>
                 <td>Subtotal</td>
-                <td class="derecha">{{ number_format((float) $venta->subtotal, 2) }}</td>
+                <td class="derecha">{{ number_format((float) $venta->subtotalNeto(), 2) }}</td>
             </tr>
             <tr>
                 <td>ITBIS</td>
@@ -69,6 +84,9 @@
                 <td class="derecha negrita">{{ $venta->moneda }} {{ number_format((float) $venta->total, 2) }}</td>
             </tr>
         </table>
+        @if ((float) $venta->descuento > 0)
+            <p class="centro">Incluye descuento de {{ $venta->moneda }} {{ number_format((float) $venta->descuento, 2) }}</p>
+        @endif
 
         @if ($qrTimbre)
             <div class="separador"></div>

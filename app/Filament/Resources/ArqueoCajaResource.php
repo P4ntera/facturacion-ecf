@@ -49,9 +49,9 @@ class ArqueoCajaResource extends Resource
 
     protected static ?string $slug = 'arqueos-caja';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Ventas';
+    protected static string|\UnitEnum|null $navigationGroup = 'Operaciones';
 
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 7;
 
     // No se crea a mano: un arqueo nace al abrir caja desde Caja/Facturación. El cierre sí se
     // hace aquí (acción "Cerrar caja" en la tabla), no desde las pantallas de venta.
@@ -68,6 +68,7 @@ class ArqueoCajaResource extends Resource
                 ->columns(3)
                 ->schema([
                     TextEntry::make('user.name')->label('Cajero'),
+                    TextEntry::make('caja.nombre')->label('Caja')->placeholder('—'),
                     TextEntry::make('estado')->label('Estado')->badge()
                         ->formatStateUsing(fn (EstadoArqueoCaja $state) => $state->etiqueta())
                         ->color(fn (EstadoArqueoCaja $state) => $state === EstadoArqueoCaja::CERRADO ? 'success' : 'warning'),
@@ -109,6 +110,11 @@ class ArqueoCajaResource extends Resource
                 TextColumn::make('user.name')
                     ->label('Cajero')
                     ->searchable()
+                    ->sortable(),
+
+                TextColumn::make('caja.nombre')
+                    ->label('Caja')
+                    ->placeholder('—')
                     ->sortable(),
 
                 TextColumn::make('abierto_en')
@@ -163,6 +169,12 @@ class ArqueoCajaResource extends Resource
                     // resueltas aparte): sin esto, se ven cajeros de otras empresas en el filtro.
                     ->relationship('user', 'name', modifyQueryUsing: fn (Builder $query) => $query->where('empresa_id', Filament::getTenant()->id))
                     ->searchable()
+                    ->preload(),
+
+                SelectFilter::make('caja_id')
+                    ->label('Caja')
+                    // Mismo motivo que el filtro de cajero: ->relationship() no se scopea solo.
+                    ->relationship('caja', 'nombre', modifyQueryUsing: fn (Builder $query) => $query->where('empresa_id', Filament::getTenant()->id))
                     ->preload(),
 
                 SelectFilter::make('estado')

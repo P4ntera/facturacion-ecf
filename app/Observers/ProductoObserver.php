@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace App\Observers;
 
+use App\Enums\TipoNotificacion;
 use App\Models\Producto;
-use App\Models\User;
+use App\Services\NotificacionService;
 use Filament\Notifications\Notification;
 
 class ProductoObserver
@@ -20,16 +21,13 @@ class ProductoObserver
             return;
         }
 
-        $destinatarios = User::permission('inventario.ajustar')->get();
-
-        if ($destinatarios->isEmpty()) {
-            return;
-        }
-
-        Notification::make()
-            ->title("Stock bajo del mínimo: {$producto->nombre}")
-            ->body("Stock actual: {$producto->stock} (mínimo: {$producto->stock_minimo}).")
-            ->warning()
-            ->sendToDatabase($destinatarios);
+        app(NotificacionService::class)->enviar(
+            TipoNotificacion::STOCK_BAJO,
+            $producto->empresa,
+            Notification::make()
+                ->title("Stock bajo del mínimo: {$producto->nombre}")
+                ->body("Stock actual: {$producto->stock} (mínimo: {$producto->stock_minimo}).")
+                ->warning(),
+        );
     }
 }

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\EstadoFiscal;
 use App\Enums\FormaPago;
 use App\Enums\TasaItbis;
 use App\Enums\TipoComprobante;
@@ -217,6 +218,8 @@ class CuentaPorCobrarServiceTest extends TestCase
     {
         $venta = $this->venderACredito();
 
+        // Anulación simple: el e-CF no llegó a ser válido ante la DGII (sin Nota de Crédito).
+        $venta->update(['estado_fiscal' => EstadoFiscal::RECHAZADO]);
         app(VentaService::class)->anular($venta, 'Error de digitación', User::factory()->create()->id);
 
         $this->assertNull($venta->fresh()->cuentaPorCobrar);

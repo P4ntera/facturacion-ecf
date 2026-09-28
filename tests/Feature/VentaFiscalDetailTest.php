@@ -112,8 +112,11 @@ class VentaFiscalDetailTest extends TestCase
 
     public function test_no_muestra_seccion_fiscal_si_la_venta_no_es_electronica(): void
     {
+        // esElectronica() depende del TIPO de comprobante, no de si ncf es null (un comprobante
+        // físico también lleva un NCF real): forzar un tipo B02 es la forma correcta de simular
+        // una venta no electrónica, ya no basta con vaciar el ncf de una venta E32.
         $venta = $this->crearVentaAceptada();
-        $venta->update(['ncf' => null]);
+        $venta->update(['tipo_comprobante' => TipoComprobante::FACTURA_CONSUMO_FISICA]);
 
         Livewire::actingAs($this->usuarioAutorizado())
             ->test(ViewVenta::class, ['record' => $venta->id])

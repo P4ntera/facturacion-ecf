@@ -65,6 +65,18 @@
         text-align: right;
     }
 
+    /* Altura mínima para que un ticket de 1 producto no salga "cortado"; sin max-height: crece
+       con los productos. */
+    .hoja {
+        min-height: 280px;
+    }
+
+    /* ITBIS por línea: más chico e indentado, pero negro (el gris se pierde en papel térmico). */
+    .itbis-linea td {
+        font-size: .85em;
+        padding-left: 2ch;
+    }
+
     img.qr {
         display: block;
         margin: 6px auto;

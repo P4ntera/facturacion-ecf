@@ -41,9 +41,9 @@ class EmpresaResource extends Resource
 
     protected static ?string $slug = 'empresas';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Super Admin';
+    protected static string|\UnitEnum|null $navigationGroup = 'Configuración';
 
-    protected static ?int $navigationSort = 70;
+    protected static ?int $navigationSort = 8;
 
     public static function form(Schema $schema): Schema
     {
@@ -75,7 +75,8 @@ class EmpresaResource extends Resource
                             ->maxLength(255),
 
                         Toggle::make('usa_ecf')
-                            ->label('Usa e-CF (facturación electrónica)')
+                            ->label('Usa facturación electrónica (e-CF)')
+                            ->helperText('Actívalo si la empresa emite comprobantes electrónicos (E31, E32, E33, E34...) que se envían a la DGII. Desactívalo para usar solo comprobantes físicos (B01, B02, B14, B15). Con cualquiera de los dos, el POS solo ofrece los tipos que tengan una secuencia NCF cargada.')
                             ->default(true),
 
                         Toggle::make('activa')

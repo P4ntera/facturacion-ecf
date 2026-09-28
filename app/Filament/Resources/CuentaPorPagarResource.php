@@ -52,7 +52,9 @@ class CuentaPorPagarResource extends Resource
 
     protected static ?string $slug = 'cuentas-por-pagar';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Cuentas';
+    protected static string|\UnitEnum|null $navigationGroup = 'Comercial';
+
+    protected static ?int $navigationSort = 4;
 
     // Nace automáticamente al comprar a crédito (CompraService::crear()); no se crea a mano.
     public static function canCreate(): bool
@@ -215,7 +217,7 @@ class CuentaPorPagarResource extends Resource
                         Select::make('pago_id')
                             ->label('Pago a anular')
                             ->options($record->pagosVigentes()->get()->mapWithKeys(
-                                fn (PagoRealizado $p) => [$p->id => "RD$" . number_format((float) $p->monto, 2) . ' — ' . $p->fecha->format('d/m/Y')]
+                                fn (PagoRealizado $p) => [$p->id => 'RD$'.number_format((float) $p->monto, 2).' — '.$p->fecha->format('d/m/Y')]
                             ))
                             ->required(),
                         Textarea::make('motivo')

@@ -5,6 +5,8 @@ namespace App\Providers\Filament;
 use App\Filament\Pages\Auth\EditProfile;
 use App\Http\Middleware\EstablecerEmpresaPermisos;
 use App\Models\Empresa;
+use Filament\Actions\Action;
+use Filament\Enums\UserMenuPosition;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -15,12 +17,14 @@ use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
 use Filament\Support\Enums\Width;
+use Filament\View\PanelsRenderHook;
 use Filament\Widgets\AccountWidget;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
+use Illuminate\Support\HtmlString;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 
 class AdminPanelProvider extends PanelProvider
@@ -34,6 +38,7 @@ class AdminPanelProvider extends PanelProvider
             ->viteTheme('resources/css/filament/admin/theme.css')
             ->login()
             ->profile(EditProfile::class)
+            ->userMenuItems([])
             // Multi-tenant nativo de Filament: cada empresa es un tenant, identificado en la URL
             // por su slug (/admin/{empresa-slug}/...). ownershipRelationship es explícito aunque
             // coincide con el default (camelCase del modelo) para que quede documentado aquí.
@@ -44,35 +49,22 @@ class AdminPanelProvider extends PanelProvider
             // normal con una sola empresa entra directo (getDefaultTenant) y no lo necesita, pero
             // no le estorba dejarlo visible.
             ->tenantMenu()
-            // Orden = orden en el sidebar (ver NavigationManager::get()); por eso Ventas va
-            // primero (el diario del negocio) y Super Admin al final (solo lo ve el super-admin,
-            // ver EmpresaResource). Todos colapsados por defecto salvo Ventas: menos ruido visual
-            // al entrar, sin esconder lo que se usa a diario.
+            // Navegación en barra superior: cada grupo es un botón con dropdown y los ítems sin
+            // grupo (solo Dashboard) van como botón suelto. Por debajo de lg (1024px) Filament
+            // oculta la barra y vuelve al sidebar off-canvas con hamburguesa, así que el CSS del
+            // sidebar en theme.css sigue en uso en mobile/tablet.
+            ->topNavigation()
+            // Orden = orden en la barra (ver NavigationManager::get()); dentro de cada grupo
+            // manda el $navigationSort de cada Resource/Page. Los grupos NO llevan ->icon(): el
+            // sidebar de mobile lanza una excepción si un grupo tiene ícono y sus ítems también
+            // (vendor/filament/filament/resources/views/components/sidebar/group.blade.php), y
+            // se prefirió conservar los íconos de los ítems, que se ven en cada dropdown.
             ->navigationGroups([
-                NavigationGroup::make('Ventas')
-                    ->icon('heroicon-o-shopping-bag')
-                    ->collapsed(false),
-                NavigationGroup::make('Maestros')
-                    ->icon('heroicon-o-rectangle-stack')
-                    ->collapsed(),
-                NavigationGroup::make('Inventario')
-                    ->icon('heroicon-o-archive-box')
-                    ->collapsed(),
-                NavigationGroup::make('Compras')
-                    ->icon('heroicon-o-shopping-cart')
-                    ->collapsed(),
-                NavigationGroup::make('Fiscal')
-                    ->icon('heroicon-o-document-text')
-                    ->collapsed(),
-                NavigationGroup::make('Reportes')
-                    ->icon('heroicon-o-chart-bar')
-                    ->collapsed(),
-                NavigationGroup::make('Configuración')
-                    ->icon('heroicon-o-cog-6-tooth')
-                    ->collapsed(),
-                NavigationGroup::make('Super Admin')
-                    ->icon('heroicon-o-building-office-2')
-                    ->collapsed(),
+                NavigationGroup::make('Operaciones'),
+                NavigationGroup::make('Inventario'),
+                NavigationGroup::make('Comercial'),
+                NavigationGroup::make('Fiscal'),
+                NavigationGroup::make('Configuración'),
             ])
             ->colors([
                 'primary' => Color::hex('#5D87FF'), // --primary
@@ -111,12 +103,21 @@ class AdminPanelProvider extends PanelProvider
             ->darkMode(false)
             ->databaseNotifications()
             ->maxContentWidth(Width::Full)
-            ->sidebarCollapsibleOnDesktop()
+            ->sidebarCollapsibleOnDesktop(false)
+            ->renderHook(
+                PanelsRenderHook::BODY_END,
+                fn () => new HtmlString('<script>try{let k="_x_collapsedGroups",v=localStorage.getItem(k);if(v&&v!=="[]"){localStorage.removeItem(k)}}catch(e){}</script>'),
+            )
             // Cuerpo de texto (--font-body). Filament no permite una segunda familia solo para
             // titulares vía este método: Manrope (--font-headline) se aplica en theme.css sobre
             // las hook classes de heading de Filament (fi-header-heading y similares).
             ->font('Inter')
-            ->brandName('Facturación e-CF')
+            ->brandName('FesrSoft ERP')
+            // Menú de usuario en la barra superior: con ->topNavigation() el sidebar solo existe
+            // en mobile, así que en posición Sidebar el menú desaparecería en escritorio. La
+            // variante de sidebar (avatar + nombre + rol) del override
+            // resources/views/vendor/filament-panels/components/user-menu.blade.php queda sin uso.
+            ->userMenu(position: UserMenuPosition::Topbar)
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')
             ->pages([

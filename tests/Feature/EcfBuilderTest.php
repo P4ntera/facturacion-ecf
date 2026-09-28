@@ -290,4 +290,60 @@ class EcfBuilderTest extends TestCase
         $this->assertSame('130987654', $comprador['RNCComprador']);
         $this->assertSame('Comercial Grande SRL', $comprador['RazonSocialComprador']);
     }
+
+    /**
+     * Una Nota de Crédito registrada a mano (ajuste de montos) declara el e-NCF modificado en
+     * InformacionReferencia (formato e-CF DGII), con CodigoModificacion 3, y lleva
+     * IndicadorNotaCredito en IdDoc.
+     */
+    public function test_nota_de_credito_incluye_informacion_de_referencia(): void
+    {
+        $this->secuencia(TipoComprobante::FACTURA_CONSUMO, 'E32');
+        $this->secuencia(TipoComprobante::NOTA_CREDITO, 'E34');
+
+        $producto = $this->producto('PCF-NC', TasaItbis::DIECIOCHO);
+        $cliente = Cliente::create(['nombre' => 'Cliente NC', 'activo' => true]);
+
+        $ventaOriginal = app(VentaService::class)->registrar([
+            'cliente_id' => $cliente->id,
+            'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
+        ], $this->empresaDefault);
+
+        $notaCredito = app(VentaService::class)->registrar([
+            'cliente_id' => $cliente->id,
+            'tipo_comprobante' => TipoComprobante::NOTA_CREDITO->value,
+            'ncf_modifica' => $ventaOriginal->ncf,
+            'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
+        ], $this->empresaDefault)->refresh();
+
+        $ecf = app(EcfBuilder::class)->construir($notaCredito)['ECF'];
+
+        $this->assertArrayNotHasKey('NCFModificado', $ecf['Encabezado']['IdDoc']);
+        $this->assertSame('0', $ecf['Encabezado']['IdDoc']['IndicadorNotaCredito']);
+        $this->assertSame([
+            'NCFModificado' => $ventaOriginal->ncf,
+            'FechaNCFModificado' => $ventaOriginal->fecha->format('d-m-Y'),
+            'CodigoModificacion' => '3',
+        ], $ecf['InformacionReferencia']);
+    }
+
+    /** Una venta normal (sin ncf_modifica) no debe llevar NCFModificado en el XML/JSON. */
+    public function test_venta_normal_no_incluye_ncf_modificado(): void
+    {
+        $this->secuencia(TipoComprobante::FACTURA_CONSUMO, 'E32');
+
+        $producto = $this->producto('PCF-SIN-NC', TasaItbis::DIECIOCHO);
+        $cliente = Cliente::create(['nombre' => 'Consumidor Final', 'activo' => true]);
+
+        $venta = app(VentaService::class)->registrar([
+            'cliente_id' => $cliente->id,
+            'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
+        ], $this->empresaDefault)->refresh();
+
+        $ecf = app(EcfBuilder::class)->construir($venta)['ECF'];
+
+        $this->assertArrayNotHasKey('NCFModificado', $ecf['Encabezado']['IdDoc']);
+        $this->assertArrayNotHasKey('IndicadorNotaCredito', $ecf['Encabezado']['IdDoc']);
+        $this->assertArrayNotHasKey('InformacionReferencia', $ecf);
+    }
 }

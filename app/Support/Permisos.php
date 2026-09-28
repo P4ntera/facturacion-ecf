@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Support;
 
+use App\Enums\TipoNotificacion;
+
 /**
  * Catálogo central de permisos granulares por módulo/pantalla. Única fuente de verdad,
  * consumida por: el seeder de roles (database/seeders/RolePermissionSeeder.php), la matriz de
@@ -46,6 +48,8 @@ class Permisos
                 'facturacion.acceder' => 'Acceder a Facturación (comprobantes avanzados)',
                 'ventas.ver' => 'Ver ventas',
                 'ventas.anular' => 'Anular ventas',
+                'ventas.nota_debito' => 'Emitir Notas de Débito',
+                'ventas.devolucion' => 'Realizar devoluciones parciales',
                 'ventas.imprimir' => 'Imprimir comprobantes y tickets',
                 'arqueo.cerrar_ajeno' => 'Cerrar cajas de otros cajeros (no solo la propia)',
             ],
@@ -77,11 +81,15 @@ class Permisos
                 'facturacion.administrar' => 'Administrar configuración de facturación',
                 'secuencias.administrar' => 'Administrar secuencias NCF',
                 'impresoras.administrar' => 'Administrar impresoras',
+                'cajas.ver' => 'Ver cajas registradoras',
+                'cajas.crear' => 'Crear cajas registradoras',
+                'cajas.editar' => 'Editar/Activar/Desactivar cajas registradoras',
                 'usuarios.gestionar' => 'Gestionar usuarios',
                 'roles.gestionar' => 'Gestionar roles y permisos',
                 'auditoria.ver' => 'Ver auditoría',
                 'ecf.gestionar' => 'Gestionar e-CF (envíos, recepción, estado fiscal)',
             ],
+            'Notificaciones' => TipoNotificacion::catalogoPermisos(),
         ];
     }
 

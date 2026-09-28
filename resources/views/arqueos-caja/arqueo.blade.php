@@ -162,7 +162,7 @@
             @foreach ($arqueo->ventas as $venta)
                 <tr>
                     <td>{{ $venta->ncf ?? '—' }}</td>
-                    <td>{{ $venta->cliente->nombre }}</td>
+                    <td>{{ $venta->nombreCliente() }}</td>
                     <td>{{ $venta->forma_pago->etiqueta() }}</td>
                     <td class="text-right">RD$ {{ number_format((float) $venta->total, 2) }}</td>
                 </tr>

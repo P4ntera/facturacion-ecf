@@ -36,13 +36,25 @@ class EnviarEcfJob implements ShouldQueue
         return [30, 60, 120, 240];
     }
 
+    /**
+     * Único criterio de "¿se puede (re)enviar este e-CF a la DGII?" — lo usan el job y la acción
+     * "Reintentar envío". Un e-NCF que la DGII ya tiene (aceptado en cualquier variante) o que
+     * está procesando (EN_PROCESO: se consulta con "Refrescar estado", no se reenvía) NO se
+     * vuelve a mandar: sería un e-NCF duplicado. Solo PENDIENTE (nunca llegó / error de red) y
+     * RECHAZADO (corregido y reenviado). Nunca una venta anulada: su e-CF no debe salir.
+     */
+    public static function puedeEnviarse(Venta $venta): bool
+    {
+        return $venta->esElectronica()
+            && ! $venta->estaAnulada()
+            && in_array($venta->estado_fiscal, [EstadoFiscal::PENDIENTE, EstadoFiscal::RECHAZADO], true);
+    }
+
     public function handle(EnvioEcfService $servicio): void
     {
         $venta = $this->venta->fresh();
 
-        // ACEPTADO o RFCE (consumo < 250k convertido por el PAC) ya son estados finales de
-        // aceptación: no hay nada que reenviar.
-        if ($venta === null || in_array($venta->estado_fiscal, [EstadoFiscal::ACEPTADO, EstadoFiscal::RFCE], true)) {
+        if ($venta === null || ! self::puedeEnviarse($venta)) {
             return;
         }
 

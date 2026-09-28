@@ -8,7 +8,6 @@ use App\Enums\Modulo;
 use App\Enums\TipoComprobante;
 use BackedEnum;
 use Filament\Support\Icons\Heroicon;
-use UnitEnum;
 
 /**
  * Caja: la operación diaria de una cajera — escanear/agregar productos y cobrar, sin exponer el
@@ -25,7 +24,7 @@ class Caja extends PuntoDeVenta
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedCalculator;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Ventas';
+    protected static string|\UnitEnum|null $navigationGroup = 'Operaciones';
 
     protected static ?int $navigationSort = 1;
 

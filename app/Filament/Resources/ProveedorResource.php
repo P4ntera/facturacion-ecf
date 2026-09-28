@@ -11,6 +11,7 @@ use App\Models\Proveedor;
 use App\Services\DgiiRncService;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
+use Filament\Facades\Filament;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -23,7 +24,6 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\ToggleColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
-use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 
 class ProveedorResource extends Resource
@@ -47,9 +47,9 @@ class ProveedorResource extends Resource
 
     protected static ?string $slug = 'proveedores';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Maestros';
+    protected static string|\UnitEnum|null $navigationGroup = 'Comercial';
 
-    protected static ?int $navigationSort = 13;
+    protected static ?int $navigationSort = 2;
 
     public static function form(Schema $schema): Schema
     {
@@ -62,7 +62,7 @@ class ProveedorResource extends Resource
                     TextInput::make('rnc')
                         ->label('RNC / Cédula')
                         ->required()
-                        ->unique(ignoreRecord: true)
+                        ->unique(ignoreRecord: true, modifyRuleUsing: fn ($rule) => $rule->where('empresa_id', Filament::getTenant()->id))
                         ->maxLength(11)
                         ->minLength(9)
                         ->numeric()
@@ -259,8 +259,6 @@ class ProveedorResource extends Resource
                     ]),
 
                 TernaryFilter::make('activo')->label('Activo en sistema')->default(true),
-
-                TrashedFilter::make(),
             ])
             ->recordActions([
                 EditAction::make(),

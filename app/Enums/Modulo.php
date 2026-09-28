@@ -22,6 +22,7 @@ enum Modulo: string
     case VENTAS_POS = 'ventas_pos';
     case VENTAS_LISTADO = 'ventas_listado';
     case VENTAS_ARQUEO_CAJA = 'ventas_arqueo_caja';
+    case VENTAS_CAJAS = 'ventas_cajas';
 
     case INVENTARIO_KARDEX = 'inventario_kardex';
 
@@ -50,6 +51,7 @@ enum Modulo: string
             self::VENTAS_POS => 'Punto de Venta',
             self::VENTAS_LISTADO => 'Ventas',
             self::VENTAS_ARQUEO_CAJA => 'Arqueos de Caja',
+            self::VENTAS_CAJAS => 'Cajas registradoras (POS táctil y display)',
             self::INVENTARIO_KARDEX => 'Kardex',
             self::COMPRAS => 'Compras',
             self::COMPRAS_PEDIDOS => 'Pedidos de Compra',
@@ -72,7 +74,8 @@ enum Modulo: string
             self::MAESTROS_PRODUCTOS, self::MAESTROS_CATEGORIAS,
             self::MAESTROS_DESCUENTOS => 'Maestros',
 
-            self::VENTAS_POS, self::VENTAS_LISTADO, self::VENTAS_ARQUEO_CAJA => 'Ventas',
+            self::VENTAS_POS, self::VENTAS_LISTADO, self::VENTAS_ARQUEO_CAJA,
+            self::VENTAS_CAJAS => 'Ventas',
 
             self::INVENTARIO_KARDEX => 'Inventario',
 
@@ -117,14 +120,18 @@ enum Modulo: string
     }
 
     /**
-     * Los módulos e-CF no son solo un toggle de empresa_modulos: además exigen usa_ecf=true (T3).
-     * Empresa::tieneModulo() consulta esto para que, con usa_ecf=false, queden ocultos sin
-     * importar lo que diga su fila en empresa_modulos.
+     * ECF_RECIBIDOS exige usa_ecf=true (T3): es la recepción de e-CF de proveedores vía el
+     * ecosistema electrónico de la DGII, no tiene sentido sin participar en él.
+     *
+     * ECF_SECUENCIAS (Secuencias NCF) YA NO exige usa_ecf: desde el soporte de comprobantes
+     * físicos (tipo B), toda empresa —tenga o no e-CF— necesita gestionar sus rangos de NCF
+     * (físicos B0X si no tiene e-CF; ambos si sí lo tiene). Excluirlo aquí sería dejar a una
+     * empresa sin e-CF sin forma de cargar su propio rango B02, bloqueando el POS por completo.
      */
     public function requiereEcf(): bool
     {
         return match ($this) {
-            self::ECF_SECUENCIAS, self::ECF_RECIBIDOS => true,
+            self::ECF_RECIBIDOS => true,
             default => false,
         };
     }

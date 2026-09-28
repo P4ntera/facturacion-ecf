@@ -95,6 +95,8 @@ class VentaResourceTest extends TestCase
     public function test_anular_repone_stock_y_marca_anulada(): void
     {
         $venta = $this->crearVenta();
+        // Anulación simple: el e-CF no llegó a ser válido ante la DGII (sin Nota de Crédito).
+        $venta->update(['estado_fiscal' => EstadoFiscal::RECHAZADO]);
         $this->assertSame('8.000', $this->producto->refresh()->stock);
 
         Livewire::actingAs($this->usuarioConPermisos(['ventas.ver', 'ventas.anular']))
@@ -119,6 +121,8 @@ class VentaResourceTest extends TestCase
     public function test_accion_anular_no_visible_si_ya_esta_anulada(): void
     {
         $venta = $this->crearVenta();
+        // Anulación simple: el e-CF no llegó a ser válido ante la DGII (sin Nota de Crédito).
+        $venta->update(['estado_fiscal' => EstadoFiscal::RECHAZADO]);
         app(VentaService::class)->anular($venta, 'motivo previo', null);
 
         Livewire::actingAs($this->usuarioConPermisos(['ventas.ver', 'ventas.anular']))

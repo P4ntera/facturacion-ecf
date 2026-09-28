@@ -23,7 +23,7 @@ class ProductoObserverTest extends TestCase
     {
         Permission::firstOrCreate(['name' => 'inventario.ajustar', 'guard_name' => 'web']);
         $rol = Role::firstOrCreate(['name' => 'Almacenista', 'guard_name' => 'web']);
-        $rol->syncPermissions(['inventario.ajustar']);
+        $rol->syncPermissions(['inventario.ajustar', 'notificaciones.stock_bajo']);
 
         $almacenista = User::factory()->create();
         $almacenista->assignRole('Almacenista');

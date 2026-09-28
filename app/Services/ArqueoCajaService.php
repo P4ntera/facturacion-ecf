@@ -9,6 +9,7 @@ use App\Enums\EstadoVenta;
 use App\Enums\FormaPago;
 use App\Enums\TipoPago;
 use App\Models\ArqueoCaja;
+use App\Models\Caja;
 use App\Models\Empresa;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -19,20 +20,54 @@ class ArqueoCajaService
      * Abre un turno de caja nuevo para el usuario. Un usuario solo puede tener uno abierto a la
      * vez. $empresa la resuelve el llamador explícitamente (Filament::getTenant() en el panel) —
      * este service no asume ningún tenant ambiente, igual que VentaService/CompraService.
+     *
+     * $caja (multi-caja, POS táctil) es opcional: Caja/Facturación siguen abriendo turnos sin
+     * caja física. Si viene, además una caja física solo puede tener UN turno abierto a la vez
+     * (dos cajeros no pueden cuadrar la misma gaveta), y se revalida que sea de $empresa y esté
+     * activa — el id llega de un selector del navegador (client-controllable).
      */
-    public function abrir(string $fondoInicial, int $userId, Empresa $empresa): ArqueoCaja
+    public function abrir(string $fondoInicial, int $userId, Empresa $empresa, ?Caja $caja = null): ArqueoCaja
     {
-        if ($this->arqueoAbiertoDe($userId, $empresa) !== null) {
-            throw new RuntimeException('Ya tienes un arqueo de caja abierto.');
-        }
+        return DB::transaction(function () use ($fondoInicial, $userId, $empresa, $caja) {
+            if ($caja !== null) {
+                // Se relee de la BD (no se confía en la instancia recibida) y se bloquea la fila:
+                // serializa aperturas concurrentes sobre la misma caja — sin el lock, dos cajeros
+                // abriendo a la vez podían pasar ambos la verificación de abajo.
+                $caja = Caja::query()
+                    ->whereKey($caja->id)
+                    ->where('empresa_id', $empresa->id)
+                    ->where('activo', true)
+                    ->lockForUpdate()
+                    ->first();
 
-        return DB::transaction(fn () => ArqueoCaja::create([
-            'empresa_id' => $empresa->id,
-            'user_id' => $userId,
-            'fondo_inicial' => $this->aMoneda($fondoInicial),
-            'abierto_en' => now(),
-            'estado' => EstadoArqueoCaja::ABIERTO,
-        ]));
+                if ($caja === null) {
+                    throw new RuntimeException('La caja indicada no existe o está inactiva.');
+                }
+
+                $abiertoEnCaja = $this->arqueoAbiertoEnCaja($caja);
+
+                if ($abiertoEnCaja !== null) {
+                    throw new RuntimeException(
+                        $abiertoEnCaja->user_id === $userId
+                            ? 'Ya tienes un arqueo de caja abierto.'
+                            : "La caja {$caja->nombre} ya tiene un arqueo abierto por otro cajero."
+                    );
+                }
+            }
+
+            if ($this->arqueoAbiertoDe($userId, $empresa) !== null) {
+                throw new RuntimeException('Ya tienes un arqueo de caja abierto.');
+            }
+
+            return ArqueoCaja::create([
+                'empresa_id' => $empresa->id,
+                'caja_id' => $caja?->id,
+                'user_id' => $userId,
+                'fondo_inicial' => $this->aMoneda($fondoInicial),
+                'abierto_en' => now(),
+                'estado' => EstadoArqueoCaja::ABIERTO,
+            ]);
+        });
     }
 
     /**
@@ -92,6 +127,15 @@ class ArqueoCajaService
         return ArqueoCaja::query()
             ->where('empresa_id', $empresa->id)
             ->where('user_id', $userId)
+            ->where('estado', EstadoArqueoCaja::ABIERTO)
+            ->first();
+    }
+
+    public function arqueoAbiertoEnCaja(Caja $caja): ?ArqueoCaja
+    {
+        return ArqueoCaja::query()
+            ->where('empresa_id', $caja->empresa_id)
+            ->where('caja_id', $caja->id)
             ->where('estado', EstadoArqueoCaja::ABIERTO)
             ->first();
     }

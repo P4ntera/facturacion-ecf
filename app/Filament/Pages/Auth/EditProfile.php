@@ -6,6 +6,7 @@ namespace App\Filament\Pages\Auth;
 
 use App\Enums\ModuloImpresion;
 use Filament\Auth\Pages\EditProfile as BaseEditProfile;
+use Filament\Facades\Filament;
 use Filament\Forms\Components\Select;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Schema;
@@ -36,7 +37,12 @@ class EditProfile extends BaseEditProfile
         return Select::make('impresora_facturacion_id')
             ->label('Mi impresora de facturación')
             ->helperText('Se usa al imprimir tickets de venta en vez de la predeterminada del módulo.')
-            ->relationship('impresoraFacturacion', 'nombre', fn (Builder $query) => $query->activas()->porModulo(ModuloImpresion::FACTURACION))
+            // Scope manual obligatorio — Filament NO aplica tenant scope dentro de
+            // ->relationship(), ni siquiera dentro de su propio Resource.
+            ->relationship('impresoraFacturacion', 'nombre', fn (Builder $query) => $query
+                ->where('empresa_id', Filament::getTenant()?->id)
+                ->activas()
+                ->porModulo(ModuloImpresion::FACTURACION))
             ->preload()
             ->native(false);
     }

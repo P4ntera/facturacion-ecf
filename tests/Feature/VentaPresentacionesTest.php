@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\EstadoFiscal;
 use App\Enums\TasaItbis;
 use App\Enums\TipoComprobante;
 use App\Enums\TipoProducto;
@@ -144,6 +145,8 @@ class VentaPresentacionesTest extends TestCase
 
         $this->assertSame('52.000', (string) $producto->refresh()->stock); // 100 - 2×24
 
+        // Anulación simple: el e-CF no llegó a ser válido ante la DGII (sin Nota de Crédito).
+        $venta->update(['estado_fiscal' => EstadoFiscal::RECHAZADO]);
         app(VentaService::class)->anular($venta, 'prueba');
 
         $this->assertSame('100.000', (string) $producto->refresh()->stock);
@@ -177,6 +180,8 @@ class VentaPresentacionesTest extends TestCase
             'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1.6, 'precio_unitario' => 45]],
         ], $this->empresaDefault);
 
+        // Anulación simple: el e-CF no llegó a ser válido ante la DGII (sin Nota de Crédito).
+        $venta->update(['estado_fiscal' => EstadoFiscal::RECHAZADO]);
         app(VentaService::class)->anular($venta, 'prueba');
 
         $this->assertSame('50.000', (string) $producto->refresh()->stock);

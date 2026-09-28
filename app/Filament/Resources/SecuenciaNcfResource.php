@@ -10,6 +10,7 @@ use App\Filament\Resources\SecuenciaNcfResource\Pages;
 use App\Models\SecuenciaNcf;
 use App\Services\SecuenciaNcfService;
 use Filament\Actions\Action;
+use Filament\Facades\Filament;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -48,7 +49,7 @@ class SecuenciaNcfResource extends Resource
 
     protected static string|\UnitEnum|null $navigationGroup = 'Fiscal';
 
-    protected static ?int $navigationSort = 40;
+    protected static ?int $navigationSort = 1;
 
     public static function form(Schema $schema): Schema
     {
@@ -68,13 +69,17 @@ class SecuenciaNcfResource extends Resource
                         }
 
                         if (blank($get('prefijo'))) {
-                            $set('prefijo', 'E'.$state);
+                            $tipo = TipoComprobante::from($state);
+                            // Electrónico: el prefijo es "E" + el código DGII desnudo (31, 32...).
+                            // Físico: el propio valor del enum YA es el prefijo completo (B01, B02...).
+                            $set('prefijo', $tipo->esElectronico() ? 'E'.$state : $tipo->value);
                         }
 
                         if ($operation === 'create') {
                             $set('secuencia_desde', app(SecuenciaNcfService::class)->sugerirSecuenciaDesde(
                                 TipoComprobante::from($state),
                                 (string) $get('prefijo'),
+                                Filament::getTenant(),
                             ));
                         }
                     }),
@@ -83,8 +88,8 @@ class SecuenciaNcfResource extends Resource
                     ->label('Prefijo')
                     ->required()
                     ->maxLength(3)
-                    ->regex('/^E\d{2}$/')
-                    ->validationMessages(['regex' => 'El prefijo debe tener el formato "E" seguido de 2 dígitos (ej. E31).'])
+                    ->regex('/^(E\d{2}|B\d{2})$/')
+                    ->validationMessages(['regex' => 'El prefijo debe ser "E" (electrónico) o "B" (físico) seguido de 2 dígitos (ej. E31, B01).'])
                     ->live(onBlur: true)
                     ->afterStateUpdated(function (?string $state, Set $set, Get $get, string $operation): void {
                         $state = strtoupper((string) $state);
@@ -92,10 +97,11 @@ class SecuenciaNcfResource extends Resource
 
                         $tipo = $get('tipo_comprobante');
 
-                        if ($operation === 'create' && $tipo !== null && preg_match('/^E\d{2}$/', $state) === 1) {
+                        if ($operation === 'create' && $tipo !== null && preg_match('/^(E\d{2}|B\d{2})$/', $state) === 1) {
                             $set('secuencia_desde', app(SecuenciaNcfService::class)->sugerirSecuenciaDesde(
                                 TipoComprobante::from($tipo),
                                 $state,
+                                Filament::getTenant(),
                             ));
                         }
                     }),
@@ -150,6 +156,7 @@ class SecuenciaNcfResource extends Resource
                                     $prefijo,
                                     $desde,
                                     (int) $value,
+                                    Filament::getTenant(),
                                     ignorarId: $record?->id,
                                 );
                             } catch (RangoNcfSolapadoException $e) {
@@ -204,11 +211,11 @@ class SecuenciaNcfResource extends Resource
                                 return;
                             }
 
-                            $existeOtraActiva = SecuenciaNcf::query()
-                                ->where('tipo_comprobante', $tipo)
-                                ->where('activa', true)
-                                ->when($record, fn (Builder $query) => $query->whereKeyNot($record->getKey()))
-                                ->exists();
+                            $existeOtraActiva = app(SecuenciaNcfService::class)->existeRangoActivo(
+                                TipoComprobante::from($tipo),
+                                Filament::getTenant(),
+                                ignorarId: $record?->id,
+                            );
 
                             if ($existeOtraActiva) {
                                 $fail('Ya hay una secuencia activa para este comprobante; desactiva la anterior primero.');
@@ -305,7 +312,7 @@ class SecuenciaNcfResource extends Resource
                     ->requiresConfirmation()
                     ->visible(fn (SecuenciaNcf $record) => ! $record->activa)
                     ->disabled(fn (SecuenciaNcf $record) => app(SecuenciaNcfService::class)
-                        ->existeRangoActivo($record->tipo_comprobante, ignorarId: $record->id))
+                        ->existeRangoActivo($record->tipo_comprobante, Filament::getTenant(), ignorarId: $record->id))
                     ->action(function (SecuenciaNcf $record): void {
                         try {
                             app(SecuenciaNcfService::class)->activarManualmente($record);
@@ -323,7 +330,7 @@ class SecuenciaNcfResource extends Resource
                     ->icon('heroicon-o-eye')
                     ->color('gray')
                     ->action(function (SecuenciaNcf $record): void {
-                        $proximo = app(SecuenciaNcfService::class)->previsualizarSiguiente($record->tipo_comprobante);
+                        $proximo = app(SecuenciaNcfService::class)->previsualizarSiguiente($record->tipo_comprobante, Filament::getTenant());
 
                         $notificacion = Notification::make();
 

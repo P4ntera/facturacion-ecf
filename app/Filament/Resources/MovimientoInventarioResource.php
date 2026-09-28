@@ -9,6 +9,7 @@ use App\Filament\Concerns\RestringidoPorModulo;
 use App\Filament\Resources\MovimientoInventarioResource\Pages;
 use App\Models\MovimientoInventario;
 use Filament\Actions\ViewAction;
+use Filament\Facades\Filament;
 use Filament\Forms\Components\DatePicker;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Resource;
@@ -42,7 +43,7 @@ class MovimientoInventarioResource extends Resource
 
     protected static string|\UnitEnum|null $navigationGroup = 'Inventario';
 
-    protected static ?int $navigationSort = 20;
+    protected static ?int $navigationSort = 3;
 
     // Kardex: solo lectura, no se crea ni edita a mano.
     public static function canCreate(): bool
@@ -143,7 +144,9 @@ class MovimientoInventarioResource extends Resource
             ->filters([
                 SelectFilter::make('producto_id')
                     ->label('Producto')
-                    ->relationship('producto', 'nombre')
+                    // Scope manual obligatorio — Filament NO aplica tenant scope dentro de
+                    // ->relationship(), ni siquiera dentro de su propio Resource.
+                    ->relationship('producto', 'nombre', modifyQueryUsing: fn (Builder $query) => $query->where('empresa_id', Filament::getTenant()->id))
                     ->searchable()
                     ->preload(),
 

@@ -3,9 +3,13 @@
 namespace App\Services\Dgii;
 
 use App\Enums\EstadoFiscal;
+use App\Enums\TipoNotificacion;
 use App\Exceptions\EcfInvalidoException;
 use App\Models\Venta;
+use App\Services\NotificacionService;
+use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 /**
  * Orquesta el envío de un e-CF ya registrado: construye el JSON (EcfBuilder), lo manda al PAC
@@ -19,6 +23,7 @@ class EnvioEcfService
     public function __construct(
         private readonly EcfBuilder $builder,
         private readonly DgiiGatewayFactory $gatewayFactory,
+        private readonly NotificacionService $notificaciones,
     ) {}
 
     public function enviar(Venta $venta): RespuestaEcf
@@ -62,13 +67,19 @@ class EnvioEcfService
 
     private function guardar(Venta $venta, RespuestaEcf $respuesta): void
     {
+        $anterior = $venta->estado_fiscal;
+
         DB::transaction(function () use ($venta, $respuesta) {
             $venta->update($this->atributosParaGuardar($venta, $respuesta));
         });
+
+        $this->notificarSiQuedoRechazada($venta, $anterior);
     }
 
     private function rechazarPorDatosInvalidos(Venta $venta, EcfInvalidoException $e): RespuestaEcf
     {
+        $anterior = $venta->estado_fiscal;
+
         DB::transaction(function () use ($venta, $e) {
             $venta->update([
                 'estado_fiscal' => EstadoFiscal::RECHAZADO,
@@ -76,7 +87,31 @@ class EnvioEcfService
             ]);
         });
 
+        $this->notificarSiQuedoRechazada($venta, $anterior);
+
         return new RespuestaEcf(exito: false, errorMessage: $e->getMessage());
+    }
+
+    /**
+     * Solo en la TRANSICIÓN a RECHAZADO: refrescar el estado de un e-CF que ya estaba rechazado
+     * no vuelve a avisar. Después del commit, y NotificacionService nunca lanza.
+     */
+    private function notificarSiQuedoRechazada(Venta $venta, ?EstadoFiscal $anterior): void
+    {
+        if ($venta->estado_fiscal !== EstadoFiscal::RECHAZADO || $anterior === EstadoFiscal::RECHAZADO) {
+            return;
+        }
+
+        $motivo = $venta->ecf_respuesta['error'] ?? null;
+
+        $this->notificaciones->enviar(
+            TipoNotificacion::ECF_RECHAZADO,
+            $venta->empresa,
+            Notification::make()
+                ->title("e-CF rechazado: {$venta->ncf}")
+                ->body(trim("Venta #{$venta->id} ({$venta->etiquetaComprobante()}). ".($motivo ? Str::limit((string) $motivo, 200) : 'Revisa la respuesta de la DGII en el detalle de la venta.')))
+                ->danger(),
+        );
     }
 
     /** @return array<string, mixed> */

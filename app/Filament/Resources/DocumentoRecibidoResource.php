@@ -54,7 +54,7 @@ class DocumentoRecibidoResource extends Resource
 
     protected static string|\UnitEnum|null $navigationGroup = 'Fiscal';
 
-    protected static ?int $navigationSort = 41;
+    protected static ?int $navigationSort = 2;
 
     public static function getEloquentQuery(): Builder
     {
@@ -172,7 +172,7 @@ class DocumentoRecibidoResource extends Resource
                         return $query->when(
                             $data['valor'] ?? null,
                             fn (Builder $q, $valor) => $q->where(fn (Builder $q2) => $q2
-                                ->where('razon_social_emisor', 'ilike', "%{$valor}%")
+                                ->whereLikeSinAcentos('razon_social_emisor', $valor)
                                 ->orWhere('rnc_emisor', 'ilike', "%{$valor}%")),
                         );
                     }),

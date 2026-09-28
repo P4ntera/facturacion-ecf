@@ -108,6 +108,24 @@ class ConfiguracionSettingsTest extends TestCase
         $this->assertSame('USD', $config->moneda);
     }
 
+    /**
+     * El toggle de ventas sin comprobante se carga con su valor guardado: sin esto aparecía
+     * apagado y al guardar cualquier otro cambio de la página lo desactivaba sin querer.
+     */
+    public function test_conserva_el_permiso_de_ventas_sin_comprobante_al_guardar_otros_cambios(): void
+    {
+        $this->empresaDefault->config()->update(['permite_ventas_sin_comprobante' => true]);
+
+        Livewire::actingAs($this->usuarioAutorizado())
+            ->test(ManageFacturacion::class)
+            ->assertSchemaStateSet(['permite_ventas_sin_comprobante' => true], 'form')
+            ->fillForm(['moneda' => 'USD'])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $this->assertTrue($this->empresaDefault->config()->fresh()->permite_ventas_sin_comprobante);
+    }
+
     public function test_un_usuario_sin_permiso_no_puede_acceder(): void
     {
         $usuario = User::factory()->create(['empresa_id' => $this->empresaDefault->id]);

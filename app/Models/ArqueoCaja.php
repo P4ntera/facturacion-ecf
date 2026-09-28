@@ -12,7 +12,7 @@ class ArqueoCaja extends Model
     protected $table = 'arqueos_caja';
 
     protected $fillable = [
-        'empresa_id', 'user_id', 'fondo_inicial', 'abierto_en', 'cerrado_en', 'estado',
+        'empresa_id', 'caja_id', 'user_id', 'fondo_inicial', 'abierto_en', 'cerrado_en', 'estado',
         'total_ventas_efectivo', 'total_ventas_tarjeta', 'total_ventas_transferencia',
         'efectivo_esperado', 'efectivo_contado', 'diferencia', 'notas',
     ];
@@ -33,6 +33,11 @@ class ArqueoCaja extends Model
     public function empresa(): BelongsTo
     {
         return $this->belongsTo(Empresa::class);
+    }
+
+    public function caja(): BelongsTo
+    {
+        return $this->belongsTo(Caja::class);
     }
 
     public function user(): BelongsTo

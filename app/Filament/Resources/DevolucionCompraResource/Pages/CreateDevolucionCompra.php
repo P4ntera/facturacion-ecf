@@ -6,6 +6,7 @@ use App\Exceptions\StockInsuficienteException;
 use App\Filament\Resources\DevolucionCompraResource;
 use App\Models\DetalleCompra;
 use App\Services\DevolucionCompraService;
+use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Support\Exceptions\Halt;
@@ -99,7 +100,7 @@ class CreateDevolucionCompra extends CreateRecord
                     ])
                     ->values()
                     ->all(),
-            ], auth()->id());
+            ], auth()->id(), Filament::getTenant());
         } catch (RuntimeException|StockInsuficienteException $e) {
             Notification::make()->title($e->getMessage())->danger()->send();
 

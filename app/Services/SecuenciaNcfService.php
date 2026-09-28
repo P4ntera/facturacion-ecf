@@ -5,17 +5,20 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Enums\TipoComprobante;
+use App\Enums\TipoNotificacion;
 use App\Exceptions\RangoNcfSolapadoException;
 use App\Exceptions\SecuenciaNcfAgotadaException;
+use App\Models\Empresa;
 use App\Models\SecuenciaNcf;
-use App\Models\User;
 use Filament\Notifications\Notification;
-use Throwable;
 
 class SecuenciaNcfService
 {
     /** Longitud del secuencial en el e-NCF (E + tipo(2) + secuencial(10) = 13). */
-    private const LONGITUD_SECUENCIAL = 10;
+    private const LONGITUD_SECUENCIAL_ELECTRONICA = 10;
+
+    /** Longitud del secuencial en el NCF físico (B + tipo(2) + secuencial(8) = 11). */
+    private const LONGITUD_SECUENCIAL_FISICA = 8;
 
     /** Umbral de comprobantes restantes para alertar "rango por agotarse". */
     public const UMBRAL_ALERTA = 50;
@@ -24,10 +27,15 @@ class SecuenciaNcfService
      * Asigna y CONSUME el siguiente e-NCF para un tipo de comprobante.
      * Debe ejecutarse DENTRO de una transacción (la abre el llamador, p. ej. VentaService):
      * usa lockForUpdate para que dos ventas simultáneas no tomen el mismo número.
+     *
+     * $empresa la resuelve el llamador explícitamente (igual que VentaService/CompraService):
+     * sin filtrar por empresa_id aquí, dos empresas con secuencias activas del mismo
+     * tipo_comprobante podrían "robarse" el contador la una a la otra.
      */
-    public function siguiente(TipoComprobante $tipo): string
+    public function siguiente(TipoComprobante $tipo, Empresa $empresa): string
     {
         $secuencia = SecuenciaNcf::query()
+            ->where('empresa_id', $empresa->id)
             ->where('tipo_comprobante', $tipo)
             ->where('activa', true)
             ->lockForUpdate()
@@ -48,7 +56,7 @@ class SecuenciaNcfService
             $secuencia->activa = false;
             $secuencia->save();
 
-            $siguiente = $this->buscarSiguienteEncolado($tipo, $secuencia);
+            $siguiente = $this->buscarSiguienteEncolado($tipo, $secuencia, $empresa);
 
             if ($siguiente === null) {
                 throw new SecuenciaNcfAgotadaException(
@@ -68,22 +76,26 @@ class SecuenciaNcfService
         }
 
         $numero = (int) $secuencia->secuencia_actual;
-        $ncf = $this->formatear($secuencia->prefijo, $numero);
+        $ncf = $this->formatear($secuencia->prefijo, $numero, $tipo);
 
         $secuencia->secuencia_actual = $numero + 1;
         $secuencia->save();
 
-        if ($this->restantes($secuencia) <= self::UMBRAL_ALERTA) {
+        // alerta_agotamiento_enviada_en deduplica: sin esto, cada consumo bajo el umbral (podrían
+        // ser decenas por hora en un negocio con volumen) generaría una notificación nueva.
+        if ($this->restantes($secuencia) <= self::UMBRAL_ALERTA && $secuencia->alerta_agotamiento_enviada_en === null) {
             $this->alertarPorAgotarse($secuencia);
+            $secuencia->update(['alerta_agotamiento_enviada_en' => now()]);
         }
 
         return $ncf;
     }
 
     /** Muestra el próximo e-NCF SIN consumirlo (para la UI). Null si no hay disponible. */
-    public function previsualizarSiguiente(TipoComprobante $tipo): ?string
+    public function previsualizarSiguiente(TipoComprobante $tipo, Empresa $empresa): ?string
     {
         $secuencia = SecuenciaNcf::query()
+            ->where('empresa_id', $empresa->id)
             ->where('tipo_comprobante', $tipo)
             ->where('activa', true)
             ->first();
@@ -93,18 +105,58 @@ class SecuenciaNcfService
         }
 
         if ($this->tieneDisponibles($secuencia)) {
-            return $this->formatear($secuencia->prefijo, (int) $secuencia->secuencia_actual);
+            return $this->formatear($secuencia->prefijo, (int) $secuencia->secuencia_actual, $tipo);
         }
 
         // El activo está agotado/vencido: si ya hay un rango consecutivo encolado, el próximo
         // e-NCF real saldrá de ahí en cuanto se consuma (ver siguiente()).
-        $siguiente = $this->buscarSiguienteEncolado($tipo, $secuencia);
+        $siguiente = $this->buscarSiguienteEncolado($tipo, $secuencia, $empresa);
 
         if ($siguiente === null || ! $this->tieneDisponibles($siguiente)) {
             return null;
         }
 
-        return $this->formatear($siguiente->prefijo, (int) $siguiente->secuencia_actual);
+        return $this->formatear($siguiente->prefijo, (int) $siguiente->secuencia_actual, $tipo);
+    }
+
+    /**
+     * Tipos de comprobante que la empresa puede emitir AHORA: los que tienen una secuencia activa
+     * con números vigentes, o cuyo rango activo está agotado/vencido pero ya tiene el siguiente
+     * rango consecutivo encolado (mismo criterio que siguiente()/previsualizarSiguiente()). Una
+     * sola consulta para no hacer N queries por render del POS. Sin e-CF habilitado
+     * (Empresa::usaEcf()) los electrónicos se excluyen aunque tengan secuencia: VentaService los
+     * rechazaría al cobrar.
+     *
+     * @return array<int, TipoComprobante>
+     */
+    public function tiposDisponibles(Empresa $empresa): array
+    {
+        $secuencias = SecuenciaNcf::query()
+            ->where('empresa_id', $empresa->id)
+            ->get();
+
+        return $secuencias
+            ->where('activa', true)
+            ->filter(function (SecuenciaNcf $activa) use ($secuencias): bool {
+                if ($this->tieneDisponibles($activa)) {
+                    return true;
+                }
+
+                if ($activa->secuencia_hasta === null) {
+                    return false;
+                }
+
+                $encolada = $secuencias->first(fn (SecuenciaNcf $s) => ! $s->activa
+                    && $s->tipo_comprobante === $activa->tipo_comprobante
+                    && (int) $s->secuencia_desde === (int) $activa->secuencia_hasta + 1);
+
+                return $encolada !== null && $this->tieneDisponibles($encolada);
+            })
+            ->map(fn (SecuenciaNcf $s) => $s->tipo_comprobante)
+            ->filter(fn (TipoComprobante $tipo) => $tipo->esFisico() || $empresa->usaEcf())
+            ->unique()
+            ->values()
+            ->all();
     }
 
     public function restantes(SecuenciaNcf $secuencia): int
@@ -146,9 +198,10 @@ class SecuenciaNcfService
      * Sugiere la próxima "secuencia_desde" para un tipo/prefijo: continúa después del rango
      * cargado más alto, o 1 si todavía no hay ninguno.
      */
-    public function sugerirSecuenciaDesde(TipoComprobante $tipo, string $prefijo): int
+    public function sugerirSecuenciaDesde(TipoComprobante $tipo, string $prefijo, Empresa $empresa): int
     {
         $maximoHasta = SecuenciaNcf::query()
+            ->where('empresa_id', $empresa->id)
             ->where('tipo_comprobante', $tipo)
             ->where('prefijo', $prefijo)
             ->max('secuencia_hasta');
@@ -160,9 +213,10 @@ class SecuenciaNcfService
      * true si ya existe un rango activo para ese tipo de comprobante (excluyendo, si aplica,
      * el propio registro que se está editando).
      */
-    public function existeRangoActivo(TipoComprobante $tipo, ?int $ignorarId = null): bool
+    public function existeRangoActivo(TipoComprobante $tipo, Empresa $empresa, ?int $ignorarId = null): bool
     {
         return SecuenciaNcf::query()
+            ->where('empresa_id', $empresa->id)
             ->where('tipo_comprobante', $tipo)
             ->where('activa', true)
             ->when($ignorarId, fn ($query) => $query->whereKeyNot($ignorarId))
@@ -178,9 +232,11 @@ class SecuenciaNcfService
         string $prefijo,
         int $desde,
         int $hasta,
+        Empresa $empresa,
         ?int $ignorarId = null,
     ): void {
         $rangos = SecuenciaNcf::query()
+            ->where('empresa_id', $empresa->id)
             ->where('tipo_comprobante', $tipo)
             ->where('prefijo', $prefijo)
             ->when($ignorarId, fn ($query) => $query->whereKeyNot($ignorarId))
@@ -206,9 +262,16 @@ class SecuenciaNcfService
      */
     public function activarManualmente(SecuenciaNcf $secuencia): void
     {
-        $secuencia = SecuenciaNcf::query()->whereKey($secuencia->getKey())->lockForUpdate()->firstOrFail();
+        // empresa_id se deriva del propio $secuencia (entidad ya validada), no de un parámetro
+        // separado ni de Filament::getTenant(): este método puede invocarse fuera del ciclo de
+        // vida de una request de panel.
+        $secuencia = SecuenciaNcf::query()
+            ->where('empresa_id', $secuencia->empresa_id)
+            ->whereKey($secuencia->getKey())
+            ->lockForUpdate()
+            ->firstOrFail();
 
-        if ($this->existeRangoActivo($secuencia->tipo_comprobante, ignorarId: $secuencia->id)) {
+        if ($this->existeRangoActivo($secuencia->tipo_comprobante, $secuencia->empresa, ignorarId: $secuencia->id)) {
             throw new RangoNcfSolapadoException(
                 "Ya hay una secuencia activa para el comprobante {$secuencia->tipo_comprobante->value}; "
                 .'desactívala antes de activar este rango.'
@@ -220,13 +283,14 @@ class SecuenciaNcfService
     }
 
     /** Busca el rango encolado consecutivo (secuencia_desde = hasta_agotado + 1) del mismo tipo. */
-    private function buscarSiguienteEncolado(TipoComprobante $tipo, SecuenciaNcf $agotado): ?SecuenciaNcf
+    private function buscarSiguienteEncolado(TipoComprobante $tipo, SecuenciaNcf $agotado, Empresa $empresa): ?SecuenciaNcf
     {
         if ($agotado->secuencia_hasta === null) {
             return null;
         }
 
         return SecuenciaNcf::query()
+            ->where('empresa_id', $empresa->id)
             ->where('tipo_comprobante', $tipo)
             ->where('activa', false)
             ->where('secuencia_desde', (int) $agotado->secuencia_hasta + 1)
@@ -235,29 +299,25 @@ class SecuenciaNcfService
             ->first();
     }
 
-    private function formatear(string $prefijo, int $numero): string
+    private function formatear(string $prefijo, int $numero, TipoComprobante $tipo): string
     {
-        return $prefijo.str_pad((string) $numero, self::LONGITUD_SECUENCIAL, '0', STR_PAD_LEFT);
+        $longitud = $tipo->esElectronico() ? self::LONGITUD_SECUENCIAL_ELECTRONICA : self::LONGITUD_SECUENCIAL_FISICA;
+
+        return $prefijo.str_pad((string) $numero, $longitud, '0', STR_PAD_LEFT);
     }
 
     private function alertarPorAgotarse(SecuenciaNcf $secuencia): void
     {
-        try {
-            $destinatarios = User::permission('secuencias.administrar')->get();
+        $restantes = $this->restantes($secuencia);
 
-            if ($destinatarios->isEmpty()) {
-                return;
-            }
-
-            $restantes = $this->restantes($secuencia);
-
+        // NotificacionService nunca lanza: la alerta no puede romper la emisión del comprobante.
+        app(NotificacionService::class)->enviar(
+            TipoNotificacion::NCF_AGOTANDOSE,
+            $secuencia->empresa,
             Notification::make()
                 ->title("Rango de NCF por agotarse: {$secuencia->tipo_comprobante->etiqueta()} — quedan {$restantes}")
                 ->body("El rango {$secuencia->prefijo} tiene {$restantes} comprobante(s) disponible(s). Carga un nuevo rango autorizado por la DGII.")
-                ->warning()
-                ->sendToDatabase($destinatarios);
-        } catch (Throwable) {
-            // La alerta nunca debe romper la emisión del comprobante.
-        }
+                ->warning(),
+        );
     }
 }

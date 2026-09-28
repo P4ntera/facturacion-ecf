@@ -28,6 +28,7 @@ class EmpresaConfiguracion extends Model
         'precio_incluye_itbis',
         'tasa_itbis_defecto',
         'tipo_comprobante_defecto',
+        'permite_ventas_sin_comprobante',
         'moneda',
         'dgii_api_key',
         'dgii_ambiente',
@@ -40,6 +41,7 @@ class EmpresaConfiguracion extends Model
     protected $casts = [
         'aplica_itbis' => 'boolean',
         'precio_incluye_itbis' => 'boolean',
+        'permite_ventas_sin_comprobante' => 'boolean',
         'dgii_ambiente' => AmbienteEcf::class,
         'dgii_api_key' => 'encrypted',
         'certificado_password' => 'encrypted',
@@ -54,6 +56,7 @@ class EmpresaConfiguracion extends Model
         'precio_incluye_itbis' => false,
         'tasa_itbis_defecto' => '18',
         'tipo_comprobante_defecto' => '32',
+        'permite_ventas_sin_comprobante' => false,
         'moneda' => 'DOP',
         'dgii_ambiente' => 'TesteCF',
         'dgii_base_url' => 'https://sandbox.pac-ecf.example.do/api/v1',

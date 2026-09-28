@@ -51,7 +51,7 @@ class DevolucionCompraServiceTest extends TestCase
             'lineas' => [
                 ['producto_id' => $producto->id, 'cantidad' => 10, 'costo_unitario' => 100],
             ],
-        ], $user->id);
+        ], $user->id, $this->empresaDefault);
 
         return [$compra, $compra->detalles()->first(), $producto, $user];
     }
@@ -69,7 +69,7 @@ class DevolucionCompraServiceTest extends TestCase
             'lineas' => [
                 ['detalle_compra_id' => $detalle->id, 'cantidad' => 2],
             ],
-        ], $user->id);
+        ], $user->id, $this->empresaDefault);
 
         $this->assertEquals(8, (float) $producto->fresh()->stock);
         $this->assertEqualsWithDelta(200.00, (float) $devolucion->subtotal, 0.01);
@@ -94,7 +94,7 @@ class DevolucionCompraServiceTest extends TestCase
             'lineas' => [
                 ['detalle_compra_id' => $detalle->id, 'cantidad' => 11],
             ],
-        ], $user->id);
+        ], $user->id, $this->empresaDefault);
     }
 
     public function test_no_permite_devolver_mas_de_lo_disponible_tras_una_devolucion_previa(): void
@@ -108,7 +108,7 @@ class DevolucionCompraServiceTest extends TestCase
             'lineas' => [
                 ['detalle_compra_id' => $detalle->id, 'cantidad' => 6],
             ],
-        ], $user->id);
+        ], $user->id, $this->empresaDefault);
 
         $this->assertEqualsWithDelta(4.0, $detalle->fresh()->cantidadDisponibleParaDevolver(), 0.001);
 
@@ -121,7 +121,7 @@ class DevolucionCompraServiceTest extends TestCase
             'lineas' => [
                 ['detalle_compra_id' => $detalle->id, 'cantidad' => 5],
             ],
-        ], $user->id);
+        ], $user->id, $this->empresaDefault);
     }
 
     public function test_no_permite_devolver_de_una_compra_anulada(): void
@@ -143,7 +143,7 @@ class DevolucionCompraServiceTest extends TestCase
             'lineas' => [
                 ['detalle_compra_id' => $detalle->id, 'cantidad' => 1],
             ],
-        ], $user->id);
+        ], $user->id, $this->empresaDefault);
     }
 
     public function test_anular_devolucion_revierte_stock(): void
@@ -157,7 +157,7 @@ class DevolucionCompraServiceTest extends TestCase
             'lineas' => [
                 ['detalle_compra_id' => $detalle->id, 'cantidad' => 3],
             ],
-        ], $user->id);
+        ], $user->id, $this->empresaDefault);
 
         $this->assertEquals(7, (float) $producto->fresh()->stock);
 
@@ -180,7 +180,7 @@ class DevolucionCompraServiceTest extends TestCase
             'lineas' => [
                 ['detalle_compra_id' => $detalle->id, 'cantidad' => 1],
             ],
-        ], $user->id);
+        ], $user->id, $this->empresaDefault);
 
         app(DevolucionCompraService::class)->anular($devolucion, 'Motivo', $user->id);
 

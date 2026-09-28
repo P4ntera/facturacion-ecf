@@ -37,7 +37,7 @@ class ComprasListadoModal extends Component implements HasActions, HasForms, Has
 
                     $query->where(function (Builder $q) use ($termino) {
                         $q->where('ncf', 'ilike', "%{$termino}%")
-                            ->orWhereRelation('proveedor', 'nombre', 'ilike', "%{$termino}%");
+                            ->orWhereHas('proveedor', fn (Builder $p) => $p->whereLikeSinAcentos('nombre', $termino));
                     });
                 }
             });

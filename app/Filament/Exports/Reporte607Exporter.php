@@ -42,15 +42,16 @@ class Reporte607Exporter extends Exporter
                 ->label('Número comprobante modificado'),
             ExportColumn::make('rnc_cedula')
                 ->label('RNC/Cédula')
-                ->getStateUsing(fn (Venta $record) => $servicio->rncCedula607($record->cliente->tipo_documento, $record->cliente->documento)),
+                ->getStateUsing(fn (Venta $record) => $servicio->rncCedula607($record->cliente?->tipo_documento, $record->cliente?->documento)),
             ExportColumn::make('tipo_identificacion')
                 ->label('Tipo identificación')
-                ->getStateUsing(fn (Venta $record) => $servicio->tipoIdentificacion607($record->cliente->tipo_documento)),
+                ->getStateUsing(fn (Venta $record) => $servicio->tipoIdentificacion607($record->cliente?->tipo_documento)),
             ExportColumn::make('tipo_ingreso')
                 ->label('Tipo de ingreso')
                 ->getStateUsing(fn () => ReporteService::TIPO_INGRESO_DEFECTO),
             ExportColumn::make('subtotal')
-                ->label('Monto facturado'),
+                ->label('Monto facturado')
+                ->getStateUsing(fn (Venta $record) => $record->subtotalNeto()),
             ExportColumn::make('total_itbis')
                 ->label('ITBIS facturado'),
             ExportColumn::make('total')

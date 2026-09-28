@@ -74,10 +74,15 @@ class Empresa extends Model implements HasName
      * Único punto de verdad para "¿esta empresa factura electrónicamente?": todo lo que muestre
      * u oculte el módulo fiscal (menú, POS, envío a la DGII) debe consultar esto, no
      * $empresa->usa_ecf directo, por si algún día la regla necesita más que un booleano.
+     *
+     * El `?? true` cubre el mismo gotcha de siempre con columnas con default en Postgres:
+     * Empresa::create() no refleja `usa_ecf DEFAULT true` en el modelo en memoria hasta un
+     * refresh() — sin esto, usaEcf() revienta con un TypeError (bool esperado, null real) en
+     * cualquier código que la consulte sobre una instancia recién creada sin refrescar.
      */
     public function usaEcf(): bool
     {
-        return $this->usa_ecf;
+        return $this->usa_ecf ?? true;
     }
 
     public function modulos(): HasMany

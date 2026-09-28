@@ -8,7 +8,6 @@ use App\Enums\FormaPago;
 use App\Enums\Modulo;
 use App\Enums\ModuloImpresion;
 use App\Enums\TipoComprobante;
-use App\Enums\TipoDocumentoCliente;
 use App\Enums\TipoPago;
 use App\Enums\TipoVenta;
 use App\Exceptions\SecuenciaNcfAgotadaException;
@@ -36,17 +35,23 @@ use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use RuntimeException;
-use UnitEnum;
 
 class PuntoDeVenta extends Page
 {
+    /**
+     * Valor del selector de comprobante para "Sin comprobante" (venta sin NCF). Un centinela y no
+     * '' porque un tipo en blanco ya significa "ninguno elegido" en este componente; solo se
+     * ofrece si la empresa lo habilitó (EmpresaConfiguracion::permite_ventas_sin_comprobante).
+     */
+    public const SIN_COMPROBANTE = 'sin_comprobante';
+
     use RestringidoPorModulo;
 
     protected string $view = 'filament.pages.punto-de-venta';
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedShoppingCart;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Ventas';
+    protected static string|\UnitEnum|null $navigationGroup = 'Operaciones';
 
     protected static ?int $navigationSort = 2;
 
@@ -96,8 +101,19 @@ class PuntoDeVenta extends Page
 
     public function mount(): void
     {
-        $this->tipoComprobante = $this->empresa()->config()->tipo_comprobante_defecto;
-        $this->clienteId = $this->clienteConsumidorFinal()->id;
+        $this->tipoComprobante = TipoComprobante::defectoParaEmpresa($this->empresa()->config(), $this->usaEcf())->value;
+
+        // Si el tipo por defecto no tiene secuencia cargada (p. ej. empresa que solo tiene B01/B02
+        // pero su default es E32), arrancar con el primero que sí se puede emitir. Sin ninguno
+        // disponible se deja el default: al cobrar, SecuenciaNcfService explica qué falta cargar.
+        $tipos = $this->tiposComprobante();
+
+        if ($tipos !== [] && ! array_key_exists($this->tipoComprobante, $tipos)) {
+            $this->tipoComprobante = (string) array_key_first($tipos);
+        }
+
+        // Sin cliente = venta al portador: el cajero solo busca uno si el comprobante lo exige.
+        $this->clienteId = null;
         $this->recalcularTotales();
     }
 
@@ -149,7 +165,7 @@ class PuntoDeVenta extends Page
             ->where('empresa_id', $this->empresaId())
             ->where('activo', true)
             ->where(fn (Builder $q) => $q
-                ->where('nombre', 'ilike', "%{$this->busquedaCliente}%")
+                ->whereLikeSinAcentos('nombre', $this->busquedaCliente)
                 ->orWhere('documento', 'ilike', "%{$this->busquedaCliente}%"))
             ->orderBy('nombre')
             ->limit(10)
@@ -162,15 +178,16 @@ class PuntoDeVenta extends Page
         $this->busquedaCliente = '';
     }
 
-    public function seleccionarConsumidorFinal(): void
-    {
-        $this->clienteId = $this->clienteConsumidorFinal()->id;
-        $this->busquedaCliente = '';
-    }
-
+    /** Vuelve a "Al portador" (sin cliente). */
     public function quitarCliente(): void
     {
         $this->clienteId = null;
+        $this->busquedaCliente = '';
+    }
+
+    public function esSinComprobante(): bool
+    {
+        return $this->tipoComprobante === self::SIN_COMPROBANTE;
     }
 
     /**
@@ -212,7 +229,9 @@ class PuntoDeVenta extends Page
      */
     public function requiereRncComprador(): bool
     {
-        if (blank($this->tipoComprobante) || ! $this->usaEcf()) {
+        // La regla de RNC obligatorio es del TIPO de comprobante (Crédito Fiscal siempre; Consumo
+        // desde el umbral), no una particularidad del e-CF: aplica igual a un B01/B02 físico.
+        if (blank($this->tipoComprobante) || $this->esSinComprobante()) {
             return false;
         }
 
@@ -227,9 +246,40 @@ class PuntoDeVenta extends Page
         return $this->requiereRncComprador() && blank($this->clienteSeleccionado()?->documento);
     }
 
+    /**
+     * true si la venta necesita un cliente y no hay ninguno (al portador): a crédito, o un tipo
+     * de comprobante que identifica al comprador (Venta::requiereCliente()). Misma regla que
+     * VentaService::registrar().
+     */
+    public function faltaCliente(): bool
+    {
+        if ($this->clienteSeleccionado() !== null) {
+            return false;
+        }
+
+        if ($this->ventaACredito) {
+            return true;
+        }
+
+        if (blank($this->tipoComprobante) || $this->esSinComprobante()) {
+            return false;
+        }
+
+        return (new Venta([
+            'tipo_comprobante' => $this->tipoComprobante,
+            'total' => $this->totales['total'] ?? '0.00',
+        ]))->requiereCliente();
+    }
+
     /** Mismo mensaje (y motivo) que bloquearía VentaService::registrar() al intentar cobrar. */
     public function mensajeFaltaRncComprador(): ?string
     {
+        if ($this->faltaCliente()) {
+            return $this->ventaACredito && $this->clienteSeleccionado() === null
+                ? 'Una venta a crédito requiere seleccionar un cliente.'
+                : 'Este tipo de comprobante requiere seleccionar un cliente'.($this->requiereRncComprador() ? ' con RNC/Cédula.' : '.');
+        }
+
         if (! $this->faltaRncComprador()) {
             return null;
         }
@@ -263,13 +313,13 @@ class PuntoDeVenta extends Page
             ->where('empresa_id', $this->empresaId())
             ->where('activo', true)
             ->where(fn (Builder $q) => $q
-                ->where('nombre', 'ilike', "%{$texto}%")
+                ->whereLikeSinAcentos('nombre', $texto)
                 ->orWhere('codigo', 'ilike', "%{$texto}%")
                 ->orWhereHas('presentaciones', fn (Builder $p) => $p
                     ->where('activa', true)
                     ->where(fn (Builder $pp) => $pp
                         ->where('codigo_barra', 'ilike', $texto)
-                        ->orWhere('nombre', 'ilike', "%{$texto}%"))))
+                        ->orWhereLikeSinAcentos('nombre', $texto))))
             ->with(['presentaciones' => fn ($q) => $q
                 ->where('activa', true)
                 ->orderByDesc('es_base')
@@ -532,7 +582,7 @@ class PuntoDeVenta extends Page
         return $cantidadBase > $stock;
     }
 
-    private function validarProductoParaVenta(Producto $producto): bool
+    protected function validarProductoParaVenta(Producto $producto): bool
     {
         if (! $producto->activo) {
             Notification::make()->title("«{$producto->nombre}» está inactivo y no se puede vender")->danger()->send();
@@ -561,7 +611,7 @@ class PuntoDeVenta extends Page
     }
 
     /** Agrega (o suma 1 a) una línea CONTABLE: por presentación si se resolvió una, o el producto suelto si no tiene ninguna (compatibilidad con productos sin presentaciones). */
-    private function agregarLineaContable(Producto $producto, ?ProductoPresentacion $presentacion): void
+    protected function agregarLineaContable(Producto $producto, ?ProductoPresentacion $presentacion): void
     {
         $presentacionId = $presentacion?->id;
 
@@ -618,19 +668,41 @@ class PuntoDeVenta extends Page
 
     public function proximoNcf(): ?string
     {
-        if (blank($this->tipoComprobante) || ! $this->usaEcf()) {
+        if (blank($this->tipoComprobante) || $this->esSinComprobante()) {
             return null;
         }
 
-        return app(SecuenciaNcfService::class)->previsualizarSiguiente(TipoComprobante::from($this->tipoComprobante));
+        // Un comprobante físico (tipo B) también tiene un próximo NCF real, solo que nunca se
+        // transmite al PAC — la previsualización aplica igual que para uno electrónico.
+        return app(SecuenciaNcfService::class)->previsualizarSiguiente(TipoComprobante::from($this->tipoComprobante), $this->empresa());
     }
 
-    /** @return array<string, string> */
+    /**
+     * Tipos seleccionables en el POS: nunca los de Compras (no son de venta), y solo los que
+     * SecuenciaNcfService::tiposDisponibles() da por emitibles (secuencia con números disponibles;
+     * electrónicos solo con e-CF habilitado). Sin esto, el selector ofrecería un tipo que
+     * VentaService::registrar() rechazaría al cobrar.
+     *
+     * @return array<string, string>
+     */
     public function tiposComprobante(): array
     {
-        return collect(TipoComprobante::cases())
+        $disponibles = app(SecuenciaNcfService::class)->tiposDisponibles($this->empresa());
+
+        $tipos = collect(TipoComprobante::cases())
+            ->filter(fn (TipoComprobante $tipo) => $tipo->esDeVenta())
+            ->filter(fn (TipoComprobante $tipo) => in_array($tipo, $disponibles, true))
             ->mapWithKeys(fn (TipoComprobante $tipo) => [$tipo->value => "{$tipo->value} — {$tipo->etiqueta()}"])
             ->all();
+
+        return $this->permiteSinComprobante()
+            ? [self::SIN_COMPROBANTE => Venta::ETIQUETA_SIN_COMPROBANTE] + $tipos
+            : $tipos;
+    }
+
+    public function permiteSinComprobante(): bool
+    {
+        return (bool) $this->empresa()->config()->permite_ventas_sin_comprobante;
     }
 
     /** @return array<string, string> */
@@ -677,8 +749,8 @@ class PuntoDeVenta extends Page
     public function puedeCobrar(): bool
     {
         return $this->arqueoAbierto() !== null
-            && $this->clienteId !== null
             && ! empty($this->carrito)
+            && ! $this->faltaCliente()
             && ! $this->hayLineasConStockInsuficiente()
             && ! $this->faltaRncComprador()
             && collect($this->carrito)->every(fn (array $linea) => (float) $linea['cantidad'] > 0);
@@ -706,7 +778,7 @@ class PuntoDeVenta extends Page
         }
 
         if (! $this->puedeCobrar()) {
-            $mensaje = $this->mensajeFaltaRncComprador() ?? 'Revisa el carrito antes de cobrar: cliente, líneas y stock.';
+            $mensaje = $this->mensajeFaltaRncComprador() ?? 'Revisa el carrito antes de cobrar: líneas y stock.';
 
             Notification::make()->title($mensaje)->danger()->send();
 
@@ -717,13 +789,15 @@ class PuntoDeVenta extends Page
             $venta = app(VentaService::class)->registrar([
                 'cliente_id' => $this->clienteId,
                 'user_id' => auth()->id(),
-                'tipo_comprobante' => $this->tipoComprobante,
+                'tipo_comprobante' => $this->esSinComprobante() ? null : $this->tipoComprobante,
+                'sin_comprobante' => $this->esSinComprobante(),
                 'descuento_global' => $this->descuentoGlobal,
                 'forma_pago' => $this->formaPago,
                 'arqueo_caja_id' => $this->arqueoAbierto()?->id,
                 'tipo_pago' => $this->ventaACredito ? TipoPago::CREDITO->value : TipoPago::CONTADO->value,
                 'fecha_limite_pago' => $this->ventaACredito && filled($this->fechaLimitePago) ? $this->fechaLimitePago : null,
                 'lineas' => $this->lineasParaService(),
+                ...$this->datosAdicionalesVenta(),
             ], $this->empresa());
         } catch (VentaInvalidaException|StockInsuficienteException|SecuenciaNcfAgotadaException $e) {
             Notification::make()->title($e->getMessage())->danger()->send();
@@ -740,6 +814,17 @@ class PuntoDeVenta extends Page
         $this->recalcularTotales();
 
         $this->notificarVentaRegistradaEImprimirTicket($venta);
+    }
+
+    /**
+     * Punto de extensión para las subclases (p. ej. PuntoDeVentaTouch agrega caja_id): se mezcla
+     * en los datos que cobrar() le pasa a VentaService::registrar().
+     *
+     * @return array<string, mixed>
+     */
+    protected function datosAdicionalesVenta(): array
+    {
+        return [];
     }
 
     /**
@@ -870,15 +955,5 @@ class PuntoDeVenta extends Page
             'descuento' => $linea['descuento'],
             'factor' => (float) ($linea['factor'] ?? 1),
         ])->all();
-    }
-
-    protected function clienteConsumidorFinal(): Cliente
-    {
-        // Sin empresa_id en la búsqueda, todas las empresas colisionarían en el mismo
-        // "Consumidor Final" (nombre no es único): cada una necesita el suyo propio.
-        return Cliente::query()->firstOrCreate(
-            ['empresa_id' => $this->empresaId(), 'nombre' => 'Consumidor Final'],
-            ['tipo_documento' => TipoDocumentoCliente::SIN_DOCUMENTO, 'activo' => true],
-        );
     }
 }

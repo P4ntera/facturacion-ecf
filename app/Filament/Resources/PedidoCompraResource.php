@@ -60,9 +60,9 @@ class PedidoCompraResource extends Resource
 
     protected static ?string $slug = 'pedidos-compra';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Compras';
+    protected static string|\UnitEnum|null $navigationGroup = 'Operaciones';
 
-    protected static ?int $navigationSort = 31;
+    protected static ?int $navigationSort = 5;
 
     public static function form(Schema $schema): Schema
     {
@@ -214,7 +214,7 @@ class PedidoCompraResource extends Resource
                             }
 
                             $service = app(PedidoCompraService::class);
-                            $calc = $service->calcularLineas($lineas);
+                            $calc = $service->calcularLineas($lineas, Filament::getTenant());
                             $totales = $service->calcularTotales($calc);
 
                             return sprintf(
