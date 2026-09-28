@@ -3,7 +3,6 @@
 namespace App\Providers\Filament;
 
 use App\Filament\Pages\Auth\EditProfile;
-use App\Filament\Pages\MisNotificaciones;
 use App\Http\Middleware\EstablecerEmpresaPermisos;
 use App\Models\Empresa;
 use Filament\Actions\Action;
@@ -39,13 +38,7 @@ class AdminPanelProvider extends PanelProvider
             ->viteTheme('resources/css/filament/admin/theme.css')
             ->login()
             ->profile(EditProfile::class)
-            ->userMenuItems([
-                Action::make('misNotificaciones')
-                    ->label('Mis notificaciones')
-                    ->icon('heroicon-o-bell-alert')
-                    ->url(fn (): string => MisNotificaciones::getUrl())
-                    ->visible(fn (): bool => MisNotificaciones::canAccess()),
-            ])
+            ->userMenuItems([])
             // Multi-tenant nativo de Filament: cada empresa es un tenant, identificado en la URL
             // por su slug (/admin/{empresa-slug}/...). ownershipRelationship es explícito aunque
             // coincide con el default (camelCase del modelo) para que quede documentado aquí.
