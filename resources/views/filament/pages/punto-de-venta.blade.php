@@ -70,25 +70,17 @@
                   <p class="pos-muted">{{ $this->clienteSeleccionado()->documento }}</p>
                 @endif
               </div>
-              <button type="button" class="btn btn-secondary" wire:click="quitarCliente">Cambiar</button>
+              <button type="button" class="btn btn-secondary" wire:click="quitarCliente">Quitar</button>
             </div>
-
-            @if ($this->mensajeFaltaRncComprador())
-              <p class="mt-2 pos-alerta">{{ $this->mensajeFaltaRncComprador() }}</p>
-            @endif
           @else
             <div class="space-y-2">
-              <div class="flex gap-2">
-                <input
-                  type="text"
-                  class="form-input"
-                  placeholder="Buscar cliente por nombre o documento..."
-                  wire:model.live.debounce.300ms="busquedaCliente"
-                />
-                <button type="button" class="btn btn-secondary pos-nowrap" wire:click="seleccionarConsumidorFinal">
-                  Consumidor Final
-                </button>
-              </div>
+              <p class="font-semibold">{{ \App\Models\Venta::ETIQUETA_AL_PORTADOR }}</p>
+              <input
+                type="text"
+                class="form-input"
+                placeholder="Buscar cliente por nombre o documento (opcional)..."
+                wire:model.live.debounce.300ms="busquedaCliente"
+              />
 
               @if ($busquedaCliente !== '')
                 <ul class="pos-resultados">
@@ -112,6 +104,10 @@
                 </ul>
               @endif
             </div>
+          @endif
+
+          @if ($this->mensajeFaltaRncComprador())
+            <p class="mt-2 pos-alerta">{{ $this->mensajeFaltaRncComprador() }}</p>
           @endif
         </div>
 

@@ -11,6 +11,9 @@ use App\Enums\Modulo;
 use App\Enums\ModuloImpresion;
 use App\Enums\TipoComprobante;
 use App\Exceptions\ArqueoCajaCerradoException;
+use App\Exceptions\CuentaConPagosRegistradosException;
+use App\Exceptions\SecuenciaNcfAgotadaException;
+use App\Exceptions\VentaInvalidaException;
 use App\Exceptions\VentaYaAnuladaException;
 use App\Filament\Concerns\RestringidoPorModulo;
 use App\Filament\Resources\VentaResource\Pages;
@@ -35,11 +38,15 @@ use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 
 class VentaResource extends Resource
 {
+    /** Valor del filtro de tipo de comprobante para ventas sin comprobante (tipo_comprobante null). */
+    private const FILTRO_SIN_COMPROBANTE = 'sin_comprobante';
+
     use RestringidoPorModulo;
 
     protected static ?string $model = Venta::class;
@@ -57,7 +64,9 @@ class VentaResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Ventas';
 
-    protected static ?int $navigationSort = 5;
+    protected static string|\UnitEnum|null $navigationGroup = 'Operaciones';
+
+    protected static ?int $navigationSort = 3;
 
     // Las ventas se crean únicamente desde el Punto de Venta (VentaService::registrar).
     public static function canCreate(): bool
@@ -72,13 +81,14 @@ class VentaResource extends Resource
                 ->columns(3)
                 ->schema([
                     TextEntry::make('fecha')->label('Fecha')->dateTime('d/m/Y H:i'),
-                    TextEntry::make('ncf')->label('NCF'),
+                    TextEntry::make('ncf')->label('NCF')->placeholder('—'),
                     TextEntry::make('tipo_comprobante')
                         ->label('Tipo')
+                        ->placeholder(Venta::ETIQUETA_SIN_COMPROBANTE)
                         ->badge()
                         ->formatStateUsing(fn (TipoComprobante $state) => "{$state->value} — {$state->etiqueta()}")
                         ->color(fn (TipoComprobante $state) => $state->esElectronico() ? 'info' : 'gray'),
-                    TextEntry::make('cliente.nombre')->label('Cliente'),
+                    TextEntry::make('cliente.nombre')->label('Cliente')->placeholder(Venta::ETIQUETA_AL_PORTADOR),
                     TextEntry::make('estado')
                         ->label('Estado')
                         ->badge()
@@ -92,6 +102,14 @@ class VentaResource extends Resource
                         ->label('Motivo de anulación')
                         ->visible(fn (Venta $record) => $record->estaAnulada())
                         ->columnSpan(3),
+                    TextEntry::make('notasCredito.ncf')
+                        ->label('Anulada ante la DGII con la Nota de Crédito')
+                        ->visible(fn (Venta $record) => $record->notasCredito()->exists())
+                        ->columnSpan(2),
+                    TextEntry::make('ventaModificada.ncf')
+                        ->label('Nota de Crédito que anula la venta')
+                        ->visible(fn (Venta $record) => $record->esNotaCreditoDeAnulacion())
+                        ->columnSpan(2),
                 ]),
 
             Section::make('Estado fiscal DGII')
@@ -199,11 +217,13 @@ class VentaResource extends Resource
 
                 TextColumn::make('cliente.nombre')
                     ->label('Cliente')
+                    ->placeholder(Venta::ETIQUETA_AL_PORTADOR)
                     ->searchable()
                     ->sortable(),
 
                 TextColumn::make('tipo_comprobante')
                     ->label('Tipo')
+                    ->placeholder(Venta::ETIQUETA_SIN_COMPROBANTE)
                     ->badge()
                     ->formatStateUsing(fn (TipoComprobante $state) => "{$state->value} — {$state->etiqueta()}")
                     ->color(fn (TipoComprobante $state) => $state->esElectronico() ? 'info' : 'gray')
@@ -243,9 +263,14 @@ class VentaResource extends Resource
 
                 SelectFilter::make('tipo_comprobante')
                     ->label('Tipo de comprobante')
-                    ->options(collect(TipoComprobante::cases())->mapWithKeys(
+                    ->options([self::FILTRO_SIN_COMPROBANTE => Venta::ETIQUETA_SIN_COMPROBANTE] + collect(TipoComprobante::cases())->mapWithKeys(
                         fn (TipoComprobante $tipo) => [$tipo->value => $tipo->etiqueta()]
-                    )),
+                    )->all())
+                    ->query(fn (Builder $query, array $data): Builder => match ($data['value'] ?? null) {
+                        null, '' => $query,
+                        self::FILTRO_SIN_COMPROBANTE => $query->whereNull('tipo_comprobante'),
+                        default => $query->where('tipo_comprobante', $data['value']),
+                    }),
 
                 SelectFilter::make('ambiente')
                     ->label('Ambiente DGII')
@@ -259,6 +284,16 @@ class VentaResource extends Resource
                     // ->relationship(), ni siquiera dentro de su propio Resource.
                     ->relationship('cliente', 'nombre', modifyQueryUsing: fn (Builder $query) => $query->where('empresa_id', Filament::getTenant()->id))
                     ->searchable(),
+
+                TernaryFilter::make('al_portador')
+                    ->label(Venta::ETIQUETA_AL_PORTADOR)
+                    ->placeholder('Todas')
+                    ->trueLabel('Solo al portador')
+                    ->falseLabel('Solo con cliente')
+                    ->queries(
+                        true: fn (Builder $query) => $query->whereNull('cliente_id'),
+                        false: fn (Builder $query) => $query->whereNotNull('cliente_id'),
+                    ),
 
                 Filter::make('fecha')
                     ->schema([
@@ -289,9 +324,15 @@ class VentaResource extends Resource
                     ->icon('heroicon-o-x-circle')
                     ->color('danger')
                     ->visible(fn (Venta $record) => $record->estado === EstadoVenta::EMITIDA
+                        && ! $record->esNotaCreditoDeAnulacion()
                         && ! ($record->arqueoCaja?->estaCerrado() ?? false)
                         && (auth()->user()?->can('ventas.anular') ?? false))
                     ->requiresConfirmation()
+                    ->modalDescription(fn (Venta $record): string => match (true) {
+                        $record->esElectronica() && $record->estado_fiscal->estaEnTramite() => 'La DGII todavía no respondió sobre esta venta: espera su respuesta antes de anularla.',
+                        $record->esElectronica() && $record->estado_fiscal->esAceptado() => "La DGII ya aceptó el e-CF {$record->ncf}: se emitirá una Nota de Crédito electrónica (e-CF 34) que lo anula, y se repondrá el stock.",
+                        default => 'Se repondrá el stock y la venta quedará anulada. No se emite Nota de Crédito (el comprobante no fue aceptado por la DGII).',
+                    })
                     ->schema([
                         Textarea::make('motivo')
                             ->label('Motivo de la anulación')
@@ -300,14 +341,20 @@ class VentaResource extends Resource
                     ])
                     ->action(function (Venta $record, array $data): void {
                         try {
-                            app(VentaService::class)->anular($record, $data['motivo'], auth()->id());
-                        } catch (VentaYaAnuladaException|ArqueoCajaCerradoException $e) {
+                            $venta = app(VentaService::class)->anular($record, $data['motivo'], auth()->id());
+                        } catch (VentaYaAnuladaException|ArqueoCajaCerradoException|VentaInvalidaException|SecuenciaNcfAgotadaException|CuentaConPagosRegistradosException $e) {
                             Notification::make()->title($e->getMessage())->danger()->send();
 
                             return;
                         }
 
-                        Notification::make()->title('Venta anulada correctamente')->success()->send();
+                        $notaCredito = $venta->notasCredito()->first();
+
+                        Notification::make()
+                            ->title('Venta anulada correctamente')
+                            ->body($notaCredito ? "Nota de Crédito {$notaCredito->ncf} emitida; se está enviando a la DGII." : null)
+                            ->success()
+                            ->send();
                     }),
 
                 self::refrescarEstadoAction(),
@@ -386,6 +433,7 @@ class VentaResource extends Resource
             ->icon('heroicon-o-paper-airplane')
             ->color('warning')
             ->visible(fn (Venta $record) => (auth()->user()?->can('ecf.gestionar') ?? false)
+                && EnviarEcfJob::puedeEnviarse($record)
                 && ($record->estado_fiscal === EstadoFiscal::PENDIENTE || isset($record->ecf_respuesta['error'])))
             ->requiresConfirmation()
             ->action(function (Venta $record): void {

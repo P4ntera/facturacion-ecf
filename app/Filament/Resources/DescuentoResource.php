@@ -36,7 +36,7 @@ class DescuentoResource extends Resource
 
     protected static string|\UnitEnum|null $navigationGroup = 'Configuración';
 
-    protected static ?int $navigationSort = 19;
+    protected static ?int $navigationSort = 6;
 
     public static function form(Schema $schema): Schema
     {

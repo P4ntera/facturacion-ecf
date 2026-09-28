@@ -2,6 +2,7 @@
 
 namespace Tests\Support;
 
+use App\Models\Caja;
 use App\Models\Categoria;
 use App\Models\Cliente;
 use App\Models\Compra;
@@ -41,6 +42,7 @@ class TenantDefaults
         DevolucionCompra::class,
         User::class,
         Descuento::class,
+        Caja::class,
     ];
 
     private static ?int $empresaId = null;

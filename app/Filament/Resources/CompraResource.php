@@ -68,7 +68,7 @@ class CompraResource extends Resource
 
     protected static string|\UnitEnum|null $navigationGroup = 'Operaciones';
 
-    protected static ?int $navigationSort = 10;
+    protected static ?int $navigationSort = 4;
 
     public static function form(Schema $schema): Schema
     {

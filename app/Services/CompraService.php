@@ -213,6 +213,16 @@ class CompraService
             $cantidad = (float) $l['cantidad'];
             $digitado = (float) $l['costo_unitario'];
 
+            // El formulario ya lo impide, pero el service es el que mueve stock y registra la CxP:
+            // una cantidad negativa sacaría inventario como si fuera una "entrada".
+            if ($cantidad <= 0) {
+                throw new RuntimeException("La cantidad de «{$producto->nombre}» debe ser mayor que cero.");
+            }
+
+            if ($digitado < 0) {
+                throw new RuntimeException("El costo de «{$producto->nombre}» no puede ser negativo.");
+            }
+
             $costoBase = ($itbisIncluido && $porcentaje > 0)
                 ? round($digitado / (1 + $porcentaje / 100), 4)
                 : $digitado;

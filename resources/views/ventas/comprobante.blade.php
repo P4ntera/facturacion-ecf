@@ -92,7 +92,7 @@
             </td>
             <td style="width: 200px;">
                 <div class="comprobante-box">
-                    <p class="tipo">{{ $venta->tipo_comprobante->etiqueta() }}</p>
+                    <p class="tipo">{{ $venta->etiquetaComprobante() }}</p>
                     <p class="ncf">{{ $venta->ncf }}</p>
                     <p>Fecha: {{ $venta->fecha->format('d/m/Y H:i') }}</p>
                 </div>
@@ -101,8 +101,8 @@
     </table>
 
     <div class="cliente-box">
-        <p><strong>Cliente:</strong> {{ $venta->cliente->nombre }}</p>
-        @if ($venta->cliente->documento)
+        <p><strong>Cliente:</strong> {{ $venta->nombreCliente() }}</p>
+        @if ($venta->cliente?->documento)
             <p><strong>Documento:</strong> {{ $venta->cliente->documento }}</p>
         @endif
     </div>
@@ -132,8 +132,9 @@
 
     <table class="totales">
         <tr>
+            {{-- Neto: el descuento global ya va prorrateado dentro de cada línea (antes del ITBIS). --}}
             <td>Subtotal</td>
-            <td class="text-right">{{ $venta->moneda }} {{ number_format((float) $venta->subtotal, 2) }}</td>
+            <td class="text-right">{{ $venta->moneda }} {{ number_format((float) $venta->subtotalNeto(), 2) }}</td>
         </tr>
         @if ((float) $venta->itbis_18 > 0)
             <tr>
@@ -155,8 +156,8 @@
         @endif
         @if ((float) $venta->descuento > 0)
             <tr>
-                <td>Descuento</td>
-                <td class="text-right">-{{ $venta->moneda }} {{ number_format((float) $venta->descuento, 2) }}</td>
+                <td>Descuento aplicado (incluido en las líneas)</td>
+                <td class="text-right">{{ $venta->moneda }} {{ number_format((float) $venta->descuento, 2) }}</td>
             </tr>
         @endif
         <tr class="total-final">

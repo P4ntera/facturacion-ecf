@@ -123,7 +123,7 @@ class ImpresionService
         $printer->text(str_repeat('-', $columnas)."\n");
 
         $printer->setEmphasis(true);
-        $printer->text($venta->tipo_comprobante->etiqueta()."\n");
+        $printer->text($venta->etiquetaComprobante()."\n");
 
         if ($venta->ncf) {
             $printer->text("{$venta->ncf}\n");
@@ -132,9 +132,9 @@ class ImpresionService
 
         $printer->setJustification(Printer::JUSTIFY_LEFT);
         $printer->text('Fecha: '.$venta->fecha->format('d/m/Y H:i')."\n");
-        $printer->text('Cliente: '.Str::limit($venta->cliente->nombre, $columnas - 9)."\n");
+        $printer->text('Cliente: '.Str::limit($venta->nombreCliente(), $columnas - 9)."\n");
 
-        if ($venta->cliente->documento) {
+        if ($venta->cliente?->documento) {
             $printer->text("Doc: {$venta->cliente->documento}\n");
         }
 
@@ -147,16 +147,34 @@ class ImpresionService
             $izquierda = "{$cantidad} x ".number_format((float) $detalle->precio_unitario, 2);
             $derecha = number_format((float) $detalle->subtotal, 2);
             $printer->text($this->lineaAlineada($izquierda, $derecha, $columnas)."\n");
+
+            if ((float) $detalle->descuento > 0) {
+                $printer->text($this->lineaAlineada('  Desc.', '-'.number_format((float) $detalle->descuento, 2), $columnas)."\n");
+            }
+
+            // ITBIS de toda la línea (itbis_monto no es unitario), indentado; los exentos no lo llevan.
+            if ((float) $detalle->itbis_monto > 0) {
+                $printer->text($this->lineaAlineada("  ITBIS {$detalle->tasa_itbis->value}%", number_format((float) $detalle->itbis_monto, 2), $columnas)."\n");
+            }
         }
 
         $printer->text(str_repeat('-', $columnas)."\n");
-        $printer->text($this->lineaAlineada('Subtotal', number_format((float) $venta->subtotal, 2), $columnas)."\n");
+        // Subtotal NETO: el descuento global va prorrateado dentro de cada línea (antes del
+        // ITBIS), así las líneas suman el subtotal y subtotal + ITBIS = TOTAL.
+        $printer->text($this->lineaAlineada('Subtotal', number_format((float) $venta->subtotalNeto(), 2), $columnas)."\n");
+
         $printer->text($this->lineaAlineada('ITBIS', number_format((float) $venta->total_itbis, 2), $columnas)."\n");
         $printer->text(str_repeat('-', $columnas)."\n");
 
         $printer->setEmphasis(true);
         $printer->text($this->lineaAlineada('TOTAL', "{$venta->moneda} ".number_format((float) $venta->total, 2), $columnas)."\n");
         $printer->setEmphasis(false);
+
+        if ((float) $venta->descuento > 0) {
+            $printer->setJustification(Printer::JUSTIFY_CENTER);
+            $printer->text("Incluye descuento de {$venta->moneda} ".number_format((float) $venta->descuento, 2)."\n");
+            $printer->setJustification(Printer::JUSTIFY_LEFT);
+        }
 
         if ($venta->dgii_url !== null) {
             $printer->text(str_repeat('-', $columnas)."\n");

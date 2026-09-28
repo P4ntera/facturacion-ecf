@@ -9,9 +9,13 @@ use App\Enums\TipoComprobante;
 use App\Enums\TipoDocumentoCliente;
 use App\Enums\TipoProducto;
 use App\Enums\TipoProveedor;
+use App\Exceptions\SecuenciaNcfAgotadaException;
 use App\Exceptions\VentaInvalidaException;
 use App\Filament\Pages\PuntoDeVenta;
+use App\Filament\Pages\PuntoDeVentaTouch;
 use App\Filament\Resources\ArqueoCajaResource;
+use App\Filament\Resources\CajaResource;
+use App\Filament\Resources\CajaResource\Pages\CreateCaja;
 use App\Filament\Resources\ClienteResource;
 use App\Filament\Resources\DescuentoResource;
 use App\Filament\Resources\DescuentoResource\Pages\CreateDescuento;
@@ -20,6 +24,7 @@ use App\Filament\Resources\PedidoCompraResource;
 use App\Filament\Resources\ProductoResource;
 use App\Filament\Resources\ProductoResource\Pages\CreateProducto;
 use App\Filament\Resources\ProductoResource\Pages\ListProductos;
+use App\Models\Caja;
 use App\Models\Cliente;
 use App\Models\Descuento;
 use App\Models\Empresa;
@@ -39,6 +44,7 @@ use Database\Seeders\RolePermissionSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 use RuntimeException;
 use Tests\Support\TenantDefaults;
@@ -793,5 +799,170 @@ class AislamientoEntreEmpresasTest extends TestCase
 
         $this->assertDatabaseHas('producto_presentaciones', ['id' => $presentacionA->id, 'codigo_barra' => 'CB-COMPARTIDO', 'empresa_id' => $empresaA->id]);
         $this->assertDatabaseHas('producto_presentaciones', ['id' => $presentacionTobogan->id, 'codigo_barra' => 'CB-COMPARTIDO', 'empresa_id' => $empresaTobogan->id]);
+    }
+
+    /**
+     * 24. Cajas registradoras (multi-caja / POS táctil): cada empresa solo ve sus cajas en el
+     * índice, no puede abrir la de otra por URL, crearlas las asocia a la empresa activa, y ni
+     * VentaService ni el POS táctil aceptan un caja_id de otra empresa.
+     */
+    public function test_24_cajas_registradoras_aisladas_por_empresa(): void
+    {
+        ['empresa' => $empresaA, 'admin' => $adminA, 'producto' => $productoA, 'cliente' => $clienteA] = $this->crearEmpresaConDatos('Empresa A', '131000001');
+        ['empresa' => $empresaTobogan] = $this->crearEmpresaConDatos('Tobogán', '131000002');
+
+        $cajaTobogan = Caja::create(['empresa_id' => $empresaTobogan->id, 'nombre' => 'Caja de Tobogán']);
+        $cajaA = Caja::create(['empresa_id' => $empresaA->id, 'nombre' => 'Caja de Empresa A']);
+
+        $this->comoEmpresa($empresaA);
+
+        $this->actingAs($adminA)
+            ->get(CajaResource::getUrl('index', tenant: $empresaA))
+            ->assertOk()
+            ->assertSee($cajaA->nombre)
+            ->assertDontSee($cajaTobogan->nombre);
+
+        $this->actingAs($adminA)
+            ->get(CajaResource::getUrl('edit', ['record' => $cajaTobogan], tenant: $empresaA))
+            ->assertNotFound();
+
+        TenantDefaults::reiniciar($empresaA);
+
+        Livewire::actingAs($adminA)
+            ->test(CreateCaja::class)
+            ->fillForm(['nombre' => 'Caja nueva', 'activo' => true])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $this->assertDatabaseHas('cajas', ['nombre' => 'Caja nueva', 'empresa_id' => $empresaA->id]);
+
+        try {
+            app(VentaService::class)->registrar([
+                'cliente_id' => $clienteA->id,
+                'caja_id' => $cajaTobogan->id,
+                'tipo_comprobante' => TipoComprobante::FACTURA_CONSUMO_FISICA->value,
+                'lineas' => [['producto_id' => $productoA->id, 'cantidad' => 1]],
+            ], $empresaA);
+            $this->fail('VentaService aceptó una caja de otra empresa.');
+        } catch (VentaInvalidaException $e) {
+            $this->assertStringContainsString('caja', $e->getMessage());
+        }
+
+        Livewire::actingAs($adminA)
+            ->test(PuntoDeVentaTouch::class)
+            ->call('seleccionarCaja', $cajaTobogan->id)
+            ->assertSet('cajaId', null)
+            ->assertDontSee($cajaTobogan->nombre);
+    }
+
+    /**
+     * 25. Las secuencias NCF tipo B son por empresa, igual que las electrónicas: una venta B02 en
+     * la empresa que tiene la secuencia funciona; en la que no la tiene, falla — no "toma
+     * prestado" el rango de la otra — y su POS ni siquiera ofrece el tipo.
+     */
+    public function test_25_secuencia_ncf_tipo_b_es_independiente_por_empresa(): void
+    {
+        ['empresa' => $empresaA, 'admin' => $adminA, 'producto' => $productoA, 'cliente' => $clienteA] = $this->crearEmpresaConDatos('Empresa A', '131000001');
+        ['empresa' => $empresaTobogan, 'admin' => $adminTobogan, 'producto' => $productoTobogan, 'cliente' => $clienteTobogan] = $this->crearEmpresaConDatos('Tobogán', '131000002');
+
+        $secuenciaA = SecuenciaNcf::create([
+            'empresa_id' => $empresaA->id,
+            'tipo_comprobante' => TipoComprobante::FACTURA_CONSUMO_FISICA->value,
+            'prefijo' => 'B02',
+            'secuencia_desde' => 1,
+            'secuencia_actual' => 1,
+            'secuencia_hasta' => 999,
+            'vencimiento' => today()->addYear(),
+            'activa' => true,
+        ]);
+
+        $this->comoEmpresa($empresaA);
+
+        $venta = app(VentaService::class)->registrar([
+            'cliente_id' => $clienteA->id,
+            'tipo_comprobante' => TipoComprobante::FACTURA_CONSUMO_FISICA->value,
+            'lineas' => [['producto_id' => $productoA->id, 'cantidad' => 1]],
+        ], $empresaA);
+
+        $this->assertSame('B0200000001', $venta->ncf);
+        $this->assertSame(EstadoFiscal::NO_APLICA, $venta->estado_fiscal);
+
+        $this->assertArrayHasKey(
+            TipoComprobante::FACTURA_CONSUMO_FISICA->value,
+            Livewire::actingAs($adminA)->test(PuntoDeVenta::class)->instance()->tiposComprobante()
+        );
+
+        $this->comoEmpresa($empresaTobogan);
+
+        try {
+            app(VentaService::class)->registrar([
+                'cliente_id' => $clienteTobogan->id,
+                'tipo_comprobante' => TipoComprobante::FACTURA_CONSUMO_FISICA->value,
+                'lineas' => [['producto_id' => $productoTobogan->id, 'cantidad' => 1]],
+            ], $empresaTobogan);
+            $this->fail('Una venta B02 consumió una secuencia que su empresa no tiene.');
+        } catch (SecuenciaNcfAgotadaException $e) {
+            $this->assertStringContainsString('B02', $e->getMessage());
+        }
+
+        $this->assertEquals(2, $secuenciaA->fresh()->secuencia_actual);
+
+        $this->assertArrayNotHasKey(
+            TipoComprobante::FACTURA_CONSUMO_FISICA->value,
+            Livewire::actingAs($adminTobogan)->test(PuntoDeVenta::class)->instance()->tiposComprobante()
+        );
+    }
+
+    /**
+     * 26. La Nota de Crédito de anulación (e-CF 34) sale de la secuencia de la empresa dueña de
+     * la venta: si solo OTRA empresa tiene secuencia 34, la anulación falla y no toca el
+     * contador ajeno.
+     */
+    public function test_26_nota_de_credito_de_anulacion_usa_la_secuencia_de_su_empresa(): void
+    {
+        Queue::fake();
+
+        ['empresa' => $empresaA, 'producto' => $productoA, 'cliente' => $clienteA] = $this->crearEmpresaConDatos('Empresa A', '131000001');
+        ['empresa' => $empresaTobogan] = $this->crearEmpresaConDatos('Tobogán', '131000002');
+
+        SecuenciaNcf::create([
+            'empresa_id' => $empresaA->id,
+            'tipo_comprobante' => TipoComprobante::FACTURA_CONSUMO->value,
+            'prefijo' => 'E32',
+            'secuencia_desde' => 1,
+            'secuencia_actual' => 1,
+            'secuencia_hasta' => 100,
+            'vencimiento' => today()->addYear(),
+            'activa' => true,
+        ]);
+
+        $secuenciaNcTobogan = SecuenciaNcf::create([
+            'empresa_id' => $empresaTobogan->id,
+            'tipo_comprobante' => TipoComprobante::NOTA_CREDITO->value,
+            'prefijo' => 'E34',
+            'secuencia_desde' => 1,
+            'secuencia_actual' => 1,
+            'secuencia_hasta' => 100,
+            'vencimiento' => today()->addYear(),
+            'activa' => true,
+        ]);
+
+        $this->comoEmpresa($empresaA);
+
+        $venta = app(VentaService::class)->registrar([
+            'cliente_id' => $clienteA->id,
+            'tipo_comprobante' => TipoComprobante::FACTURA_CONSUMO->value,
+            'lineas' => [['producto_id' => $productoA->id, 'cantidad' => 1]],
+        ], $empresaA);
+        $venta->update(['estado_fiscal' => EstadoFiscal::ACEPTADO]);
+
+        try {
+            app(VentaService::class)->anular($venta, 'Devolución');
+            $this->fail('La Nota de Crédito tomó la secuencia 34 de otra empresa.');
+        } catch (SecuenciaNcfAgotadaException) {
+        }
+
+        $this->assertEquals(1, $secuenciaNcTobogan->fresh()->secuencia_actual);
+        $this->assertSame(EstadoVenta::EMITIDA, $venta->fresh()->estado);
     }
 }

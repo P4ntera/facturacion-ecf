@@ -8,6 +8,7 @@ use App\Models\User;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
@@ -33,7 +34,7 @@ class UserResource extends Resource
 
     protected static string|\UnitEnum|null $navigationGroup = 'Configuración';
 
-    protected static ?int $navigationSort = 60;
+    protected static ?int $navigationSort = 1;
 
     public static function form(Schema $schema): Schema
     {
@@ -92,6 +93,11 @@ class UserResource extends Resource
                 ->preload()
                 ->native(false)
                 ->visible(fn (): bool => auth()->user()?->can('usuarios.gestionar') ?? false),
+
+            Toggle::make('activo')
+                ->label('Activo')
+                ->default(true)
+                ->visible(fn (): bool => auth()->user()?->can('usuarios.gestionar') ?? false),
         ]);
     }
 
@@ -122,9 +128,9 @@ class UserResource extends Resource
                 ->sortable()
                 ->toggleable(isToggledHiddenByDefault: true),
         ])
-        ->filters([
-            TernaryFilter::make('activo')->label('Activo')->default(true),
-        ]);
+            ->filters([
+                TernaryFilter::make('activo')->label('Activo')->default(true),
+            ]);
     }
 
     public static function getPages(): array

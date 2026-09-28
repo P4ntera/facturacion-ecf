@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\EstadoFiscal;
 use App\Enums\FormaPago;
 use App\Enums\TasaItbis;
 use App\Enums\TipoComprobante;
@@ -204,9 +205,15 @@ class VentaServiceTest extends TestCase
             'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
         ], $this->empresaDefault);
 
-        // Subtotal 100, 10% de descuento = 10.00, ITBIS 18% sobre 100 = 18.00, total 108.00.
+        // Subtotal 100, 10% de descuento = 10.00, ITBIS 18% sobre la base NETA (90) = 16.20,
+        // total 106.20. El descuento se prorratea como descuento de línea antes del ITBIS.
+        $this->assertSame('100.00', $venta->subtotal);
         $this->assertSame('10.00', $venta->descuento);
-        $this->assertEqualsWithDelta(108.00, (float) $venta->total, 0.01);
+        $this->assertSame('90.00', $venta->monto_gravado_18);
+        $this->assertSame('16.20', $venta->total_itbis);
+        $this->assertSame('106.20', $venta->total);
+        $this->assertSame('10.00', $venta->detalles->first()->descuento);
+        $this->assertSame('90.00', $venta->detalles->first()->subtotal);
     }
 
     /** descuento_id es client-controllable: debe pertenecer a esta empresa y estar activo. */
@@ -400,6 +407,8 @@ class VentaServiceTest extends TestCase
             'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
         ], $this->empresaDefault);
 
+        // Anulación simple: el e-CF no llegó a ser válido ante la DGII (sin Nota de Crédito).
+        $venta->update(['estado_fiscal' => EstadoFiscal::RECHAZADO]);
         $anulada = app(VentaService::class)->anular($venta, 'Cliente se arrepintió', $cajero->id);
 
         $this->assertTrue($anulada->estaAnulada());

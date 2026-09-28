@@ -291,8 +291,12 @@ class EcfBuilderTest extends TestCase
         $this->assertSame('Comercial Grande SRL', $comprador['RazonSocialComprador']);
     }
 
-    /** Una Nota de Crédito debe declarar NCFModificado en IdDoc (norma DGII). */
-    public function test_nota_de_credito_incluye_ncf_modificado_en_iddoc(): void
+    /**
+     * Una Nota de Crédito registrada a mano (ajuste de montos) declara el e-NCF modificado en
+     * InformacionReferencia (formato e-CF DGII), con CodigoModificacion 3, y lleva
+     * IndicadorNotaCredito en IdDoc.
+     */
+    public function test_nota_de_credito_incluye_informacion_de_referencia(): void
     {
         $this->secuencia(TipoComprobante::FACTURA_CONSUMO, 'E32');
         $this->secuencia(TipoComprobante::NOTA_CREDITO, 'E34');
@@ -312,9 +316,15 @@ class EcfBuilderTest extends TestCase
             'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
         ], $this->empresaDefault)->refresh();
 
-        $idDoc = app(EcfBuilder::class)->construir($notaCredito)['ECF']['Encabezado']['IdDoc'];
+        $ecf = app(EcfBuilder::class)->construir($notaCredito)['ECF'];
 
-        $this->assertSame($ventaOriginal->ncf, $idDoc['NCFModificado']);
+        $this->assertArrayNotHasKey('NCFModificado', $ecf['Encabezado']['IdDoc']);
+        $this->assertSame('0', $ecf['Encabezado']['IdDoc']['IndicadorNotaCredito']);
+        $this->assertSame([
+            'NCFModificado' => $ventaOriginal->ncf,
+            'FechaNCFModificado' => $ventaOriginal->fecha->format('d-m-Y'),
+            'CodigoModificacion' => '3',
+        ], $ecf['InformacionReferencia']);
     }
 
     /** Una venta normal (sin ncf_modifica) no debe llevar NCFModificado en el XML/JSON. */
@@ -330,8 +340,10 @@ class EcfBuilderTest extends TestCase
             'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
         ], $this->empresaDefault)->refresh();
 
-        $idDoc = app(EcfBuilder::class)->construir($venta)['ECF']['Encabezado']['IdDoc'];
+        $ecf = app(EcfBuilder::class)->construir($venta)['ECF'];
 
-        $this->assertArrayNotHasKey('NCFModificado', $idDoc);
+        $this->assertArrayNotHasKey('NCFModificado', $ecf['Encabezado']['IdDoc']);
+        $this->assertArrayNotHasKey('IndicadorNotaCredito', $ecf['Encabezado']['IdDoc']);
+        $this->assertArrayNotHasKey('InformacionReferencia', $ecf);
     }
 }

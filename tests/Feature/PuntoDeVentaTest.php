@@ -57,13 +57,17 @@ class PuntoDeVentaTest extends TestCase
         ], $overrides));
     }
 
-    public function test_selecciona_consumidor_final_por_defecto_al_montar(): void
+    /** Por defecto la venta es al portador: sin cliente, y sin crear un "Consumidor Final" genérico. */
+    public function test_arranca_al_portador_sin_cliente(): void
     {
         Livewire::actingAs($this->vendedor())
             ->test(PuntoDeVenta::class)
             ->call('abrirCaja', '500.00')
             ->assertSet('totales.total', '0.00')
-            ->assertSee('Consumidor Final');
+            ->assertSet('clienteId', null)
+            ->assertSee('Al portador');
+
+        $this->assertDatabaseMissing('clientes', ['nombre' => 'Consumidor Final']);
     }
 
     public function test_agregar_producto_lo_suma_al_carrito_y_recalcula_totales(): void
@@ -175,13 +179,32 @@ class PuntoDeVentaTest extends TestCase
         $this->assertTrue($componente->instance()->puedeCobrar());
     }
 
-    public function test_tipo_32_al_cruzar_250k_en_vivo_exige_rnc_con_consumidor_final(): void
+    public function test_tipo_32_al_cruzar_250k_en_vivo_exige_cliente_al_portador(): void
     {
         $producto = $this->producto(['codigo' => 'POS-250K', 'precio' => 300000]);
 
         $componente = Livewire::actingAs($this->vendedor())
             ->test(PuntoDeVenta::class)
             ->set('tipoComprobante', TipoComprobante::FACTURA_CONSUMO->value)
+            ->call('agregarProducto', $producto->id);
+
+        $this->assertTrue($componente->instance()->faltaCliente());
+        $this->assertFalse($componente->instance()->puedeCobrar());
+        $this->assertStringContainsString(
+            'requiere seleccionar un cliente con RNC/Cédula',
+            $componente->instance()->mensajeFaltaRncComprador(),
+        );
+    }
+
+    public function test_tipo_32_al_cruzar_250k_en_vivo_exige_rnc_con_cliente_sin_documento(): void
+    {
+        $producto = $this->producto(['codigo' => 'POS-250K', 'precio' => 300000]);
+        $cliente = Cliente::create(['nombre' => 'Cliente sin documento', 'activo' => true]);
+
+        $componente = Livewire::actingAs($this->vendedor())
+            ->test(PuntoDeVenta::class)
+            ->set('tipoComprobante', TipoComprobante::FACTURA_CONSUMO->value)
+            ->call('seleccionarCliente', $cliente->id)
             ->call('agregarProducto', $producto->id);
 
         $this->assertTrue($componente->instance()->requiereRncComprador());
@@ -353,7 +376,9 @@ class PuntoDeVentaTest extends TestCase
             ->call('agregarProducto', $producto->id)
             ->set('descuentoId', (string) $descuento->id)
             ->assertSet('totales.descuento', '10.00')
-            ->assertSet('totales.total', '108.00');
+            // El ITBIS va sobre la base ya descontada: 18% de 90 = 16.20 (no de 100).
+            ->assertSet('totales.total_itbis', '16.20')
+            ->assertSet('totales.total', '106.20');
     }
 
     public function test_un_descuento_de_otra_empresa_no_se_aplica(): void

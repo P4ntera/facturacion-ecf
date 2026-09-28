@@ -129,8 +129,8 @@
    Filament deja el sidebar transparente en escritorio (`lg:bg-transparent`), así que hoy hereda
    el fondo de `.fi-body` sin querer. Se fuerza el navy del diseño aprobado (--fondo-sidebar) y se
    recolorea texto/íconos/activo a mano: Filament pinta el ítem activo con su color 'primary'
-   (azul #5D87FF, pensado para fondo claro), que no combina con navy — por eso el color activo
-   sale de --sidebar-item-activo-texto/fondo en vez de dejarlo en manos de Filament. */
+   (azul #5D87FF, pensado para fondo claro), que no combina con navy: por eso el color activo sale
+   de --sidebar-item-activo-texto/fondo en lugar de dejárselo a Filament. */
 
 .fi-sidebar,
 .fi-sidebar-header-ctn,
@@ -143,19 +143,31 @@
     border-block-end:1px solid var(--sidebar-borde);
 }
 
-/* Texto/ícono de cada ítem: gris azulado por defecto, azul claro sobre fondo tintado si está
-   activo. El ícono hereda color via `currentColor` (así generan sus SVG los heroicons de
-   Filament), por eso alcanza con colorear el botón contenedor. */
+/* Texto/ícono de cada ítem: gris claro por defecto, blanco sobre fondo azul oscuro si está activo.
+   OJO: colorear solo el botón NO alcanza — Filament (components/sidebar.css) le pone color propio
+   al label (`text-gray-700`) y al ícono (`text-gray-400`, `text-primary-700` si está activo), así
+   que no heredan del botón. Hay que colorear label e ícono explícitamente. Las reglas de Filament
+   viven en `@layer components`; estas van sin capa, así que ganan sin necesidad de !important. */
 .fi-sidebar-item-btn{
-    color:var(--sidebar-item-texto);
     border-radius:8px;
     padding-block:10px;
     padding-inline:12px;
 }
 
-.fi-sidebar-item-btn:hover{
+.fi-sidebar-item-btn,
+.fi-sidebar-item-btn > .fi-icon,
+.fi-sidebar-item-btn > .fi-sidebar-item-label{
+    color:var(--sidebar-item-texto);
+}
+
+.fi-sidebar-item.fi-sidebar-item-has-url > .fi-sidebar-item-btn:hover,
+.fi-sidebar-item.fi-sidebar-item-has-url > .fi-sidebar-item-btn:focus-visible{
     background-color:var(--sidebar-hover-fondo);
-    color:var(--sidebar-usuario-nombre);
+}
+
+.fi-sidebar-item-btn:hover > .fi-icon,
+.fi-sidebar-item-btn:hover > .fi-sidebar-item-label{
+    color:var(--sidebar-item-activo-texto);
 }
 
 .fi-sidebar-item-icon{
@@ -163,18 +175,16 @@
     width:18px;
 }
 
-.fi-sidebar-item.fi-active > .fi-sidebar-item-btn{
-    background-color:var(--sidebar-item-activo-fondo) !important;
-    color:var(--sidebar-item-activo-texto) !important;
+.fi-sidebar-item.fi-active > .fi-sidebar-item-btn,
+.fi-sidebar-item.fi-sidebar-item-has-url.fi-active > .fi-sidebar-item-btn:hover,
+.fi-sidebar-item.fi-sidebar-item-has-url.fi-active > .fi-sidebar-item-btn:focus-visible{
+    background-color:var(--sidebar-item-activo-fondo);
 }
 
-.fi-sidebar-item.fi-active > .fi-sidebar-item-btn .fi-sidebar-item-icon,
-.fi-sidebar-item.fi-active > .fi-sidebar-item-btn .fi-sidebar-item-label{
-    color:inherit !important;
-}
-
-.fi-sidebar-item.fi-active > .fi-sidebar-item-btn:hover{
-    background-color:var(--sidebar-item-activo-fondo) !important;
+.fi-sidebar-item.fi-active > .fi-sidebar-item-btn,
+.fi-sidebar-item.fi-active > .fi-sidebar-item-btn > .fi-icon,
+.fi-sidebar-item.fi-active > .fi-sidebar-item-btn > .fi-sidebar-item-label{
+    color:var(--sidebar-item-activo-texto);
 }
 
 /* Labels de sección (Operaciones, Fiscal...): mayúsculas, tracking amplio, tenues — como
@@ -209,12 +219,139 @@
     padding-block:4px;
 }
 
+/* Sidebar en mobile/tablet (< lg = 1024px, el mismo breakpoint que usa Filament): el off-canvas,
+   el overlay y la hamburguesa del topbar ya los resuelve Filament de forma nativa
+   (components/sidebar.css); acá solo se agrandan los blancos táctiles a 44px (WCAG 2.5.5) y el
+   texto de los ítems. Sin !important: las reglas de Filament están en @layer components. */
+@media (max-width: 1023px){
+    .fi-sidebar-item-btn,
+    .fi-tenant-menu-trigger,
+    .fi-user-menu-trigger{
+        min-height:44px;
+    }
+
+    .fi-sidebar-item-label{
+        font-size:0.9375rem;
+    }
+
+    .fi-sidebar-item-icon{
+        height:20px;
+        width:20px;
+    }
+}
+
+/*======== BARRA SUPERIOR: navegación por grupos con dropdowns (->topNavigation()) ========
+   Selectores sacados de vendor/filament/filament/resources/views/livewire/topbar.blade.php y
+   components/topbar/item.blade.php. Filament pinta la barra blanca con texto gris/primary para
+   fondo claro; acá se pasa a navy. Los paneles de los dropdowns usan `x-float.teleport`, que en
+   Filament solo cambia el posicionamiento a `fixed` (NO mueve el nodo al <body>), así que siguen
+   dentro de `.fi-topbar-nav-groups` y se pueden apuntar ahí sin afectar el resto de los
+   dropdowns del panel (acciones de tabla, menú de usuario...). */
+
+.fi-topbar{
+    background-color:var(--topbar-fondo);
+    border-block-end:1px solid var(--topbar-borde);
+    box-shadow:none;
+}
+
+.fi-topbar-item-btn,
+.fi-topbar-item-btn > .fi-icon,
+.fi-topbar-item-label{
+    color:var(--topbar-item-texto);
+}
+
+.fi-topbar-item-btn{
+    transition:color 0.15s, background-color 0.15s;
+}
+
+.fi-topbar-item-btn:hover,
+.fi-topbar-item-btn:focus-visible{
+    background-color:var(--topbar-item-hover-fondo);
+}
+
+.fi-topbar-item-btn:hover > .fi-icon,
+.fi-topbar-item-btn:hover > .fi-topbar-item-label,
+.fi-topbar-item-btn:focus-visible > .fi-topbar-item-label{
+    color:var(--topbar-item-hover-texto);
+}
+
+/* Activo: texto blanco + subrayado azul. Se usa box-shadow inset en vez de border-bottom para
+   no mover el alto del botón (ni desalinear la barra) al cambiar de página. */
+.fi-topbar-item.fi-active .fi-topbar-item-btn{
+    background-color:transparent;
+    border-end-start-radius:0;
+    border-end-end-radius:0;
+    box-shadow:inset 0 -2px 0 var(--topbar-item-activo-borde);
+}
+
+.fi-topbar-item.fi-active .fi-topbar-item-btn > .fi-icon,
+.fi-topbar-item.fi-active .fi-topbar-item-label{
+    color:var(--topbar-item-activo-texto);
+}
+
+/* Dropdown de cada grupo. Gana sobre la regla global de .fi-dropdown-panel ("REMATE", al final
+   del archivo) por especificidad. */
+.fi-topbar-nav-groups .fi-dropdown-panel{
+    background-color:var(--topbar-dropdown-fondo);
+    border:1px solid var(--topbar-borde);
+    border-radius:10px;
+    box-shadow:0 12px 32px rgb(0 0 0 / 0.5);
+}
+
+.fi-topbar-nav-groups .fi-dropdown-panel > *{
+    border-color:var(--topbar-borde);
+}
+
+.fi-topbar-nav-groups .fi-dropdown-list-item{
+    border-radius:7px;
+    transition:background-color 0.12s, color 0.12s;
+}
+
+.fi-topbar-nav-groups .fi-dropdown-list-item-label,
+.fi-topbar-nav-groups .fi-dropdown-list-item > .fi-icon{
+    color:var(--topbar-item-texto);
+}
+
+.fi-topbar-nav-groups .fi-dropdown-list-item:hover,
+.fi-topbar-nav-groups .fi-dropdown-list-item:focus-visible{
+    background-color:var(--topbar-dropdown-item-hover-fondo);
+}
+
+.fi-topbar-nav-groups .fi-dropdown-list-item:hover .fi-dropdown-list-item-label,
+.fi-topbar-nav-groups .fi-dropdown-list-item:focus-visible .fi-dropdown-list-item-label{
+    color:var(--topbar-item-hover-texto);
+}
+
+/* Ítem de la página actual: Filament le pone color="primary" (clase .fi-color-primary). */
+.fi-topbar-nav-groups .fi-dropdown-list-item.fi-color-primary{
+    background-color:var(--topbar-dropdown-item-activo-fondo);
+}
+
+.fi-topbar-nav-groups .fi-dropdown-list-item.fi-color-primary .fi-dropdown-list-item-label,
+.fi-topbar-nav-groups .fi-dropdown-list-item.fi-color-primary > .fi-icon{
+    color:var(--topbar-item-activo-texto);
+}
+
+/* Botones de ícono de la barra (hamburguesa en mobile, campana de notificaciones): Filament los
+   pinta gris medio, poco visible sobre navy. */
+.fi-topbar .fi-icon-btn{
+    color:var(--topbar-item-texto);
+}
+
+.fi-topbar .fi-icon-btn:hover{
+    color:var(--topbar-item-hover-texto);
+}
+
+.fi-topbar .fi-icon-btn-badge-ctn{
+    background-color:var(--topbar-fondo);
+}
+
 /* Bloque de marca (logo): ver resources/views/vendor/filament-panels/components/logo.blade.php
    —el override que arma el ícono "F" + nombre + empresa activa que pide el diseño. El mismo
-   componente se reusa en el topbar (mobile) y en las páginas "simple" (login...), ambas sobre
-   fondo claro: los colores de texto por defecto son para fondo claro, y solo se invierten a
-   blanco/slate DENTRO del sidebar (.fi-sidebar-header), que es navy. El ícono no necesita este
-   escalonado: el chip azul sólido se lee bien sobre cualquier fondo. */
+   componente se reusa en la barra superior, en el sidebar off-canvas de mobile y en las páginas
+   "simple" (login...). Los colores de texto por defecto son para fondo claro (login), y se
+   invierten a blanco/slate dentro de .fi-topbar y .fi-sidebar-header, que son navy. El ícono no
+   necesita este escalonado: el chip azul sólido se lee bien sobre cualquier fondo. */
 .sidebar-brand{
     display:flex;
     align-items:center;
@@ -262,12 +399,31 @@
     text-overflow:ellipsis;
 }
 
-.fi-sidebar-header .sidebar-brand-nombre{
+.fi-sidebar-header .sidebar-brand-nombre,
+.fi-topbar .sidebar-brand-nombre{
     color:var(--sidebar-brand-nombre);
 }
 
-.fi-sidebar-header .sidebar-brand-subtitulo{
+.fi-sidebar-header .sidebar-brand-subtitulo,
+.fi-topbar .sidebar-brand-subtitulo{
     color:var(--sidebar-brand-subtitulo);
+}
+
+/* Selector de empresa (->tenantMenu()): Filament pinta el nombre de la empresa con
+   `text-gray-950` (pensado para fondo claro), invisible sobre navy. Aparece en la barra superior
+   (escritorio) y en el sidebar off-canvas (mobile), ambos navy. */
+:is(.fi-sidebar, .fi-topbar) .fi-tenant-menu-trigger-tenant-name{
+    color:var(--sidebar-usuario-nombre);
+}
+
+:is(.fi-sidebar, .fi-topbar) .fi-tenant-menu-trigger-current-tenant-label,
+:is(.fi-sidebar, .fi-topbar) .fi-tenant-menu-trigger .fi-icon{
+    color:var(--sidebar-brand-subtitulo);
+}
+
+:is(.fi-sidebar, .fi-topbar) .fi-tenant-menu-trigger:hover,
+:is(.fi-sidebar, .fi-topbar) .fi-tenant-menu-trigger:focus-visible{
+    background-color:var(--sidebar-hover-fondo);
 }
 
 /* Bloque de usuario al pie del sidebar (->userMenu(position: Sidebar) en AdminPanelProvider):

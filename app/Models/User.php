@@ -3,6 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Enums\TipoNotificacion;
 use Database\Factories\UserFactory;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Models\Contracts\HasDefaultTenant;
@@ -128,6 +129,24 @@ class User extends Authenticatable implements FilamentUser, HasDefaultTenant, Ha
     public function empresa(): BelongsTo
     {
         return $this->belongsTo(Empresa::class);
+    }
+
+    public function preferenciasNotificacion(): HasMany
+    {
+        return $this->hasMany(PreferenciaNotificacion::class);
+    }
+
+    /**
+     * true si este usuario recibe las notificaciones de $tipo: su rol tiene el permiso y no la
+     * silenció. Sin preferencia guardada = activa.
+     */
+    public function recibeNotificacion(TipoNotificacion $tipo): bool
+    {
+        if (! $this->can($tipo->permiso())) {
+            return false;
+        }
+
+        return $this->preferenciasNotificacion()->where('tipo', $tipo->value)->value('activa') ?? true;
     }
 
     /**

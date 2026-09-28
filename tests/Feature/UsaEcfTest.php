@@ -8,15 +8,18 @@ use App\Enums\TipoComprobante;
 use App\Enums\TipoProducto;
 use App\Exceptions\VentaInvalidaException;
 use App\Filament\Resources\DocumentoRecibidoResource;
+use App\Filament\Resources\EmpresaResource\Pages\EditEmpresa;
 use App\Filament\Resources\SecuenciaNcfResource;
 use App\Jobs\EnviarEcfJob;
 use App\Models\Cliente;
 use App\Models\Producto;
 use App\Models\SecuenciaNcf;
 use App\Models\User;
+use App\Services\SecuenciaNcfService;
 use App\Services\VentaService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
+use Livewire\Livewire;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -182,5 +185,68 @@ class UsaEcfTest extends TestCase
 
         $this->assertTrue(SecuenciaNcfResource::canAccess());
         $this->assertFalse(DocumentoRecibidoResource::canAccess());
+    }
+
+    private function secuenciaCreditoFiscalElectronica(): void
+    {
+        SecuenciaNcf::create([
+            'tipo_comprobante' => TipoComprobante::FACTURA_CREDITO_FISCAL->value,
+            'prefijo' => 'E31',
+            'secuencia_desde' => 1,
+            'secuencia_actual' => 1,
+            'secuencia_hasta' => 1000,
+            'vencimiento' => now()->addYear(),
+            'activa' => true,
+        ]);
+    }
+
+    /** Sin e-CF, tiposDisponibles() excluye los electrónicos aunque tengan secuencia cargada. */
+    public function test_empresa_sin_ecf_solo_tiene_disponibles_los_tipos_b(): void
+    {
+        $this->empresaDefault->update(['usa_ecf' => false]);
+        $this->secuenciaFisicaConsumo();
+        $this->secuenciaCreditoFiscalElectronica();
+
+        $tipos = app(SecuenciaNcfService::class)->tiposDisponibles($this->empresaDefault);
+
+        $this->assertContains(TipoComprobante::FACTURA_CONSUMO_FISICA, $tipos);
+        $this->assertNotContains(TipoComprobante::FACTURA_CREDITO_FISCAL, $tipos);
+    }
+
+    /** Con e-CF, una empresa puede tener a la vez tipos B y E disponibles. */
+    public function test_empresa_con_ecf_tiene_disponibles_todos_los_tipos_con_secuencia(): void
+    {
+        $this->empresaDefault->update(['usa_ecf' => true]);
+        $this->secuenciaFisicaConsumo();
+        $this->secuenciaCreditoFiscalElectronica();
+
+        $tipos = app(SecuenciaNcfService::class)->tiposDisponibles($this->empresaDefault);
+
+        $this->assertContains(TipoComprobante::FACTURA_CONSUMO_FISICA, $tipos);
+        $this->assertContains(TipoComprobante::FACTURA_CREDITO_FISCAL, $tipos);
+    }
+
+    /** El toggle de EmpresaResource persiste usa_ecf en ambos sentidos. */
+    public function test_el_toggle_usa_ecf_se_guarda(): void
+    {
+        $superAdmin = User::factory()->create(['empresa_id' => null, 'es_super_admin' => true]);
+        $this->empresaDefault->update(['usa_ecf' => false]);
+
+        Livewire::actingAs($superAdmin)
+            ->test(EditEmpresa::class, ['record' => $this->empresaDefault->getRouteKey()])
+            ->assertFormSet(['usa_ecf' => false])
+            ->fillForm(['usa_ecf' => true])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $this->assertTrue($this->empresaDefault->fresh()->usa_ecf);
+
+        Livewire::actingAs($superAdmin)
+            ->test(EditEmpresa::class, ['record' => $this->empresaDefault->getRouteKey()])
+            ->fillForm(['usa_ecf' => false])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $this->assertFalse($this->empresaDefault->fresh()->usa_ecf);
     }
 }

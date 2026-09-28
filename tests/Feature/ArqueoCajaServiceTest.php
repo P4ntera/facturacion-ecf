@@ -3,11 +3,15 @@
 namespace Tests\Feature;
 
 use App\Enums\EstadoArqueoCaja;
+use App\Enums\EstadoFiscal;
 use App\Enums\FormaPago;
 use App\Enums\TasaItbis;
 use App\Enums\TipoComprobante;
 use App\Enums\TipoProducto;
+use App\Models\ArqueoCaja;
+use App\Models\Caja;
 use App\Models\Cliente;
+use App\Models\Empresa;
 use App\Models\Producto;
 use App\Models\SecuenciaNcf;
 use App\Models\User;
@@ -121,6 +125,8 @@ class ArqueoCajaServiceTest extends TestCase
         $this->vender($arqueo->id, $user->id, FormaPago::EFECTIVO, 'ARQ-ANUL-1');
 
         $venta = $arqueo->ventas()->first();
+        // Anulación simple: el e-CF no llegó a ser válido ante la DGII (sin Nota de Crédito).
+        $venta->update(['estado_fiscal' => EstadoFiscal::RECHAZADO]);
         app(VentaService::class)->anular($venta, 'Prueba', $user->id);
 
         $cerrado = $service->cerrar($arqueo, '500.00', null, $user->id);
@@ -191,5 +197,53 @@ class ArqueoCajaServiceTest extends TestCase
         $user = User::factory()->create();
 
         $this->assertNull(app(ArqueoCajaService::class)->arqueoAbiertoDe($user->id, $this->empresaDefault));
+    }
+
+    public function test_una_caja_fisica_solo_admite_un_turno_abierto_a_la_vez(): void
+    {
+        $caja = Caja::create(['nombre' => 'Caja 1']);
+        $cajeroA = User::factory()->create();
+        $cajeroB = User::factory()->create();
+
+        $arqueo = app(ArqueoCajaService::class)->abrir('100', $cajeroA->id, $this->empresaDefault, $caja);
+        $this->assertSame($caja->id, $arqueo->caja_id);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('La caja Caja 1 ya tiene un arqueo abierto por otro cajero.');
+
+        app(ArqueoCajaService::class)->abrir('100', $cajeroB->id, $this->empresaDefault, $caja);
+    }
+
+    public function test_cerrado_el_turno_la_caja_se_puede_volver_a_abrir(): void
+    {
+        $caja = Caja::create(['nombre' => 'Caja 1']);
+        $cajeroA = User::factory()->create();
+        $cajeroB = User::factory()->create();
+
+        $arqueo = app(ArqueoCajaService::class)->abrir('100', $cajeroA->id, $this->empresaDefault, $caja);
+        app(ArqueoCajaService::class)->cerrar($arqueo, '100', null, $cajeroA->id);
+
+        $nuevo = app(ArqueoCajaService::class)->abrir('50', $cajeroB->id, $this->empresaDefault, $caja);
+
+        $this->assertSame($nuevo->id, app(ArqueoCajaService::class)->arqueoAbiertoEnCaja($caja)?->id);
+    }
+
+    public function test_no_abre_turno_en_una_caja_de_otra_empresa_o_inactiva(): void
+    {
+        $otra = Empresa::factory()->create();
+        $ajena = Caja::create(['empresa_id' => $otra->id, 'nombre' => 'Caja Ajena']);
+        $inactiva = Caja::create(['nombre' => 'Caja Apagada', 'activo' => false]);
+        $cajero = User::factory()->create();
+
+        foreach ([$ajena, $inactiva] as $caja) {
+            try {
+                app(ArqueoCajaService::class)->abrir('0', $cajero->id, $this->empresaDefault, $caja);
+                $this->fail('Debió rechazar la caja '.$caja->nombre);
+            } catch (RuntimeException $e) {
+                $this->assertSame('La caja indicada no existe o está inactiva.', $e->getMessage());
+            }
+        }
+
+        $this->assertSame(0, ArqueoCaja::count());
     }
 }

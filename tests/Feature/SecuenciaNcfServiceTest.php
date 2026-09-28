@@ -19,7 +19,7 @@ class SecuenciaNcfServiceTest extends TestCase
     {
         Permission::firstOrCreate(['name' => 'secuencias.administrar', 'guard_name' => 'web']);
         $rol = Role::firstOrCreate(['name' => 'Administrador', 'guard_name' => 'web']);
-        $rol->syncPermissions(['secuencias.administrar']);
+        $rol->syncPermissions(['secuencias.administrar', 'notificaciones.ncf_agotandose']);
 
         $usuario = User::factory()->create();
         $usuario->assignRole('Administrador');

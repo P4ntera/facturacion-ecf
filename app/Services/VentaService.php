@@ -18,6 +18,7 @@ use App\Exceptions\SecuenciaNcfAgotadaException;
 use App\Exceptions\StockInsuficienteException;
 use App\Exceptions\VentaInvalidaException;
 use App\Exceptions\VentaYaAnuladaException;
+use App\Models\Caja;
 use App\Models\Cliente;
 use App\Models\Descuento;
 use App\Models\Empresa;
@@ -43,14 +44,16 @@ class VentaService
      * detalle, y descuenta inventario — todo dentro de una única transacción atómica.
      *
      * @param  array{
-     *   cliente_id: int,
+     *   cliente_id?: int|null,
      *   user_id?: int|null,
      *   tipo_comprobante?: TipoComprobante|string|null,
+     *   sin_comprobante?: bool,
      *   ncf_modifica?: string|null,
      *   descuento_global?: string|float|int|null,
      *   descuento_id?: int|null,
      *   forma_pago?: FormaPago|string|null,
      *   arqueo_caja_id?: int|null,
+     *   caja_id?: int|null,
      *   permite_precio_cero?: bool,
      *   lineas: array<int, array{
      *     producto_id: int,
@@ -64,7 +67,12 @@ class VentaService
      * $empresa: quien llama la resuelve explícitamente (Filament::getTenant() en el panel) — este
      * service no asume ningún tenant ambiente, para poder invocarse igual desde una cola o un
      * comando. Su EmpresaConfiguracion decide comportamiento fiscal (ITBIS, tipo por defecto,
-     * moneda); empresa_id en la Venta se deriva del cliente (ya validado), no de este parámetro.
+     * moneda).
+     *
+     * cliente_id null = venta al portador (permitida salvo que el comprobante o el crédito exijan
+     * cliente). sin_comprobante = true registra la venta sin NCF (tipo_comprobante null), solo si
+     * la empresa lo habilitó (EmpresaConfiguracion::permite_ventas_sin_comprobante); no se usa
+     * tipo_comprobante => null para esto porque null ya significa "el tipo por defecto".
      *
      * @throws VentaInvalidaException
      * @throws SecuenciaNcfAgotadaException
@@ -82,20 +90,36 @@ class VentaService
                 throw new VentaInvalidaException('La venta debe tener al menos una línea.');
             }
 
-            $cliente = Cliente::where('empresa_id', $empresa->id)->find($datos['cliente_id'] ?? null);
+            // Sin cliente_id = venta al portador. Si viene uno, es client-controllable: se
+            // revalida que sea de esta empresa y esté activo.
+            $cliente = null;
 
-            if ($cliente === null || ! $cliente->activo) {
-                throw new VentaInvalidaException('El cliente indicado no existe o está inactivo.');
+            if (filled($datos['cliente_id'] ?? null)) {
+                $cliente = Cliente::where('empresa_id', $empresa->id)->find($datos['cliente_id']);
+
+                if ($cliente === null || ! $cliente->activo) {
+                    throw new VentaInvalidaException('El cliente indicado no existe o está inactivo.');
+                }
             }
 
-            $tipoComprobante = $this->resolverTipoComprobante($datos['tipo_comprobante'] ?? null, $config, $usaEcf);
+            $cajaId = $this->resolverCaja($datos['caja_id'] ?? null, $empresa);
+
+            $sinComprobante = (bool) ($datos['sin_comprobante'] ?? false);
+
+            if ($sinComprobante && ! $config->permite_ventas_sin_comprobante) {
+                throw new VentaInvalidaException('Esta empresa no tiene habilitadas las ventas sin comprobante fiscal: elige un tipo de comprobante.');
+            }
+
+            $tipoComprobante = $sinComprobante
+                ? null
+                : $this->resolverTipoComprobante($datos['tipo_comprobante'] ?? null, $config, $usaEcf);
 
             // Defensa en profundidad: tipo_comprobante puede venir de una propiedad Livewire
             // pública (PuntoDeVenta::$tipoComprobante) o de una futura API — nunca confiar en que
             // el cliente solo mande tipos de venta. Sin esto, una venta podría consumir (y
             // "quemar") la secuencia NCF de Compras (41), Gastos Menores (43) o Pagos al
             // Exterior (47/B17), que le pertenece a un flujo completamente distinto.
-            if (! $tipoComprobante->esDeVenta()) {
+            if ($tipoComprobante !== null && ! $tipoComprobante->esDeVenta()) {
                 throw new VentaInvalidaException(
                     "El tipo de comprobante {$tipoComprobante->value} ({$tipoComprobante->etiqueta()}) no es válido para una venta."
                 );
@@ -105,7 +129,7 @@ class VentaService
             // comprobantes físicos (tipo B). El selector del POS/la config ya filtran esto (ver
             // PuntoDeVenta::tiposComprobante()); esta es la defensa de última línea si igual
             // llega un tipo electrónico explícito (Livewire público, API futura).
-            if ($tipoComprobante->esElectronico() && ! $usaEcf) {
+            if ($tipoComprobante?->esElectronico() && ! $usaEcf) {
                 throw new VentaInvalidaException(
                     "Esta empresa no tiene facturación electrónica habilitada; usa un comprobante físico (tipo B) en vez de {$tipoComprobante->value} ({$tipoComprobante->etiqueta()})."
                 );
@@ -115,7 +139,7 @@ class VentaService
             // emitido: la norma DGII exige declarar cuál (NCFModificado en el XML/JSON, ver
             // EcfBuilder::idDoc()). Se valida contra una venta real de esta misma empresa —igual
             // que cliente_id/producto_id, ncf_modifica viene del formulario y es client-controllable.
-            $ncfModifica = $datos['ncf_modifica'] ?? null;
+            $ncfModifica = $sinComprobante ? null : ($datos['ncf_modifica'] ?? null);
 
             if (in_array($tipoComprobante, [TipoComprobante::NOTA_CREDITO, TipoComprobante::NOTA_DEBITO], true)) {
                 if (blank($ncfModifica)) {
@@ -138,14 +162,7 @@ class VentaService
             $estrategia = $config->precio_incluye_itbis ? new ConItbisIncluido : new SinItbisIncluido;
             $permitePrecioCero = (bool) ($datos['permite_precio_cero'] ?? false);
 
-            [$detalles, $productosLineas, $acumulado] = $this->procesarLineas($lineas, $config, $estrategia, $empresa, $permitePrecioCero);
-
-            // El % de descuento_id se aplica sobre el subtotal ya calculado (con descuentos de
-            // línea aplicados, antes de ITBIS) — mismo cálculo que hacía PuntoDeVenta en el
-            // frontend antes de esta corrección, ahora centralizado aquí para que cualquier
-            // llamador (POS, una futura API, un import batch) obtenga el mismo resultado sin
-            // tener que reimplementarlo.
-            $descuentoGlobal = $this->resolverDescuentoGlobal($datos, $acumulado['subtotal'], $empresa);
+            [$detalles, $productosLineas, $acumulado, $descuentoGlobal] = $this->calcularLineas($datos, $lineas, $config, $estrategia, $empresa, $permitePrecioCero);
 
             $total = $this->calcularTotalFinal($acumulado, $descuentoGlobal);
 
@@ -156,32 +173,39 @@ class VentaService
             // el caso electrónico; en el físico, sería un comprobante mal emitido igual).
             $this->validarComprador($tipoComprobante, $cliente, $total);
 
+            $tipoPago = $datos['tipo_pago'] ?? TipoPago::CONTADO;
+            $tipoPago = $tipoPago instanceof TipoPago ? $tipoPago : TipoPago::from((int) $tipoPago);
+
+            // La cuenta por cobrar se abre a nombre de alguien: un crédito al portador no se
+            // podría cobrar.
+            if ($tipoPago === TipoPago::CREDITO && $cliente === null) {
+                throw new VentaInvalidaException('Una venta a crédito requiere seleccionar un cliente.');
+            }
+
             // Se asigna DESPUÉS de validar: si algo más falla y la transacción hace rollback, el
             // NCF no se "quema" (el contador también se revierte). Todo tipo_comprobante de venta
             // —físico o electrónico— consume una secuencia real: la diferencia entre B y E es
             // solo si el comprobante se transmite al PAC (ver VentaObserver, que dispara
             // EnviarEcfJob únicamente cuando esElectronica()).
-            $ncf = $this->ncfService->siguiente($tipoComprobante, $empresa);
-
-            $tipoPago = $datos['tipo_pago'] ?? TipoPago::CONTADO;
-            $tipoPago = $tipoPago instanceof TipoPago ? $tipoPago : TipoPago::from((int) $tipoPago);
+            // Sin comprobante no consume secuencia: la venta queda sin NCF.
+            $ncf = $tipoComprobante !== null ? $this->ncfService->siguiente($tipoComprobante, $empresa) : null;
 
             $fechaLimitePago = $tipoPago === TipoPago::CREDITO
                 ? ($datos['fecha_limite_pago'] ?? now()->addDays(30)->toDateString())
                 : null;
 
             $venta = Venta::create([
-                // Se deriva del cliente (ya validado arriba) en vez de depender de que Filament
-                // haya asociado el tenant automáticamente: este service puede invocarse fuera
-                // del ciclo de vida de una request de panel (colas, comandos, tests).
-                'empresa_id' => $cliente->empresa_id,
-                'cliente_id' => $cliente->id,
+                // Explícito en vez de depender de que Filament haya asociado el tenant: este
+                // service puede invocarse fuera de una request de panel (colas, comandos, tests).
+                'empresa_id' => $empresa->id,
+                'cliente_id' => $cliente?->id,
                 'user_id' => $datos['user_id'] ?? null,
                 'tipo_comprobante' => $tipoComprobante,
                 'ncf' => $ncf,
                 'ncf_modifica' => $ncfModifica,
                 'forma_pago' => $datos['forma_pago'] ?? FormaPago::EFECTIVO,
                 'arqueo_caja_id' => $datos['arqueo_caja_id'] ?? null,
+                'caja_id' => $cajaId,
                 'tipo_pago' => $tipoPago,
                 'fecha_limite_pago' => $fechaLimitePago,
                 'fecha' => now(),
@@ -200,8 +224,9 @@ class VentaService
                 // Todo tipo_comprobante ELECTRÓNICO queda PENDIENTE de transmitir: VentaObserver
                 // dispara EnviarEcfJob (a cola, sin bloquear el cobro) al ver esElectronica() +
                 // PENDIENTE. Un comprobante FÍSICO (tipo B) nunca se transmite al PAC, así que su
-                // estado fiscal no aplica — independientemente de si la empresa usa e-CF.
-                'estado_fiscal' => $tipoComprobante->esElectronico() ? EstadoFiscal::PENDIENTE : EstadoFiscal::NO_APLICA,
+                // estado fiscal no aplica — independientemente de si la empresa usa e-CF. Lo mismo
+                // una venta sin comprobante.
+                'estado_fiscal' => $tipoComprobante?->esElectronico() ? EstadoFiscal::PENDIENTE : EstadoFiscal::NO_APLICA,
             ]);
 
             $venta->detalles()->createMany($detalles);
@@ -258,9 +283,7 @@ class VentaService
         $estrategia = $config->precio_incluye_itbis ? new ConItbisIncluido : new SinItbisIncluido;
         $permitePrecioCero = (bool) ($datos['permite_precio_cero'] ?? false);
 
-        [, , $acumulado] = $this->procesarLineas($lineas, $config, $estrategia, $empresa, $permitePrecioCero);
-
-        $descuentoGlobal = $this->resolverDescuentoGlobal($datos, $acumulado['subtotal'], $empresa);
+        [, , $acumulado, $descuentoGlobal] = $this->calcularLineas($datos, $lineas, $config, $estrategia, $empresa, $permitePrecioCero);
 
         return [
             ...$acumulado,
@@ -270,16 +293,53 @@ class VentaService
     }
 
     /**
-     * Anula una venta: repone el stock de cada línea y marca la venta como ANULADA.
+     * Anula una venta: repone el stock de cada línea y marca la venta como ANULADA. Según su
+     * situación fiscal:
      *
-     * El e-NCF no se libera ni se borra: queda como comprobante anulado (internamente). La
-     * anulación fiscal correcta de un e-CF ya emitido es una Nota de Crédito (Fase 9).
+     * - e-CF ya aceptado por la DGII (ACEPTADO / ACEPTADO_CONDICIONAL / RFCE): además emite una
+     *   Nota de Crédito electrónica (e-CF 34) que la anula ante la DGII — ver emitirNotaCredito().
+     *   La venta original conserva su estado_fiscal: para la DGII sigue siendo válida, la Nota es
+     *   la que la contrarresta.
+     * - e-CF todavía en trámite (PENDIENTE / EN_PROCESO): se rechaza; hay que esperar la
+     *   respuesta de la DGII para saber si hace falta Nota de Crédito.
+     * - e-CF rechazado, comprobante físico (tipo B) o venta sin comprobante: anulación interna
+     *   simple, sin Nota de Crédito (el NCF queda como anulado).
+     *
+     * @throws VentaYaAnuladaException
+     * @throws VentaInvalidaException
+     * @throws ArqueoCajaCerradoException
+     * @throws CuentaConPagosRegistradosException
+     * @throws SecuenciaNcfAgotadaException si hace falta Nota de Crédito y no hay secuencia 34
      */
     public function anular(Venta $venta, string $motivo, ?int $userId = null): Venta
     {
+        // Queda en motivo_anulacion (608, auditoría) y, si hay Nota de Crédito, viaja a la DGII
+        // como RazonModificacion: nunca en blanco.
+        if (blank($motivo)) {
+            throw new VentaInvalidaException('Debe indicar el motivo de la anulación.');
+        }
+
         return DB::transaction(function () use ($venta, $motivo, $userId) {
+            // Bloquea la fila: dos anulaciones simultáneas no pueden emitir dos Notas de Crédito
+            // ni reponer el stock dos veces.
+            $venta = Venta::query()->lockForUpdate()->findOrFail($venta->id);
+
             if ($venta->estaAnulada()) {
                 throw new VentaYaAnuladaException("La venta #{$venta->id} ya fue anulada anteriormente.");
+            }
+
+            if ($venta->esNotaCreditoDeAnulacion()) {
+                throw new VentaInvalidaException(
+                    "El documento #{$venta->id} es una Nota de Crédito de anulación: no se anula (la venta que anuló ya no se puede revivir)."
+                );
+            }
+
+            $requiereNotaCredito = $venta->esElectronica() && $venta->estado_fiscal->esAceptado();
+
+            if ($venta->esElectronica() && $venta->estado_fiscal->estaEnTramite()) {
+                throw new VentaInvalidaException(
+                    "Espere a que la DGII procese la venta #{$venta->id} ({$venta->ncf}) antes de anularla: si la acepta, la anulación requiere una Nota de Crédito."
+                );
             }
 
             if ($venta->arqueoCaja?->estaCerrado()) {
@@ -297,6 +357,12 @@ class VentaService
             }
 
             $cuentaPorCobrar?->delete();
+
+            // Antes de tocar stock: si no hay secuencia 34 disponible, SecuenciaNcfAgotadaException
+            // revierte todo y la venta queda intacta.
+            if ($requiereNotaCredito) {
+                $this->emitirNotaCredito($venta, $userId);
+            }
 
             foreach ($venta->detalles as $detalle) {
                 $producto = $detalle->producto;
@@ -324,18 +390,82 @@ class VentaService
         });
     }
 
+    /**
+     * Nota de Crédito electrónica (e-CF 34) que anula TOTALMENTE una venta ya aceptada por la
+     * DGII: una fila más de ventas, con las mismas líneas y montos que la original (en positivo:
+     * el tipo 34 ya indica que es un crédito), ncf_modifica = e-NCF de la original y
+     * venta_modificada_id apuntando a ella. VentaObserver la despacha al PAC igual que cualquier
+     * e-CF PENDIENTE. No mueve stock (lo repone anular()) ni cuenta en la caja (sin arqueo): es un
+     * documento fiscal, no una operación de caja.
+     */
+    private function emitirNotaCredito(Venta $venta, ?int $userId): Venta
+    {
+        $empresa = $venta->empresa;
+
+        $notaCredito = Venta::create([
+            'empresa_id' => $venta->empresa_id,
+            'cliente_id' => $venta->cliente_id,
+            'user_id' => $userId,
+            'tipo_comprobante' => TipoComprobante::NOTA_CREDITO,
+            'ncf' => $this->ncfService->siguiente(TipoComprobante::NOTA_CREDITO, $empresa),
+            'ncf_modifica' => $venta->ncf,
+            'venta_modificada_id' => $venta->id,
+            'forma_pago' => $venta->forma_pago,
+            'tipo_pago' => $venta->tipo_pago,
+            'fecha_limite_pago' => $venta->fecha_limite_pago,
+            'fecha' => now(),
+            'moneda' => $venta->moneda,
+            'tasa_cambio' => $venta->tasa_cambio,
+            'subtotal' => $venta->subtotal,
+            'descuento' => $venta->descuento,
+            'monto_gravado_18' => $venta->monto_gravado_18,
+            'monto_gravado_16' => $venta->monto_gravado_16,
+            'monto_gravado_0' => $venta->monto_gravado_0,
+            'monto_exento' => $venta->monto_exento,
+            'itbis_18' => $venta->itbis_18,
+            'itbis_16' => $venta->itbis_16,
+            'total_itbis' => $venta->total_itbis,
+            'total' => $venta->total,
+            'estado' => EstadoVenta::EMITIDA,
+            'estado_fiscal' => EstadoFiscal::PENDIENTE,
+        ]);
+
+        $notaCredito->detalles()->createMany(
+            $venta->detalles->map(fn ($detalle) => $detalle->only([
+                'producto_id', 'presentacion_id', 'descripcion', 'cantidad', 'factor',
+                'precio_unitario', 'descuento', 'tasa_itbis', 'itbis_monto', 'subtotal',
+            ]))->all()
+        );
+
+        return $notaCredito;
+    }
+
     // -------------------------------------------------------------------------
 
     /**
      * Crédito Fiscal (31) siempre exige RNC del comprador; Consumo (32) lo exige desde
-     * Venta::UMBRAL_CONSUMO. Se evalúa sobre una Venta "en memoria" (sin persistir) porque acá
-     * solo se conocen tipo_comprobante y total todavía.
+     * Venta::UMBRAL_CONSUMO; Regímenes Especiales y Gubernamental exigen al menos un cliente (ver
+     * Venta::requiereCliente()). Sin comprobante no exige nada. Se evalúa sobre una Venta "en
+     * memoria" (sin persistir) porque acá solo se conocen tipo_comprobante y total todavía.
      */
-    private function validarComprador(TipoComprobante $tipoComprobante, Cliente $cliente, string $total): void
+    private function validarComprador(?TipoComprobante $tipoComprobante, ?Cliente $cliente, string $total): void
     {
-        $requiereComprador = (new Venta(['tipo_comprobante' => $tipoComprobante, 'total' => $total]))->requiereComprador();
+        if ($tipoComprobante === null) {
+            return;
+        }
 
-        if (! $requiereComprador || ! blank($cliente->documento)) {
+        $venta = new Venta(['tipo_comprobante' => $tipoComprobante, 'total' => $total]);
+        $requiereComprador = $venta->requiereComprador();
+
+        if ($cliente === null && $venta->requiereCliente()) {
+            $conDocumento = $requiereComprador ? ' con RNC/Cédula' : '';
+
+            throw new VentaInvalidaException(
+                "Este tipo de comprobante ({$tipoComprobante->value} — {$tipoComprobante->etiqueta()}) requiere seleccionar un cliente{$conDocumento}."
+            );
+        }
+
+        if (! $requiereComprador || ! blank($cliente?->documento)) {
             return;
         }
 
@@ -346,6 +476,27 @@ class VentaService
         };
 
         throw new VentaInvalidaException($mensaje);
+    }
+
+    /**
+     * caja_id viene del selector de caja del POS táctil (client-controllable): igual que
+     * cliente_id, se revalida que la caja sea de esta empresa y esté activa.
+     *
+     * @throws VentaInvalidaException
+     */
+    private function resolverCaja(int|string|null $cajaId, Empresa $empresa): ?int
+    {
+        if (blank($cajaId)) {
+            return null;
+        }
+
+        $caja = Caja::where('empresa_id', $empresa->id)->where('activo', true)->find($cajaId);
+
+        if ($caja === null) {
+            throw new VentaInvalidaException('La caja indicada no existe, está inactiva, o no pertenece a esta empresa.');
+        }
+
+        return $caja->id;
     }
 
     private function resolverTipoComprobante(TipoComprobante|string|null $valor, EmpresaConfiguracion $config, bool $usaEcf): TipoComprobante
@@ -374,7 +525,63 @@ class VentaService
      *
      * @throws VentaInvalidaException
      */
-    private function procesarLineas(array $lineas, EmpresaConfiguracion $config, ImpuestoStrategy $estrategia, Empresa $empresa, bool $permitePrecioCero = false): array
+    /**
+     * Líneas + descuento global, tal como se guardan (compartido por registrar() y
+     * previsualizar(), para que el POS muestre exactamente lo que se cobrará).
+     *
+     * El descuento global (monto fijo o % de descuento_id sobre el subtotal) se PRORRATEA como
+     * descuento de cada línea ANTES de calcular el ITBIS: el impuesto va sobre lo que el cliente
+     * realmente paga, y el e-CF cuadra (suma de MontoItem = MontoGravado; MontoGravado + ITBIS =
+     * MontoTotal), cosa que la DGII valida. Antes se restaba después del ITBIS, lo que cobraba
+     * ITBIS de más y producía e-CF con totales que no cuadraban.
+     *
+     * Devuelve $acumulado con 'subtotal' BRUTO (antes del descuento global) y los montos
+     * gravados/ITBIS NETOS, y el descuento REAL aplicado (bruto − neto, en base sin ITBIS: puede
+     * diferir por centavos del pedido por el redondeo por línea). Así venta.total sigue siendo
+     * subtotal − descuento + ITBIS.
+     *
+     * @return array{0: array<int, array<string, mixed>>, 1: array<int, array<string, mixed>>, 2: array<string, string>, 3: string}
+     *
+     * @throws VentaInvalidaException
+     */
+    private function calcularLineas(array $datos, array $lineas, EmpresaConfiguracion $config, ImpuestoStrategy $estrategia, Empresa $empresa, bool $permitePrecioCero): array
+    {
+        [$detalles, $productosLineas, $acumulado] = $this->procesarLineas($lineas, $config, $estrategia, $empresa, $permitePrecioCero);
+
+        $subtotalBruto = $acumulado['subtotal'];
+        $descuentoGlobal = $this->resolverDescuentoGlobal($datos, $subtotalBruto, $empresa);
+
+        // descuento_global viene de una propiedad pública del POS (client-controllable).
+        if (bccomp($descuentoGlobal, '0', 2) < 0) {
+            throw new VentaInvalidaException('El descuento no puede ser negativo.');
+        }
+
+        if (bccomp($descuentoGlobal, $subtotalBruto, 2) > 0) {
+            throw new VentaInvalidaException(
+                'El descuento (RD$ '.number_format((float) $descuentoGlobal, 2).') no puede ser mayor que el subtotal (RD$ '.number_format((float) $subtotalBruto, 2).').'
+            );
+        }
+
+        if (bccomp($descuentoGlobal, '0', 2) === 0) {
+            return [$detalles, $productosLineas, $acumulado, '0.00'];
+        }
+
+        $proporcion = bcdiv($descuentoGlobal, $subtotalBruto, 12);
+
+        [$detalles, $productosLineas, $acumulado] = $this->procesarLineas($lineas, $config, $estrategia, $empresa, $permitePrecioCero, $proporcion);
+
+        $descuentoReal = bcsub($subtotalBruto, $acumulado['subtotal'], 2);
+        $acumulado['subtotal'] = $subtotalBruto;
+
+        return [$detalles, $productosLineas, $acumulado, $descuentoReal];
+    }
+
+    /**
+     * $proporcionDescuentoGlobal (0..1): parte del descuento global que le toca a cada línea,
+     * sobre su monto ya neto de su propio descuento, en las mismas unidades que usa la
+     * estrategia (base sin ITBIS, o precio con ITBIS incluido). Ver calcularLineas().
+     */
+    private function procesarLineas(array $lineas, EmpresaConfiguracion $config, ImpuestoStrategy $estrategia, Empresa $empresa, bool $permitePrecioCero = false, string $proporcionDescuentoGlobal = '0'): array
     {
         $detalles = [];
         $productosLineas = [];
@@ -433,7 +640,32 @@ class VentaService
                 throw new VentaInvalidaException("El precio unitario de «{$descripcion}» debe ser mayor que cero.");
             }
 
+            // Ni siquiera con permite_precio_cero: un precio negativo es un crédito disfrazado de
+            // venta (eso es una Nota de Crédito).
+            if (bccomp($precioUnitario, '0.00', 2) < 0) {
+                throw new VentaInvalidaException("El precio unitario de «{$descripcion}» no puede ser negativo.");
+            }
+
             $descuentoLinea = $this->aMoneda($linea['descuento'] ?? '0');
+            // Mismo redondeo que las estrategias de ITBIS (cantidad a 4 decimales, half-up).
+            $brutoLinea = bcadd(bcmul($precioUnitario, number_format($cantidad, 4, '.', ''), 6), '0.005', 2);
+
+            // El descuento de línea viene del carrito del POS (client-controllable): negativo
+            // subiría el precio; mayor que la línea la dejaría en negativo.
+            if (bccomp($descuentoLinea, '0.00', 2) < 0) {
+                throw new VentaInvalidaException("El descuento de «{$descripcion}» no puede ser negativo.");
+            }
+
+            if (bccomp($descuentoLinea, $brutoLinea, 2) > 0) {
+                throw new VentaInvalidaException("El descuento de «{$descripcion}» no puede ser mayor que el importe de la línea.");
+            }
+
+            if (bccomp($proporcionDescuentoGlobal, '0', 12) > 0) {
+                $parteGlobal = bcadd(bcmul(bcsub($brutoLinea, $descuentoLinea, 2), $proporcionDescuentoGlobal, 6), '0.005', 2);
+                $descuentoLinea = bccomp(bcadd($descuentoLinea, $parteGlobal, 2), $brutoLinea, 2) > 0
+                    ? $brutoLinea
+                    : bcadd($descuentoLinea, $parteGlobal, 2);
+            }
             $tasaEfectiva = $config->aplica_itbis ? $producto->tasa_itbis : TasaItbis::CERO;
 
             $desglose = $estrategia->calcular($precioUnitario, $cantidad, $descuentoLinea, $tasaEfectiva);

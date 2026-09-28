@@ -47,9 +47,9 @@ class ProveedorResource extends Resource
 
     protected static ?string $slug = 'proveedores';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Operaciones';
+    protected static string|\UnitEnum|null $navigationGroup = 'Comercial';
 
-    protected static ?int $navigationSort = 11;
+    protected static ?int $navigationSort = 2;
 
     public static function form(Schema $schema): Schema
     {

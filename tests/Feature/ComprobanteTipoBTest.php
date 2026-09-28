@@ -164,6 +164,9 @@ class ComprobanteTipoBTest extends TestCase
     {
         $vendedor = $this->vendedor();
 
+        $this->secuencia(TipoComprobante::FACTURA_CONSUMO_FISICA, 'B02');
+        $this->secuencia(TipoComprobante::FACTURA_CONSUMO, 'E32');
+
         $this->empresaDefault->update(['usa_ecf' => false]);
 
         $tiposSinEcf = Livewire::actingAs($vendedor)->test(PuntoDeVenta::class)->instance()->tiposComprobante();
@@ -179,6 +182,67 @@ class ComprobanteTipoBTest extends TestCase
         $this->assertArrayHasKey(TipoComprobante::FACTURA_CONSUMO_FISICA->value, $tiposConEcf);
         $this->assertArrayHasKey(TipoComprobante::FACTURA_CONSUMO->value, $tiposConEcf);
         $this->assertArrayNotHasKey(TipoComprobante::COMPRAS->value, $tiposConEcf);
+    }
+
+    /** B01 (Crédito Fiscal físico) exige comprador identificado, igual que el E31. */
+    public function test_tipo_b01_requiere_cliente_con_documento(): void
+    {
+        $this->secuencia(TipoComprobante::FACTURA_CREDITO_FISCAL_FISICA, 'B01');
+
+        $producto = $this->producto();
+        $cliente = Cliente::create(['nombre' => 'Cliente sin RNC', 'activo' => true]);
+
+        $this->expectException(VentaInvalidaException::class);
+        $this->expectExceptionMessage('Crédito Fiscal');
+
+        app(VentaService::class)->registrar([
+            'cliente_id' => $cliente->id,
+            'tipo_comprobante' => TipoComprobante::FACTURA_CREDITO_FISCAL_FISICA->value,
+            'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
+        ], $this->empresaDefault);
+    }
+
+    /** B02 por RD$250,000 o más exige comprador identificado, igual que el E32. */
+    public function test_tipo_b02_sobre_umbral_requiere_cliente_con_documento(): void
+    {
+        $this->secuencia(TipoComprobante::FACTURA_CONSUMO_FISICA, 'B02');
+
+        $producto = $this->producto(stock: 5000);
+        $cliente = Cliente::create(['nombre' => 'Cliente anónimo', 'activo' => true]);
+
+        $this->expectException(VentaInvalidaException::class);
+        $this->expectExceptionMessage('250,000');
+
+        // 3000 x RD$100 + 18% ITBIS = RD$354,000.
+        app(VentaService::class)->registrar([
+            'cliente_id' => $cliente->id,
+            'tipo_comprobante' => TipoComprobante::FACTURA_CONSUMO_FISICA->value,
+            'lineas' => [['producto_id' => $producto->id, 'cantidad' => 3000]],
+        ], $this->empresaDefault);
+    }
+
+    /**
+     * La presencia de secuencias decide qué ve cada empresa en el POS: sin secuencia B02 no se
+     * ofrece; con una activa sí; y deja de ofrecerse cuando se agota sin rango siguiente.
+     */
+    public function test_tipos_b_aparecen_solo_si_hay_secuencia_disponible(): void
+    {
+        $vendedor = $this->vendedor();
+        $this->empresaDefault->update(['usa_ecf' => false]);
+
+        $sinSecuencia = Livewire::actingAs($vendedor)->test(PuntoDeVenta::class)->instance()->tiposComprobante();
+        $this->assertArrayNotHasKey(TipoComprobante::FACTURA_CONSUMO_FISICA->value, $sinSecuencia);
+
+        $this->secuencia(TipoComprobante::FACTURA_CONSUMO_FISICA, 'B02', 1, 999);
+
+        $pos = Livewire::actingAs($vendedor)->test(PuntoDeVenta::class);
+        $this->assertSame([TipoComprobante::FACTURA_CONSUMO_FISICA->value], array_keys($pos->instance()->tiposComprobante()));
+        $pos->assertSet('tipoComprobante', TipoComprobante::FACTURA_CONSUMO_FISICA->value);
+
+        SecuenciaNcf::where('prefijo', 'B02')->update(['secuencia_actual' => 1000]);
+
+        $agotada = Livewire::actingAs($vendedor)->test(PuntoDeVenta::class)->instance()->tiposComprobante();
+        $this->assertArrayNotHasKey(TipoComprobante::FACTURA_CONSUMO_FISICA->value, $agotada);
     }
 
     /** El 607 y el desglose del dashboard incluyen comprobantes físicos, no solo electrónicos. */

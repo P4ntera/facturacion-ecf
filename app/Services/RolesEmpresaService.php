@@ -86,6 +86,9 @@ class RolesEmpresaService
                 // Solo consulta: saber cuánto se le debe a un proveedor ayuda a decidir si
                 // comprarle de nuevo, pero pagarle es una decisión financiera de Administrador.
                 'cxp.ver',
+                // Es quien repone: la única alerta que le toca. Vendedor no recibe ninguna
+                // (las de NCF, e-CF y cuentas son del Administrador).
+                'notificaciones.stock_bajo',
             ]);
         });
 

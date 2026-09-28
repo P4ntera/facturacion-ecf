@@ -18,7 +18,7 @@
                     <div class="ultimas-ventas-item-info">
                         <span class="ultimas-ventas-ncf">{{ $venta->ncf ?? '—' }}</span>
                         <span class="ultimas-ventas-detalle">
-                            {{ $venta->cliente?->nombre ?? 'Consumidor final' }}
+                            {{ $venta->nombreCliente() }}
                             · {{ $venta->forma_pago?->etiqueta() ?? '—' }}
                         </span>
                     </div>

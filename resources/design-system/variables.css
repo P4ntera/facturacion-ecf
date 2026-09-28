@@ -130,17 +130,30 @@
        componente. Valores del diseño aprobado (ver tarea "Dashboard y Sidebar del diseño UI"). */
 
     --fondo-sidebar:#0F172A;
-    --sidebar-item-texto:#94A3B8;          /* ítem inactivo */
+    --sidebar-item-texto:#CBD5E1;          /* ítem inactivo (slate-300) */
     --sidebar-item-activo-fondo:#1E3A5F;
-    --sidebar-item-activo-texto:#E0F2FE;
-    --sidebar-grupo-label:#475569;         /* labels de sección: Operaciones, Fiscal... */
+    --sidebar-item-activo-texto:#FFFFFF;
+    --sidebar-grupo-label:#64748B;         /* labels de sección: Operaciones, Fiscal... */
     --sidebar-borde:rgb(255 255 255 / 0.06);
-    --sidebar-hover-fondo:rgb(255 255 255 / 0.04);
+    --sidebar-hover-fondo:#1E293B;
     --sidebar-brand-icono-fondo:#3B82F6;
     --sidebar-brand-nombre:#FFFFFF;
-    --sidebar-brand-subtitulo:#64748B;     /* nombre de la empresa activa, bajo el brand */
+    --sidebar-brand-subtitulo:#94A3B8;     /* nombre de la empresa activa, bajo el brand */
     --sidebar-usuario-nombre:#E2E8F0;
     --sidebar-usuario-rol:#64748B;
+
+    /* Barra superior (->topNavigation()): mismo navy que el sidebar, que sigue en uso como
+       off-canvas en mobile. */
+    --topbar-fondo:#0F172A;
+    --topbar-borde:#334155;
+    --topbar-item-texto:#CBD5E1;
+    --topbar-item-hover-texto:#F1F5F9;
+    --topbar-item-hover-fondo:rgb(255 255 255 / 0.04);
+    --topbar-item-activo-texto:#FFFFFF;
+    --topbar-item-activo-borde:#3B82F6;
+    --topbar-dropdown-fondo:#1E293B;
+    --topbar-dropdown-item-hover-fondo:#334155;
+    --topbar-dropdown-item-activo-fondo:#1E3A5F;
 
     /*======== FORMAS ========*/
 

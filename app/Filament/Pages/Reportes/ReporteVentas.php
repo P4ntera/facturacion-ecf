@@ -9,6 +9,7 @@ use App\Enums\EstadoVenta;
 use App\Enums\TipoComprobante;
 use App\Filament\Exports\VentaExporter;
 use App\Filament\Resources\VentaResource;
+use App\Models\Venta;
 use App\Services\ReporteService;
 use BackedEnum;
 use Filament\Forms\Components\DatePicker;
@@ -47,10 +48,12 @@ class ReporteVentas extends ReportePage
 
                 TextColumn::make('cliente.nombre')
                     ->label('Cliente')
+                    ->placeholder(Venta::ETIQUETA_AL_PORTADOR)
                     ->searchable(),
 
                 TextColumn::make('tipo_comprobante')
                     ->label('Tipo')
+                    ->placeholder(Venta::ETIQUETA_SIN_COMPROBANTE)
                     ->formatStateUsing(fn (TipoComprobante $state) => $state->etiqueta()),
 
                 TextColumn::make('subtotal')
@@ -59,7 +62,7 @@ class ReporteVentas extends ReportePage
                     ->summarize(
                         Summarizer::make()
                             ->label('Total')
-                            ->using(fn (QueryBuilder $query) => $query->where('estado', EstadoVenta::EMITIDA->value)->sum('subtotal'))
+                            ->using(fn (QueryBuilder $query) => $query->where('estado', EstadoVenta::EMITIDA->value)->whereNull('venta_modificada_id')->sum('subtotal'))
                             ->money('DOP'),
                     ),
 
@@ -69,7 +72,7 @@ class ReporteVentas extends ReportePage
                     ->summarize(
                         Summarizer::make()
                             ->label('Total')
-                            ->using(fn (QueryBuilder $query) => $query->where('estado', EstadoVenta::EMITIDA->value)->sum('total_itbis'))
+                            ->using(fn (QueryBuilder $query) => $query->where('estado', EstadoVenta::EMITIDA->value)->whereNull('venta_modificada_id')->sum('total_itbis'))
                             ->money('DOP'),
                     ),
 
@@ -79,7 +82,7 @@ class ReporteVentas extends ReportePage
                     ->summarize(
                         Summarizer::make()
                             ->label('Total (no anuladas)')
-                            ->using(fn (QueryBuilder $query) => $query->where('estado', EstadoVenta::EMITIDA->value)->sum('total'))
+                            ->using(fn (QueryBuilder $query) => $query->where('estado', EstadoVenta::EMITIDA->value)->whereNull('venta_modificada_id')->sum('total'))
                             ->money('DOP'),
                     ),
 

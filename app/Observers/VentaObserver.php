@@ -16,8 +16,11 @@ class VentaObserver
      */
     public function created(Venta $venta): void
     {
+        // afterCommit: "created" se dispara ANTES de que VentaService guarde las líneas (y dentro
+        // de su transacción). Sin esto, con una cola no transaccional (sync, redis) el job podía
+        // correr antes del commit y armar un e-CF sin ítems.
         if ($venta->esElectronica() && $venta->estado_fiscal === EstadoFiscal::PENDIENTE) {
-            EnviarEcfJob::dispatch($venta);
+            EnviarEcfJob::dispatch($venta)->afterCommit();
         }
     }
 }

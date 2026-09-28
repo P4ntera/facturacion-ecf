@@ -3,8 +3,10 @@
 namespace App\Providers\Filament;
 
 use App\Filament\Pages\Auth\EditProfile;
+use App\Filament\Pages\MisNotificaciones;
 use App\Http\Middleware\EstablecerEmpresaPermisos;
 use App\Models\Empresa;
+use Filament\Actions\Action;
 use Filament\Enums\UserMenuPosition;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -18,12 +20,12 @@ use Filament\Support\Colors\Color;
 use Filament\Support\Enums\Width;
 use Filament\View\PanelsRenderHook;
 use Filament\Widgets\AccountWidget;
-use Illuminate\Support\HtmlString;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
+use Illuminate\Support\HtmlString;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 
 class AdminPanelProvider extends PanelProvider
@@ -37,6 +39,13 @@ class AdminPanelProvider extends PanelProvider
             ->viteTheme('resources/css/filament/admin/theme.css')
             ->login()
             ->profile(EditProfile::class)
+            ->userMenuItems([
+                Action::make('misNotificaciones')
+                    ->label('Mis notificaciones')
+                    ->icon('heroicon-o-bell-alert')
+                    ->url(fn (): string => MisNotificaciones::getUrl())
+                    ->visible(fn (): bool => MisNotificaciones::canAccess()),
+            ])
             // Multi-tenant nativo de Filament: cada empresa es un tenant, identificado en la URL
             // por su slug (/admin/{empresa-slug}/...). ownershipRelationship es explícito aunque
             // coincide con el default (camelCase del modelo) para que quede documentado aquí.
@@ -47,16 +56,22 @@ class AdminPanelProvider extends PanelProvider
             // normal con una sola empresa entra directo (getDefaultTenant) y no lo necesita, pero
             // no le estorba dejarlo visible.
             ->tenantMenu()
-            // Orden = orden en el sidebar (ver NavigationManager::get()). Dashboard, Caja,
-            // Facturación, Productos, Clientes y Ventas quedan SIN grupo (uso diario, sin la
-            // fricción de un header colapsable) — ver el diseño aprobado en la tarea de
-            // sidebar/dashboard. El resto se agrupa en 4 secciones; Super Admin al final porque
-            // solo la ve el super-admin (ver EmpresaResource).
+            // Navegación en barra superior: cada grupo es un botón con dropdown y los ítems sin
+            // grupo (solo Dashboard) van como botón suelto. Por debajo de lg (1024px) Filament
+            // oculta la barra y vuelve al sidebar off-canvas con hamburguesa, así que el CSS del
+            // sidebar en theme.css sigue en uso en mobile/tablet.
+            ->topNavigation()
+            // Orden = orden en la barra (ver NavigationManager::get()); dentro de cada grupo
+            // manda el $navigationSort de cada Resource/Page. Los grupos NO llevan ->icon(): el
+            // sidebar de mobile lanza una excepción si un grupo tiene ícono y sus ítems también
+            // (vendor/filament/filament/resources/views/components/sidebar/group.blade.php), y
+            // se prefirió conservar los íconos de los ítems, que se ven en cada dropdown.
             ->navigationGroups([
                 NavigationGroup::make('Operaciones'),
+                NavigationGroup::make('Inventario'),
+                NavigationGroup::make('Comercial'),
                 NavigationGroup::make('Fiscal'),
                 NavigationGroup::make('Configuración'),
-                NavigationGroup::make('Super Admin'),
             ])
             ->colors([
                 'primary' => Color::hex('#5D87FF'), // --primary
@@ -105,11 +120,11 @@ class AdminPanelProvider extends PanelProvider
             // las hook classes de heading de Filament (fi-header-heading y similares).
             ->font('Inter')
             ->brandName('FesrSoft ERP')
-            // El bloque de usuario (avatar + nombre + rol) va al pie del sidebar, no en el
-            // topbar, para calzar con el diseño aprobado — ver
-            // resources/views/vendor/filament-panels/components/user-menu.blade.php (override
-            // que agrega el rol debajo del nombre; Filament no lo trae de fábrica).
-            ->userMenu(position: UserMenuPosition::Sidebar)
+            // Menú de usuario en la barra superior: con ->topNavigation() el sidebar solo existe
+            // en mobile, así que en posición Sidebar el menú desaparecería en escritorio. La
+            // variante de sidebar (avatar + nombre + rol) del override
+            // resources/views/vendor/filament-panels/components/user-menu.blade.php queda sin uso.
+            ->userMenu(position: UserMenuPosition::Topbar)
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')
             ->pages([

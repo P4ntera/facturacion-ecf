@@ -43,7 +43,9 @@ class ClienteResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Clientes';
 
-    protected static ?int $navigationSort = 4;
+    protected static string|\UnitEnum|null $navigationGroup = 'Comercial';
+
+    protected static ?int $navigationSort = 1;
 
     public static function form(Schema $schema): Schema
     {

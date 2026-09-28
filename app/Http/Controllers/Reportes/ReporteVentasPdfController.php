@@ -23,13 +23,14 @@ class ReporteVentasPdfController extends ReportePdfController
             ->orderBy('fecha')
             ->get();
 
-        $emitidas = $ventas->where('estado', EstadoVenta::EMITIDA);
+        // Sin las Notas de Crédito de anulación: la venta que anulan ya queda fuera por ANULADA.
+        $emitidas = $ventas->where('estado', EstadoVenta::EMITIDA)->whereNull('venta_modificada_id');
 
         $filas = $ventas->map(fn (Venta $venta) => [
             'fecha' => $venta->fecha->format('d/m/Y H:i'),
             'ncf' => $venta->ncf ?? '—',
-            'cliente' => $venta->cliente->nombre,
-            'tipo' => $venta->tipo_comprobante->etiqueta(),
+            'cliente' => $venta->nombreCliente(),
+            'tipo' => $venta->etiquetaComprobante(),
             'subtotal' => number_format((float) $venta->subtotal, 2),
             'itbis' => number_format((float) $venta->total_itbis, 2),
             'total' => number_format((float) $venta->total, 2),

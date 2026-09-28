@@ -11,9 +11,12 @@ use BackedEnum;
 use Filament\Forms\Components\DatePicker;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\Summarizers\Sum;
+use Filament\Tables\Columns\Summarizers\Summarizer;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Table;
+use Illuminate\Database\Query\Builder as QueryBuilder;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Formato 607 (Envío de Ventas de Bienes y Servicios) de la DGII. La regla fiscal de qué se
@@ -53,24 +56,29 @@ class ReporteFiscal607 extends ReportePage
 
                 TextColumn::make('rnc_cedula')
                     ->label('RNC/Cédula')
-                    ->getStateUsing(fn (Venta $record) => $servicio->rncCedula607($record->cliente->tipo_documento, $record->cliente->documento))
+                    ->getStateUsing(fn (Venta $record) => $servicio->rncCedula607($record->cliente?->tipo_documento, $record->cliente?->documento))
                     ->placeholder('—'),
 
                 TextColumn::make('tipo_identificacion')
                     ->label('Tipo identificación')
                     ->getStateUsing(fn (Venta $record) => $servicio->etiquetaTipoIdentificacion607(
-                        $servicio->tipoIdentificacion607($record->cliente->tipo_documento),
+                        $servicio->tipoIdentificacion607($record->cliente?->tipo_documento),
                     )),
 
                 TextColumn::make('tipo_ingreso')
                     ->label('Tipo de ingreso')
                     ->getStateUsing(fn () => ReporteService::TIPO_INGRESO_DEFECTO),
 
+                // Base neta (subtotal − descuento global), igual que ReporteService::reporte607().
                 TextColumn::make('subtotal')
                     ->label('Monto facturado')
+                    ->getStateUsing(fn (Venta $record) => $record->subtotalNeto())
                     ->money('DOP')
                     ->sortable()
-                    ->summarize(Sum::make()->label('Total')->money('DOP')),
+                    ->summarize(Summarizer::make()
+                        ->label('Total')
+                        ->money('DOP')
+                        ->using(fn (QueryBuilder $query) => $query->sum(DB::raw('subtotal - descuento')))),
 
                 TextColumn::make('total_itbis')
                     ->label('ITBIS facturado')

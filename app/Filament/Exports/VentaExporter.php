@@ -24,11 +24,12 @@ class VentaExporter extends Exporter
                 ->formatStateUsing(fn ($state) => $state?->format('d/m/Y H:i')),
             ExportColumn::make('ncf')
                 ->label('e-NCF'),
-            ExportColumn::make('cliente.nombre')
-                ->label('Cliente'),
+            ExportColumn::make('cliente')
+                ->label('Cliente')
+                ->getStateUsing(fn (Venta $record) => $record->nombreCliente()),
             ExportColumn::make('tipo_comprobante')
                 ->label('Tipo')
-                ->formatStateUsing(fn ($state) => $state?->etiqueta()),
+                ->getStateUsing(fn (Venta $record) => $record->etiquetaComprobante()),
             ExportColumn::make('subtotal')
                 ->label('Subtotal'),
             ExportColumn::make('total_itbis')

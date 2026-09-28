@@ -49,7 +49,7 @@ class AuditoriaResource extends Resource
 
     protected static string|\UnitEnum|null $navigationGroup = 'Configuración';
 
-    protected static ?int $navigationSort = 65;
+    protected static ?int $navigationSort = 7;
 
     // Auditoría de solo lectura: append-only, igual que el Kardex.
     public static function canCreate(): bool

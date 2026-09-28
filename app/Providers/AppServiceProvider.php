@@ -7,6 +7,7 @@ use App\Policies\ActivityPolicy;
 use Filament\Events\TenantSet;
 use Filament\Schemas\Schema;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Number;
@@ -85,5 +86,27 @@ class AppServiceProvider extends ServiceProvider
         // Filament — Table/Schema::configureUsing() no los cubre. Number::useLocale() es el
         // equivalente global de Laravel: mismo 'es_DO', mismo resultado "RD$1,234.50".
         Number::useLocale('es_DO');
+
+        // Búsqueda de texto insensible a acentos y mayúsculas ("jose" encuentra "José") para las
+        // consultas manuales (POS, modales): mismo criterio que Filament aplica a sus propias
+        // búsquedas vía config('database.connections.pgsql.search_collation'). Sin esa collation
+        // (otro driver) cae a un ilike/like normal. Solo para campos de texto libre (nombres,
+        // razón social); códigos, RNC y códigos de barra siguen con ilike.
+        Builder::macro('whereLikeSinAcentos', function (string $columna, string $valor, string $boolean = 'and'): Builder {
+            /** @var Builder $this */
+            $conexion = $this->getConnection();
+            $collation = $conexion->getConfig('search_collation');
+            $columna = $conexion->getQueryGrammar()->wrap($columna);
+            $comparacion = filled($collation)
+                ? "{$columna} collate \"{$collation}\" like ?"
+                : $columna.' '.($conexion->getDriverName() === 'pgsql' ? 'ilike' : 'like').' ?';
+
+            return $this->whereRaw($comparacion, ["%{$valor}%"], $boolean);
+        });
+
+        Builder::macro('orWhereLikeSinAcentos', function (string $columna, string $valor): Builder {
+            /** @var Builder $this */
+            return $this->whereLikeSinAcentos($columna, $valor, 'or');
+        });
     }
 }

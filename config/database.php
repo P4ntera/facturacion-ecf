@@ -95,6 +95,9 @@ return [
             'prefix_indexes' => true,
             'search_path' => 'public',
             'sslmode' => 'prefer',
+            // Búsquedas insensibles a acentos: Filament la aplica a todas sus búsquedas; el macro
+            // whereLikeSinAcentos, a las manuales. Ver migración create_sin_acentos_collation.
+            'search_collation' => 'sin_acentos',
         ],
 
         'sqlsrv' => [

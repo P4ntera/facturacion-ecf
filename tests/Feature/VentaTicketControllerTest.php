@@ -93,6 +93,61 @@ class VentaTicketControllerTest extends TestCase
             ->assertSee('width: 80mm', false);
     }
 
+    /** Cada línea gravada muestra su ITBIS (total de la línea); una exenta no; el total se mantiene. */
+    public function test_el_ticket_muestra_el_itbis_por_linea_y_omite_los_exentos(): void
+    {
+        $usuario = $this->usuarioConPermiso();
+        $venta = $this->crearVentaConDetalle(['subtotal' => '80.00', 'total' => '89.00']);
+
+        DetalleVenta::create([
+            'venta_id' => $venta->id,
+            'producto_id' => $venta->detalles()->value('producto_id'),
+            'descripcion' => 'Producto exento',
+            'cantidad' => '1.000',
+            'precio_unitario' => '30.00',
+            'tasa_itbis' => TasaItbis::CERO,
+            'itbis_monto' => '0.00',
+            'subtotal' => '30.00',
+        ]);
+
+        $this->actingAs($usuario)
+            ->get(route('ventas.ticket', $venta))
+            ->assertOk()
+            ->assertSee('ITBIS 18%')
+            ->assertSeeInOrder(['Producto ticket', 'ITBIS 18%', '9.00', 'Producto exento'])
+            ->assertDontSee('ITBIS 0%')
+            ->assertSee('min-height: 280px', false);
+    }
+
+    /** Con descuento global, el ticket lo muestra para que Subtotal - Descuento + ITBIS = TOTAL. */
+    /**
+     * Con descuento global (prorrateado en las líneas antes del ITBIS, como lo guarda
+     * VentaService): la línea muestra su descuento, el subtotal es NETO (= suma de líneas) y
+     * subtotal + ITBIS = TOTAL.
+     */
+    public function test_el_ticket_con_descuento_suma_lineas_subtotal_itbis_y_total(): void
+    {
+        $usuario = $this->usuarioConPermiso();
+        // Bruto 50, 10% de descuento = 5, base neta 45, ITBIS 18% = 8.10, total 53.10.
+        $conDescuento = $this->crearVentaConDetalle(['descuento' => '5.00', 'total_itbis' => '8.10', 'total' => '53.10']);
+        $conDescuento->detalles()->update(['descuento' => '5.00', 'subtotal' => '45.00', 'itbis_monto' => '8.10']);
+
+        $this->actingAs($usuario)
+            ->get(route('ventas.ticket', $conDescuento))
+            ->assertOk()
+            ->assertSeeInOrder(['Producto ticket', '45.00', 'Desc.', '-5.00', 'ITBIS 18%', '8.10', 'Subtotal', '45.00', 'ITBIS', '8.10', 'TOTAL', '53.10', 'Incluye descuento de', '5.00']);
+
+        $sinDescuento = $conDescuento;
+        $sinDescuento->update(['descuento' => '0.00', 'total_itbis' => '9.00', 'total' => '59.00']);
+        $sinDescuento->detalles()->update(['descuento' => '0.00', 'subtotal' => '50.00', 'itbis_monto' => '9.00']);
+
+        $this->actingAs($usuario)
+            ->get(route('ventas.ticket', $sinDescuento))
+            ->assertOk()
+            ->assertDontSee('Desc.')
+            ->assertDontSee('Incluye descuento');
+    }
+
     public function test_el_ticket_respeta_el_ancho_58mm_por_query_param(): void
     {
         $usuario = $this->usuarioConPermiso();

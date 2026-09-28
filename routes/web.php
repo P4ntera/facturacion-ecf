@@ -15,6 +15,7 @@ use App\Http\Controllers\RncController;
 use App\Http\Controllers\VentaComprobanteController;
 use App\Http\Controllers\VentaEcfXmlController;
 use App\Http\Controllers\VentaTicketController;
+use App\Livewire\DisplayCliente;
 use Illuminate\Support\Facades\Route;
 
 // La app es 100% panel de Filament: la raíz solo redirige a /admin (login incluido).
@@ -58,6 +59,14 @@ Route::middleware(['auth', 'can:reportes.exportar'])->prefix('reportes')->name('
     Route::get('/inventario/pdf', ReporteInventarioPdfController::class)->name('inventario.pdf');
     Route::get('/fiscal-607/pdf', ReporteFiscal607PdfController::class)->name('fiscal-607.pdf');
 });
+
+// Display del cliente de una caja registradora (segundo monitor/TV): público, sin login — el
+// token de 64 caracteres de la caja es la credencial (ver App\Livewire\DisplayCliente). El
+// throttle solo cubre la carga inicial; el polling va por /livewire/update.
+Route::get('/display/{token}', DisplayCliente::class)
+    ->where('token', '[A-Za-z0-9]{64}')
+    ->middleware('throttle:30,1')
+    ->name('display.cliente');
 
 // URLs públicas que se registran en el portal de la DGII (ella misma las llama, sin sesión ni
 // CSRF — ver bootstrap/app.php). Seguridad: RNC/tamaño/rate limit/registro en RecepcionEcfService.
