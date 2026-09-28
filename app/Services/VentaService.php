@@ -440,6 +440,306 @@ class VentaService
         return $notaCredito;
     }
 
+    /**
+     * Nota de Débito electrónica (e-CF 33): cargo adicional sobre una venta ya aceptada por la
+     * DGII. Los montos van positivos (es un cargo, no un crédito). No mueve inventario (no hay
+     * producto físico que entre o salga, es un ajuste de precio).
+     *
+     * @param  array<int, array{producto_id: int, cantidad: float|int, monto: string|float}>  $detalles
+     *
+     * @throws VentaInvalidaException
+     * @throws SecuenciaNcfAgotadaException
+     */
+    public function emitirNotaDebito(Venta $ventaOriginal, Empresa $empresa, array $detalles, string $motivo): Venta
+    {
+        $this->validarVentaModificable($ventaOriginal);
+
+        if (empty($detalles)) {
+            throw new VentaInvalidaException('Debe incluir al menos un ítem en la Nota de Débito.');
+        }
+
+        if (blank($motivo)) {
+            throw new VentaInvalidaException('El motivo es obligatorio para Notas de Débito.');
+        }
+
+        return DB::transaction(function () use ($ventaOriginal, $empresa, $detalles, $motivo) {
+            $config = $empresa->config();
+            $ncf = $this->ncfService->siguiente(TipoComprobante::NOTA_DEBITO, $empresa);
+
+            $acumulado = [
+                'subtotal' => '0.00', 'monto_gravado_18' => '0.00', 'monto_gravado_16' => '0.00',
+                'monto_gravado_0' => '0.00', 'itbis_18' => '0.00', 'itbis_16' => '0.00', 'total_itbis' => '0.00',
+            ];
+            $detallesCrear = [];
+
+            foreach ($detalles as $detalle) {
+                $monto = $this->aMoneda($detalle['monto']);
+
+                if (bccomp($monto, '0', 2) <= 0) {
+                    throw new VentaInvalidaException('Los montos de la Nota de Débito deben ser positivos.');
+                }
+
+                $producto = Producto::where('empresa_id', $empresa->id)->findOrFail($detalle['producto_id']);
+                $cantidad = (float) ($detalle['cantidad'] ?? 1);
+                $tasaEfectiva = $config->aplica_itbis ? $producto->tasa_itbis : TasaItbis::CERO;
+                $base = bcmul($monto, number_format($cantidad, 4, '.', ''), 2);
+                $itbis = bcdiv(bcmul($base, (string) $tasaEfectiva->porcentaje(), 4), '100', 2);
+
+                $acumulado['subtotal'] = bcadd($acumulado['subtotal'], $base, 2);
+                $acumulado['total_itbis'] = bcadd($acumulado['total_itbis'], $itbis, 2);
+
+                match ($tasaEfectiva) {
+                    TasaItbis::DIECIOCHO => $acumulado['monto_gravado_18'] = bcadd($acumulado['monto_gravado_18'], $base, 2),
+                    TasaItbis::DIECISEIS => $acumulado['monto_gravado_16'] = bcadd($acumulado['monto_gravado_16'], $base, 2),
+                    TasaItbis::CERO => $acumulado['monto_gravado_0'] = bcadd($acumulado['monto_gravado_0'], $base, 2),
+                };
+
+                match ($tasaEfectiva) {
+                    TasaItbis::DIECIOCHO => $acumulado['itbis_18'] = bcadd($acumulado['itbis_18'], $itbis, 2),
+                    TasaItbis::DIECISEIS => $acumulado['itbis_16'] = bcadd($acumulado['itbis_16'], $itbis, 2),
+                    TasaItbis::CERO => null,
+                };
+
+                $detallesCrear[] = [
+                    'producto_id' => $producto->id,
+                    'descripcion' => $producto->nombre,
+                    'cantidad' => $cantidad,
+                    'factor' => 1,
+                    'precio_unitario' => $monto,
+                    'descuento' => '0.00',
+                    'tasa_itbis' => $tasaEfectiva,
+                    'itbis_monto' => $itbis,
+                    'subtotal' => $base,
+                ];
+            }
+
+            $total = bcadd($acumulado['subtotal'], $acumulado['total_itbis'], 2);
+
+            $notaDebito = Venta::create([
+                'empresa_id' => $empresa->id,
+                'cliente_id' => $ventaOriginal->cliente_id,
+                'user_id' => auth()->id(),
+                'tipo_comprobante' => TipoComprobante::NOTA_DEBITO,
+                'ncf' => $ncf,
+                'ncf_modifica' => $ventaOriginal->ncf,
+                'venta_modificada_id' => $ventaOriginal->id,
+                'forma_pago' => $ventaOriginal->forma_pago,
+                'tipo_pago' => $ventaOriginal->tipo_pago,
+                'fecha' => now(),
+                'moneda' => $ventaOriginal->moneda,
+                'tasa_cambio' => $ventaOriginal->tasa_cambio,
+                'subtotal' => $acumulado['subtotal'],
+                'descuento' => '0.00',
+                'monto_gravado_18' => $acumulado['monto_gravado_18'],
+                'monto_gravado_16' => $acumulado['monto_gravado_16'],
+                'monto_gravado_0' => $acumulado['monto_gravado_0'],
+                'monto_exento' => '0.00',
+                'itbis_18' => $acumulado['itbis_18'],
+                'itbis_16' => $acumulado['itbis_16'],
+                'total_itbis' => $acumulado['total_itbis'],
+                'total' => $total,
+                'estado' => EstadoVenta::EMITIDA,
+                'estado_fiscal' => EstadoFiscal::PENDIENTE,
+                'motivo_anulacion' => $motivo,
+            ]);
+
+            $notaDebito->detalles()->createMany($detallesCrear);
+
+            return $notaDebito;
+        });
+    }
+
+    /**
+     * Nota de Crédito parcial (e-CF 34): devuelve ALGUNOS productos de una venta ya aceptada.
+     * Usa los precios originales de la venta (no los actuales del producto). Repone stock de los
+     * productos devueltos.
+     *
+     * @param  array<int, array{producto_id: int, cantidad: float|int, presentacion_id?: int|null}>  $detalles
+     *
+     * @throws VentaInvalidaException
+     * @throws SecuenciaNcfAgotadaException
+     * @throws StockInsuficienteException  (no debería: es ENTRADA, pero por seguridad)
+     */
+    public function emitirNotaCreditoParcial(Venta $ventaOriginal, Empresa $empresa, array $detalles, string $motivo): Venta
+    {
+        $this->validarVentaModificable($ventaOriginal);
+
+        if (empty($detalles)) {
+            throw new VentaInvalidaException('Debe incluir al menos un producto a devolver.');
+        }
+
+        if (blank($motivo)) {
+            throw new VentaInvalidaException('El motivo es obligatorio para devoluciones parciales.');
+        }
+
+        return DB::transaction(function () use ($ventaOriginal, $empresa, $detalles, $motivo) {
+            $ventaOriginal = Venta::query()->lockForUpdate()->findOrFail($ventaOriginal->id);
+
+            $acumulado = [
+                'subtotal' => '0.00', 'monto_gravado_18' => '0.00', 'monto_gravado_16' => '0.00',
+                'monto_gravado_0' => '0.00', 'itbis_18' => '0.00', 'itbis_16' => '0.00', 'total_itbis' => '0.00',
+            ];
+            $detallesCrear = [];
+            $stockMovimientos = [];
+
+            foreach ($detalles as $detalle) {
+                $cantidad = (float) $detalle['cantidad'];
+
+                if ($cantidad <= 0) {
+                    throw new VentaInvalidaException('La cantidad a devolver debe ser mayor que cero.');
+                }
+
+                $detalleOriginal = $ventaOriginal->detalles()
+                    ->where('producto_id', $detalle['producto_id'])
+                    ->when(
+                        filled($detalle['presentacion_id'] ?? null),
+                        fn ($q) => $q->where('presentacion_id', $detalle['presentacion_id']),
+                        fn ($q) => $q->whereNull('presentacion_id'),
+                    )
+                    ->first();
+
+                if ($detalleOriginal === null) {
+                    throw new VentaInvalidaException('El producto no pertenece a la venta original.');
+                }
+
+                $yaDevuelto = Venta::where('venta_modificada_id', $ventaOriginal->id)
+                    ->where('tipo_comprobante', TipoComprobante::NOTA_CREDITO)
+                    ->where('estado', '!=', EstadoVenta::ANULADA)
+                    ->join('detalle_ventas', 'ventas.id', '=', 'detalle_ventas.venta_id')
+                    ->where('detalle_ventas.producto_id', $detalle['producto_id'])
+                    ->when(
+                        filled($detalle['presentacion_id'] ?? null),
+                        fn ($q) => $q->where('detalle_ventas.presentacion_id', $detalle['presentacion_id']),
+                        fn ($q) => $q->whereNull('detalle_ventas.presentacion_id'),
+                    )
+                    ->sum('detalle_ventas.cantidad');
+
+                $disponible = bcsub((string) $detalleOriginal->cantidad, (string) $yaDevuelto, 3);
+
+                if (bccomp(number_format($cantidad, 3, '.', ''), $disponible, 3) > 0) {
+                    $nombre = $detalleOriginal->descripcion;
+
+                    throw new VentaInvalidaException(
+                        "No puede devolver {$cantidad} de «{$nombre}». Disponible: {$disponible}."
+                    );
+                }
+
+                $precioUnitario = (string) $detalleOriginal->precio_unitario;
+                $descuentoLinea = (string) $detalleOriginal->descuento;
+                $tasaEfectiva = $detalleOriginal->tasa_itbis;
+                $cantidadOriginal = (string) $detalleOriginal->cantidad;
+                $proporcion = bcdiv(number_format($cantidad, 4, '.', ''), $cantidadOriginal, 12);
+                $base = bcadd(bcmul((string) $detalleOriginal->subtotal, $proporcion, 6), '0.005', 2);
+                $itbis = bcadd(bcmul((string) $detalleOriginal->itbis_monto, $proporcion, 6), '0.005', 2);
+
+                $acumulado['subtotal'] = bcadd($acumulado['subtotal'], $base, 2);
+                $acumulado['total_itbis'] = bcadd($acumulado['total_itbis'], $itbis, 2);
+
+                match ($tasaEfectiva) {
+                    TasaItbis::DIECIOCHO => $acumulado['monto_gravado_18'] = bcadd($acumulado['monto_gravado_18'], $base, 2),
+                    TasaItbis::DIECISEIS => $acumulado['monto_gravado_16'] = bcadd($acumulado['monto_gravado_16'], $base, 2),
+                    TasaItbis::CERO => $acumulado['monto_gravado_0'] = bcadd($acumulado['monto_gravado_0'], $base, 2),
+                };
+
+                match ($tasaEfectiva) {
+                    TasaItbis::DIECIOCHO => $acumulado['itbis_18'] = bcadd($acumulado['itbis_18'], $itbis, 2),
+                    TasaItbis::DIECISEIS => $acumulado['itbis_16'] = bcadd($acumulado['itbis_16'], $itbis, 2),
+                    TasaItbis::CERO => null,
+                };
+
+                $detallesCrear[] = [
+                    'producto_id' => $detalleOriginal->producto_id,
+                    'presentacion_id' => $detalleOriginal->presentacion_id,
+                    'descripcion' => $detalleOriginal->descripcion,
+                    'cantidad' => $cantidad,
+                    'factor' => $detalleOriginal->factor,
+                    'precio_unitario' => $precioUnitario,
+                    'descuento' => $descuentoLinea,
+                    'tasa_itbis' => $tasaEfectiva,
+                    'itbis_monto' => $itbis,
+                    'subtotal' => $base,
+                ];
+
+                $stockMovimientos[] = [
+                    'producto' => $detalleOriginal->producto,
+                    'cantidad' => $cantidad * (float) $detalleOriginal->factor,
+                ];
+            }
+
+            $total = bcadd($acumulado['subtotal'], $acumulado['total_itbis'], 2);
+            $ncf = $this->ncfService->siguiente(TipoComprobante::NOTA_CREDITO, $empresa);
+
+            $notaCredito = Venta::create([
+                'empresa_id' => $empresa->id,
+                'cliente_id' => $ventaOriginal->cliente_id,
+                'user_id' => auth()->id(),
+                'tipo_comprobante' => TipoComprobante::NOTA_CREDITO,
+                'ncf' => $ncf,
+                'ncf_modifica' => $ventaOriginal->ncf,
+                'venta_modificada_id' => $ventaOriginal->id,
+                'forma_pago' => $ventaOriginal->forma_pago,
+                'tipo_pago' => $ventaOriginal->tipo_pago,
+                'fecha' => now(),
+                'moneda' => $ventaOriginal->moneda,
+                'tasa_cambio' => $ventaOriginal->tasa_cambio,
+                'subtotal' => $acumulado['subtotal'],
+                'descuento' => '0.00',
+                'monto_gravado_18' => $acumulado['monto_gravado_18'],
+                'monto_gravado_16' => $acumulado['monto_gravado_16'],
+                'monto_gravado_0' => $acumulado['monto_gravado_0'],
+                'monto_exento' => '0.00',
+                'itbis_18' => $acumulado['itbis_18'],
+                'itbis_16' => $acumulado['itbis_16'],
+                'total_itbis' => $acumulado['total_itbis'],
+                'total' => $total,
+                'estado' => EstadoVenta::EMITIDA,
+                'estado_fiscal' => EstadoFiscal::PENDIENTE,
+                'motivo_anulacion' => $motivo,
+            ]);
+
+            $notaCredito->detalles()->createMany($detallesCrear);
+
+            foreach ($stockMovimientos as $mov) {
+                if ($mov['producto'] !== null) {
+                    $this->inventarioService->registrarMovimiento(
+                        $mov['producto'],
+                        TipoMovimiento::ENTRADA,
+                        OrigenMovimiento::DEVOLUCION_VENTA,
+                        $mov['cantidad'],
+                        $notaCredito->id,
+                        auth()->id(),
+                        $motivo,
+                    );
+                }
+            }
+
+            return $notaCredito;
+        });
+    }
+
+    /**
+     * Validaciones comunes para ND y NC parcial: la venta debe ser electrónica, aceptada, no
+     * anulada, y no ser ella misma una nota.
+     */
+    private function validarVentaModificable(Venta $venta): void
+    {
+        if (! $venta->esElectronica()) {
+            throw new VentaInvalidaException('Solo se pueden emitir notas sobre ventas electrónicas.');
+        }
+
+        if (! $venta->estado_fiscal->esAceptado()) {
+            throw new VentaInvalidaException('La venta debe estar aceptada por la DGII.');
+        }
+
+        if ($venta->estaAnulada()) {
+            throw new VentaInvalidaException('No se puede emitir una nota sobre una venta anulada.');
+        }
+
+        if ($venta->esNotaCreditoDeAnulacion()) {
+            throw new VentaInvalidaException('No se puede emitir una nota sobre otra nota.');
+        }
+    }
+
     // -------------------------------------------------------------------------
 
     /**

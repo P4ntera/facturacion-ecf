@@ -48,6 +48,8 @@ class Permisos
                 'facturacion.acceder' => 'Acceder a Facturación (comprobantes avanzados)',
                 'ventas.ver' => 'Ver ventas',
                 'ventas.anular' => 'Anular ventas',
+                'ventas.nota_debito' => 'Emitir Notas de Débito',
+                'ventas.devolucion' => 'Realizar devoluciones parciales',
                 'ventas.imprimir' => 'Imprimir comprobantes y tickets',
                 'arqueo.cerrar_ajeno' => 'Cerrar cajas de otros cajeros (no solo la propia)',
             ],

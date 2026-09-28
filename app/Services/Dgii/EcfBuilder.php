@@ -73,7 +73,8 @@ class EcfBuilder
         }
 
         $original = $this->ventaModificada($venta);
-        $esAnulacion = $venta->esNotaCreditoDeAnulacion();
+        $esAnulacionTotal = $venta->venta_modificada_id !== null
+            && $original?->estaAnulada();
 
         $referencia = ['NCFModificado' => $venta->ncf_modifica];
 
@@ -81,9 +82,16 @@ class EcfBuilder
             $referencia['FechaNCFModificado'] = $original->fecha->format('d-m-Y');
         }
 
-        $referencia['CodigoModificacion'] = $esAnulacion ? '1' : '3';
+        $referencia['CodigoModificacion'] = match (true) {
+            $esAnulacionTotal => '1',
+            $venta->tipo_comprobante === TipoComprobante::NOTA_DEBITO => '3',
+            $venta->venta_modificada_id !== null && $venta->tipo_comprobante === TipoComprobante::NOTA_CREDITO => '5',
+            default => '3',
+        };
 
-        $razon = $esAnulacion ? $original?->motivo_anulacion : null;
+        $razon = $esAnulacionTotal
+            ? $original?->motivo_anulacion
+            : $venta->motivo_anulacion;
 
         if (filled($razon)) {
             $referencia['RazonModificacion'] = Str::limit($razon, 87);

@@ -26,7 +26,10 @@ use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Repeater;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
 use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Infolists\Components\RepeatableEntry\TableColumn;
 use Filament\Infolists\Components\TextEntry;
@@ -356,6 +359,120 @@ class VentaResource extends Resource
                             ->success()
                             ->send();
                     }),
+
+                Action::make('notaDebito')
+                    ->label('Nota de Débito')
+                    ->icon('heroicon-o-plus-circle')
+                    ->color('warning')
+                    ->requiresConfirmation()
+                    ->modalHeading('Emitir Nota de Débito')
+                    ->modalDescription(fn (Venta $record): string => "Cargo adicional sobre la venta {$record->ncf}.")
+                    ->schema([
+                        Textarea::make('motivo')
+                            ->label('Motivo del ajuste')
+                            ->required()
+                            ->maxLength(255)
+                            ->rows(2),
+                        Repeater::make('detalles')
+                            ->label('Ítems del ajuste')
+                            ->schema([
+                                Select::make('producto_id')
+                                    ->label('Producto')
+                                    ->options(fn (Venta $record) => $record->detalles->mapWithKeys(fn ($d) => [
+                                        $d->producto_id => $d->descripcion,
+                                    ]))
+                                    ->required(),
+                                TextInput::make('cantidad')
+                                    ->numeric()
+                                    ->default(1)
+                                    ->minValue(1)
+                                    ->required(),
+                                TextInput::make('monto')
+                                    ->label('Monto unitario adicional')
+                                    ->numeric()
+                                    ->prefix('RD$')
+                                    ->required()
+                                    ->minValue(0.01),
+                            ])
+                            ->minItems(1)
+                            ->required(),
+                    ])
+                    ->action(function (Venta $record, array $data): void {
+                        try {
+                            $nd = app(VentaService::class)->emitirNotaDebito(
+                                $record, Filament::getTenant(), $data['detalles'], $data['motivo'],
+                            );
+                        } catch (VentaInvalidaException|SecuenciaNcfAgotadaException $e) {
+                            Notification::make()->title($e->getMessage())->danger()->send();
+
+                            return;
+                        }
+
+                        Notification::make()
+                            ->title("Nota de Débito {$nd->ncf} emitida")
+                            ->body('Se está enviando a la DGII.')
+                            ->success()
+                            ->send();
+                    })
+                    ->visible(fn (Venta $record) => $record->estado !== EstadoVenta::ANULADA
+                        && ! $record->esNotaCreditoDeAnulacion()
+                        && $record->esElectronica()
+                        && $record->estado_fiscal->esAceptado()
+                        && (auth()->user()?->can('ventas.nota_debito') ?? false)),
+
+                Action::make('devolucionParcial')
+                    ->label('Devolución parcial')
+                    ->icon('heroicon-o-arrow-uturn-left')
+                    ->color('warning')
+                    ->requiresConfirmation()
+                    ->modalHeading('Devolución parcial de productos')
+                    ->modalDescription(fn (Venta $record): string => "Nota de Crédito parcial sobre la venta {$record->ncf}.")
+                    ->schema([
+                        Textarea::make('motivo')
+                            ->label('Motivo de la devolución')
+                            ->required()
+                            ->maxLength(255)
+                            ->rows(2),
+                        Repeater::make('detalles')
+                            ->label('Productos a devolver')
+                            ->schema([
+                                Select::make('producto_id')
+                                    ->label('Producto')
+                                    ->options(fn (Venta $record) => $record->detalles->mapWithKeys(fn ($d) => [
+                                        $d->producto_id => "{$d->descripcion} (vendido: {$d->cantidad})",
+                                    ]))
+                                    ->required(),
+                                TextInput::make('cantidad')
+                                    ->label('Cantidad a devolver')
+                                    ->numeric()
+                                    ->minValue(0.001)
+                                    ->required(),
+                            ])
+                            ->minItems(1)
+                            ->required(),
+                    ])
+                    ->action(function (Venta $record, array $data): void {
+                        try {
+                            $nc = app(VentaService::class)->emitirNotaCreditoParcial(
+                                $record, Filament::getTenant(), $data['detalles'], $data['motivo'],
+                            );
+                        } catch (VentaInvalidaException|SecuenciaNcfAgotadaException $e) {
+                            Notification::make()->title($e->getMessage())->danger()->send();
+
+                            return;
+                        }
+
+                        Notification::make()
+                            ->title("Nota de Crédito {$nc->ncf} emitida")
+                            ->body('Productos devueltos al inventario. Se está enviando a la DGII.')
+                            ->success()
+                            ->send();
+                    })
+                    ->visible(fn (Venta $record) => $record->estado !== EstadoVenta::ANULADA
+                        && ! $record->esNotaCreditoDeAnulacion()
+                        && $record->esElectronica()
+                        && $record->estado_fiscal->esAceptado()
+                        && (auth()->user()?->can('ventas.devolucion') ?? false)),
 
                 self::refrescarEstadoAction(),
                 self::reintentarEnvioAction(),
