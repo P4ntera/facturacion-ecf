@@ -162,7 +162,7 @@ class VentaService
             $estrategia = $config->precio_incluye_itbis ? new ConItbisIncluido : new SinItbisIncluido;
             $permitePrecioCero = (bool) ($datos['permite_precio_cero'] ?? false);
 
-            [$detalles, $productosLineas, $acumulado, $descuentoGlobal] = $this->calcularLineas($datos, $lineas, $config, $estrategia, $empresa, $permitePrecioCero);
+            [$detalles, $productosLineas, $acumulado, $descuentoGlobal] = $this->calcularLineas($datos, $lineas, $config, $estrategia, $empresa, $permitePrecioCero, $cliente);
 
             $total = $this->calcularTotalFinal($acumulado, $descuentoGlobal);
 
@@ -283,7 +283,11 @@ class VentaService
         $estrategia = $config->precio_incluye_itbis ? new ConItbisIncluido : new SinItbisIncluido;
         $permitePrecioCero = (bool) ($datos['permite_precio_cero'] ?? false);
 
-        [, , $acumulado, $descuentoGlobal] = $this->calcularLineas($datos, $lineas, $config, $estrategia, $empresa, $permitePrecioCero);
+        $cliente = filled($datos['cliente_id'] ?? null)
+            ? Cliente::where('empresa_id', $empresa->id)->find($datos['cliente_id'])
+            : null;
+
+        [, , $acumulado, $descuentoGlobal] = $this->calcularLineas($datos, $lineas, $config, $estrategia, $empresa, $permitePrecioCero, $cliente);
 
         return [
             ...$acumulado,
@@ -854,8 +858,31 @@ class VentaService
      *
      * @throws VentaInvalidaException
      */
-    private function calcularLineas(array $datos, array $lineas, EmpresaConfiguracion $config, ImpuestoStrategy $estrategia, Empresa $empresa, bool $permitePrecioCero): array
+    private function calcularLineas(array $datos, array $lineas, EmpresaConfiguracion $config, ImpuestoStrategy $estrategia, Empresa $empresa, bool $permitePrecioCero, ?Cliente $cliente = null): array
     {
+        // Si el cliente tiene lista de precio asignada y activa, inyectar el precio de lista
+        // en las líneas que no traigan precio_unitario explícito.
+        $listaPrecio = $cliente?->listaPrecio;
+
+        if ($listaPrecio !== null && $listaPrecio->activa) {
+            $preciosLista = $listaPrecio->productos()
+                ->whereIn('producto_id', array_column($lineas, 'producto_id'))
+                ->get()
+                ->keyBy('id');
+
+            $lineas = array_map(function (array $linea) use ($preciosLista) {
+                if (blank($linea['precio_unitario'] ?? null)) {
+                    $precioLista = $preciosLista->get($linea['producto_id']);
+
+                    if ($precioLista !== null) {
+                        $linea['precio_unitario'] = $precioLista->pivot->precio;
+                    }
+                }
+
+                return $linea;
+            }, $lineas);
+        }
+
         [$detalles, $productosLineas, $acumulado] = $this->procesarLineas($lineas, $config, $estrategia, $empresa, $permitePrecioCero);
 
         $subtotalBruto = $acumulado['subtotal'];

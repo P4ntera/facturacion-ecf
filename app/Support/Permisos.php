@@ -42,6 +42,10 @@ class Permisos
                 'descuentos.crear' => 'Crear descuentos',
                 'descuentos.editar' => 'Editar descuentos',
                 'descuentos.desactivar' => 'Activar/Desactivar descuentos',
+                'listas_precio.ver' => 'Ver listas de precio',
+                'listas_precio.crear' => 'Crear listas de precio',
+                'listas_precio.editar' => 'Editar listas de precio',
+                'listas_precio.desactivar' => 'Activar/Desactivar listas de precio',
             ],
             'Ventas' => [
                 'pos.acceder' => 'Acceder a Caja (venta rápida)',

@@ -18,7 +18,7 @@ class Cliente extends Model
 
     protected $fillable = [
         'empresa_id', 'tipo_documento', 'documento', 'nombre',
-        'telefono', 'email', 'direccion', 'activo',
+        'telefono', 'email', 'direccion', 'activo', 'lista_precio_id',
     ];
 
     protected $casts = [
@@ -34,6 +34,11 @@ class Cliente extends Model
     public function empresa(): BelongsTo
     {
         return $this->belongsTo(Empresa::class);
+    }
+
+    public function listaPrecio(): BelongsTo
+    {
+        return $this->belongsTo(ListaPrecio::class);
     }
 
     public function ventas(): HasMany
