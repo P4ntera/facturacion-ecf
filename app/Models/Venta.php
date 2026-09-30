@@ -36,7 +36,7 @@ class Venta extends Model
         'estado', 'estado_fiscal', 'ecf_track_id',
         'pac_id', 'codigo_seguridad', 'dgii_url', 'xml_url', 'ambiente',
         'ecf_enviado_en', 'ecf_respuesta',
-        'motivo_anulacion', 'anulada_en',
+        'motivo_anulacion', 'anulada_en', 'tipo_anulacion_608',
     ];
 
     protected $casts = [

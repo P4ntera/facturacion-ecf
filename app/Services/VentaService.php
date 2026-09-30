@@ -162,7 +162,7 @@ class VentaService
             $estrategia = $config->precio_incluye_itbis ? new ConItbisIncluido : new SinItbisIncluido;
             $permitePrecioCero = (bool) ($datos['permite_precio_cero'] ?? false);
 
-            [$detalles, $productosLineas, $acumulado, $descuentoGlobal] = $this->calcularLineas($datos, $lineas, $config, $estrategia, $empresa, $permitePrecioCero);
+            [$detalles, $productosLineas, $acumulado, $descuentoGlobal] = $this->calcularLineas($datos, $lineas, $config, $estrategia, $empresa, $permitePrecioCero, $cliente);
 
             $total = $this->calcularTotalFinal($acumulado, $descuentoGlobal);
 
@@ -283,7 +283,11 @@ class VentaService
         $estrategia = $config->precio_incluye_itbis ? new ConItbisIncluido : new SinItbisIncluido;
         $permitePrecioCero = (bool) ($datos['permite_precio_cero'] ?? false);
 
-        [, , $acumulado, $descuentoGlobal] = $this->calcularLineas($datos, $lineas, $config, $estrategia, $empresa, $permitePrecioCero);
+        $cliente = filled($datos['cliente_id'] ?? null)
+            ? Cliente::where('empresa_id', $empresa->id)->find($datos['cliente_id'])
+            : null;
+
+        [, , $acumulado, $descuentoGlobal] = $this->calcularLineas($datos, $lineas, $config, $estrategia, $empresa, $permitePrecioCero, $cliente);
 
         return [
             ...$acumulado,
@@ -311,7 +315,7 @@ class VentaService
      * @throws CuentaConPagosRegistradosException
      * @throws SecuenciaNcfAgotadaException si hace falta Nota de Crédito y no hay secuencia 34
      */
-    public function anular(Venta $venta, string $motivo, ?int $userId = null): Venta
+    public function anular(Venta $venta, string $motivo, ?int $userId = null, ?string $tipoAnulacion608 = null): Venta
     {
         // Queda en motivo_anulacion (608, auditoría) y, si hay Nota de Crédito, viaja a la DGII
         // como RazonModificacion: nunca en blanco.
@@ -380,10 +384,20 @@ class VentaService
                 }
             }
 
+            // Para comprobantes físicos (tipo B), el tipo de anulación es obligatorio
+            // porque va al Formato 608 de la DGII. Los e-CF no van al 608 (se anulan
+            // vía Nota de Crédito E34), así que no lo necesitan.
+            if ($venta->tipo_comprobante?->esFisico() && blank($tipoAnulacion608)) {
+                throw new VentaInvalidaException(
+                    'Debe seleccionar el tipo de anulación para el reporte 608 (comprobante físico).'
+                );
+            }
+
             $venta->update([
                 'estado' => EstadoVenta::ANULADA,
                 'motivo_anulacion' => $motivo,
                 'anulada_en' => now(),
+                'tipo_anulacion_608' => $venta->tipo_comprobante?->esFisico() ? $tipoAnulacion608 : null,
             ]);
 
             return $venta->refresh();
@@ -844,8 +858,31 @@ class VentaService
      *
      * @throws VentaInvalidaException
      */
-    private function calcularLineas(array $datos, array $lineas, EmpresaConfiguracion $config, ImpuestoStrategy $estrategia, Empresa $empresa, bool $permitePrecioCero): array
+    private function calcularLineas(array $datos, array $lineas, EmpresaConfiguracion $config, ImpuestoStrategy $estrategia, Empresa $empresa, bool $permitePrecioCero, ?Cliente $cliente = null): array
     {
+        // Si el cliente tiene lista de precio asignada y activa, inyectar el precio de lista
+        // en las líneas que no traigan precio_unitario explícito.
+        $listaPrecio = $cliente?->listaPrecio;
+
+        if ($listaPrecio !== null && $listaPrecio->activa) {
+            $preciosLista = $listaPrecio->productos()
+                ->whereIn('producto_id', array_column($lineas, 'producto_id'))
+                ->get()
+                ->keyBy('id');
+
+            $lineas = array_map(function (array $linea) use ($preciosLista) {
+                if (blank($linea['precio_unitario'] ?? null)) {
+                    $precioLista = $preciosLista->get($linea['producto_id']);
+
+                    if ($precioLista !== null) {
+                        $linea['precio_unitario'] = $precioLista->pivot->precio;
+                    }
+                }
+
+                return $linea;
+            }, $lineas);
+        }
+
         [$detalles, $productosLineas, $acumulado] = $this->procesarLineas($lineas, $config, $estrategia, $empresa, $permitePrecioCero);
 
         $subtotalBruto = $acumulado['subtotal'];

@@ -333,6 +333,35 @@ class CompraServiceTest extends TestCase
         $this->assertEqualsWithDelta(400.00, (float) $compra->monto_total_factura, 0.01);
     }
 
+    public function test_bcmath_precision_itbis_incluido(): void
+    {
+        [$user, $proveedor] = $this->setup();
+        $producto = $this->crearProducto(['tasa_itbis' => TasaItbis::DIECIOCHO]);
+
+        // 33.33 con ITBIS incluido: base = 33.33 / 1.18 = 28.2457...
+        // Con float: round(28.2457... * 1, 2) = 28.25; itbis = round(28.25 * 0.18, 2) = 5.085 → 5.09
+        // Total debería ser 28.25 + 5.09 = 33.34 (≠ 33.33 original — diferencia aceptable por redondeo)
+        // Lo importante: que no haya errores de acumulación con múltiples líneas.
+        $compra = app(CompraService::class)->crear([
+            'proveedor_id' => $proveedor->id,
+            'tipo_comprobante' => TipoComprobante::COMPRAS,
+            'ncf' => null,
+            'fecha' => now(),
+            'itbis_incluido' => true,
+            'lineas' => [
+                ['producto_id' => $producto->id, 'cantidad' => 3, 'costo_unitario' => 33.33],
+                ['producto_id' => $producto->id, 'cantidad' => 7, 'costo_unitario' => 33.33],
+            ],
+        ], $user->id, $this->empresaDefault);
+
+        // 10 unidades × base 28.2457 → subtotal acumulado debe ser consistente
+        $this->assertSame(
+            bcadd((string) $compra->subtotal, (string) $compra->itbis, 2),
+            (string) bcmul((string) $compra->total, '1', 2),
+            'total debe ser exactamente subtotal + itbis (sin error de acumulación float)',
+        );
+    }
+
     public function test_anular_compras_solo_lo_tiene_administrador(): void
     {
         $this->seed(RolePermissionSeeder::class);

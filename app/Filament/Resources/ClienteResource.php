@@ -115,6 +115,13 @@ class ClienteResource extends Resource
                     ->rows(2)
                     ->columnSpanFull(),
 
+                Select::make('lista_precio_id')
+                    ->label('Lista de precio')
+                    ->relationship('listaPrecio', 'nombre', modifyQueryUsing: fn ($query) => $query->where('empresa_id', Filament::getTenant()->id)->where('activa', true))
+                    ->placeholder('Precio base (sin lista)')
+                    ->searchable()
+                    ->preload(),
+
                 Toggle::make('activo')
                     ->label('Activo')
                     ->default(true),

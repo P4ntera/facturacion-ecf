@@ -78,9 +78,13 @@ class DevolucionCompraService
                     );
                 }
 
-                $subtotal = round((float) $detalleCompra->costo_unitario * $cantidad, 2);
+                $cantidadStr = (string) $cantidad;
+                $costoStr = (string) $detalleCompra->costo_unitario;
                 $porcentaje = $detalleCompra->tasa_itbis->porcentaje();
-                $itbisMonto = round($subtotal * $porcentaje / 100, 2);
+                $porcentajeStr = (string) $porcentaje;
+
+                $subtotal = bcmul($costoStr, $cantidadStr, 2);
+                $itbisMonto = bcdiv(bcmul($subtotal, $porcentajeStr, 4), '100', 2);
 
                 $lineasCalc[] = [
                     'detalle_compra_id' => $detalleCompra->id,
@@ -137,7 +141,7 @@ class DevolucionCompraService
             }
 
             if ($compra->cuentaPorPagar !== null) {
-                $this->cuentaPorPagarService->reducirPorDevolucion($compra->cuentaPorPagar, (float) $totales['total']);
+                $this->cuentaPorPagarService->reducirPorDevolucion($compra->cuentaPorPagar, (float) $totales['total']); // @phpstan-ignore cast.useless
             }
 
             return $devolucion->load('detalles.producto', 'compra.proveedor');
@@ -189,32 +193,35 @@ class DevolucionCompraService
     /** Agrupa totales de la cabecera. Público: reutilizado por DevolucionCompraResource. */
     public function calcularTotales(array $lineas): array
     {
-        $montoGravado18 = 0.0;
-        $montoGravado16 = 0.0;
-        $montoGravado0 = 0.0;
+        $montoGravado18 = '0';
+        $montoGravado16 = '0';
+        $montoGravado0 = '0';
+        $subtotal = '0';
 
         foreach ($lineas as $l) {
+            $sub = (string) $l['subtotal'];
+            $subtotal = bcadd($subtotal, $sub, 2);
+
             match ($l['tasa_itbis']) {
-                TasaItbis::DIECIOCHO => $montoGravado18 += $l['subtotal'],
-                TasaItbis::DIECISEIS => $montoGravado16 += $l['subtotal'],
-                TasaItbis::CERO => $montoGravado0 += $l['subtotal'],
+                TasaItbis::DIECIOCHO => $montoGravado18 = bcadd($montoGravado18, $sub, 2),
+                TasaItbis::DIECISEIS => $montoGravado16 = bcadd($montoGravado16, $sub, 2),
+                TasaItbis::CERO => $montoGravado0 = bcadd($montoGravado0, $sub, 2),
             };
         }
 
-        $subtotal = round(array_sum(array_column($lineas, 'subtotal')), 2);
-        $itbis18 = round($montoGravado18 * 0.18, 2);
-        $itbis16 = round($montoGravado16 * 0.16, 2);
-        $totalItbis = round($itbis18 + $itbis16, 2);
+        $itbis18 = bcmul($montoGravado18, '0.18', 2);
+        $itbis16 = bcmul($montoGravado16, '0.16', 2);
+        $totalItbis = bcadd($itbis18, $itbis16, 2);
 
         return [
             'subtotal' => $subtotal,
-            'monto_gravado_18' => round($montoGravado18, 2),
-            'monto_gravado_16' => round($montoGravado16, 2),
-            'monto_gravado_0' => round($montoGravado0, 2),
+            'monto_gravado_18' => $montoGravado18,
+            'monto_gravado_16' => $montoGravado16,
+            'monto_gravado_0' => $montoGravado0,
             'itbis_18' => $itbis18,
             'itbis_16' => $itbis16,
             'itbis' => $totalItbis,
-            'total' => round($subtotal + $totalItbis, 2),
+            'total' => bcadd($subtotal, $totalItbis, 2),
         ];
     }
 }

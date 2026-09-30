@@ -341,6 +341,91 @@ class ReporteService
         return implode("\n", $lineas);
     }
 
+    // ──────────────────────────────────────────────────────────────────────
+    // Formato 608 — Comprobantes Fiscales Anulados
+    // ──────────────────────────────────────────────────────────────────────
+
+    /**
+     * Catálogo DGII de "Tipo de anulación" para el 608.
+     */
+    public const TIPO_ANULACION_608 = [
+        '01' => 'Deterioro de factura pre-impresa',
+        '02' => 'Errores de impresión (factura pre-impresa)',
+        '03' => 'Impresión defectuosa',
+        '04' => 'Corrección de la información',
+        '05' => 'Cambio de productos',
+        '06' => 'Devolución de productos',
+        '07' => 'Omisión de productos',
+        '08' => 'Errores en secuencia de NCF',
+        '09' => 'Por cese de operaciones',
+        '10' => 'Pérdida o hurto de talonarios',
+    ];
+
+    /**
+     * Query base del 608: ventas ANULADAS con comprobante FÍSICO (tipo B) y NCF, en el rango
+     * por fecha de anulación (anulada_en), no por fecha de emisión.
+     *
+     * Los e-CF anulados NO van al 608: su anulación se reporta vía Nota de Crédito E34
+     * directamente ante la DGII.
+     */
+    public function reporte608Query(Carbon $desde, Carbon $hasta, ?int $empresaId = null): Builder
+    {
+        $tiposFisicos = collect(TipoComprobante::cases())
+            ->filter->esFisico()
+            ->map->value
+            ->all();
+
+        return Venta::query()
+            ->whereBetween('anulada_en', [$desde->copy()->startOfDay(), $hasta->copy()->endOfDay()])
+            ->where('estado', EstadoVenta::ANULADA)
+            ->whereNotNull('ncf')
+            ->where('ncf', '!=', '')
+            ->whereIn('tipo_comprobante', $tiposFisicos)
+            ->when($empresaId, fn (Builder $query, int $id) => $query->where('empresa_id', $id));
+    }
+
+    /**
+     * Una fila por comprobante físico anulado en el rango, con las 3 columnas del 608.
+     *
+     * @return Collection<int, array{ncf: string, tipo_anulacion: string, fecha_anulacion: string}>
+     */
+    public function reporte608(Carbon $desde, Carbon $hasta, ?int $empresaId = null): Collection
+    {
+        return $this->reporte608Query($desde, $hasta, $empresaId)
+            ->orderBy('anulada_en')
+            ->get()
+            ->map(fn (Venta $venta) => [
+                'ncf' => $venta->ncf,
+                'tipo_anulacion' => $venta->tipo_anulacion_608 ?? '04',
+                'fecha_anulacion' => $venta->anulada_en->format('Ymd'),
+            ]);
+    }
+
+    /**
+     * Generar el TXT del 608 en formato DGII (pipe-delimited).
+     */
+    public function exportar608Txt(string $rncEmpresa, Carbon $desde, Carbon $hasta, ?int $empresaId = null): string
+    {
+        $registros = $this->reporte608($desde, $hasta, $empresaId);
+        $periodo = $desde->format('Ym');
+
+        $lineas = [];
+
+        // Encabezado
+        $lineas[] = implode('|', ['608', $rncEmpresa, $periodo, (string) $registros->count()]);
+
+        // Registros
+        foreach ($registros as $reg) {
+            $lineas[] = implode('|', [
+                $reg['ncf'],
+                $reg['tipo_anulacion'],
+                $reg['fecha_anulacion'],
+            ]);
+        }
+
+        return implode("\n", $lineas);
+    }
+
     /**
      * @return array{total_vendido: string, total_itbis: string, cantidad_ventas: int, ticket_promedio: string}
      */
