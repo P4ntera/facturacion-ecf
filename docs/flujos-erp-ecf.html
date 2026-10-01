@@ -1,0 +1,695 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>body{margin:0}</style>
+</head>
+<body>
+<title>Flujos del ERP e-CF</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --bg: #F3F5F6;
+    --surface: #FFFFFF;
+    --group: #E7ECEF;
+    --ink: #17222A;
+    --muted: #56656F;
+    --line: #B9C5CC;
+    --edge: #6B7B86;
+    --accent: #1C5D99;
+    --accent-soft: #E3EEF8;
+    --fiscal: #A15C00;
+    --fiscal-soft: #FBF0E0;
+    --ok: #2D7A4A;
+    --ok-soft: #E4F3EA;
+    --bad: #B42318;
+    --bad-soft: #FCE9E7;
+    --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+    --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #0E1418;
+      --surface: #161F25;
+      --group: #1B262D;
+      --ink: #E2E9ED;
+      --muted: #95A5AF;
+      --line: #3A4A54;
+      --edge: #8798A3;
+      --accent: #78B4EA;
+      --accent-soft: #16304A;
+      --fiscal: #E8A64E;
+      --fiscal-soft: #33260F;
+      --ok: #6CC58F;
+      --ok-soft: #12301F;
+      --bad: #F28B82;
+      --bad-soft: #3A1714;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #0E1418;
+    --surface: #161F25;
+    --group: #1B262D;
+    --ink: #E2E9ED;
+    --muted: #95A5AF;
+    --line: #3A4A54;
+    --edge: #8798A3;
+    --accent: #78B4EA;
+    --accent-soft: #16304A;
+    --fiscal: #E8A64E;
+    --fiscal-soft: #33260F;
+    --ok: #6CC58F;
+    --ok-soft: #12301F;
+    --bad: #F28B82;
+    --bad-soft: #3A1714;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 15px;
+    line-height: 1.6;
+  }
+  .wrap {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding-inline: 20px;
+    padding-block: 40px 72px;
+  }
+  header { display: grid; gap: 10px; margin-bottom: 28px; }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  h1 {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(30px, 5vw, 44px);
+    line-height: 1.1;
+    margin: 0;
+    text-wrap: balance;
+  }
+  .lede { max-width: 66ch; color: var(--muted); margin: 0; }
+
+  nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 40px;
+  }
+  nav a {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ink);
+    text-decoration: none;
+    padding: 6px 12px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--surface);
+  }
+  nav a:hover { border-color: var(--accent); color: var(--accent); }
+  nav a:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  section { display: grid; gap: 14px; padding-block: 28px; border-top: 1px solid var(--line); }
+  h2 {
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: 24px;
+    line-height: 1.2;
+    margin: 0;
+    text-wrap: balance;
+  }
+  section > p { max-width: 70ch; margin: 0; }
+
+  figure { margin: 0; display: grid; gap: 10px; }
+  .canvas {
+    overflow-x: auto;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .canvas svg { display: block; width: 100%; height: auto; color: var(--edge); }
+  .canvas.w-1000 svg { min-width: 760px; }
+  .canvas.w-800 svg { max-width: 800px; margin: 0 auto; min-width: 620px; }
+  figcaption { font-size: 13px; color: var(--muted); max-width: 80ch; }
+
+  .rules {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 10px 28px;
+    margin: 4px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .rules li { padding-left: 14px; position: relative; font-size: 14px; }
+  .rules li::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0.65em;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+  code, .code { font-family: var(--mono); font-size: 0.88em; }
+
+  .callout {
+    border: 1px solid var(--bad);
+    background: var(--bad-soft);
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-size: 14px;
+    max-width: 80ch;
+  }
+  .callout strong { color: var(--bad); }
+  .callout.ok { border-color: var(--ok); background: var(--ok-soft); }
+  .callout.ok strong { color: var(--ok); }
+  h3 {
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: 16px;
+    margin: 8px 0 0;
+  }
+  .todo li.done::before { content: "✓"; color: var(--ok); border-color: var(--ok); }
+  .todo li.done strong { color: var(--muted); }
+
+  .todo { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; counter-reset: q; }
+  .todo li {
+    display: grid;
+    grid-template-columns: 34px 1fr;
+    gap: 4px 12px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 14px 16px;
+    counter-increment: q;
+  }
+  .todo li::before {
+    content: counter(q);
+    grid-row: span 2;
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    border-radius: 50%;
+    width: 26px;
+    height: 26px;
+    display: grid;
+    place-items: center;
+  }
+  .todo strong { font-weight: 600; }
+  .todo span { color: var(--muted); font-size: 14px; }
+
+  /* SVG */
+  .node { fill: var(--surface); stroke: var(--line); stroke-width: 1.25; }
+  .node.key { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.75; }
+  .node.fiscal { fill: var(--fiscal-soft); stroke: var(--fiscal); stroke-width: 1.5; }
+  .node.ok { fill: var(--ok-soft); stroke: var(--ok); stroke-width: 1.5; }
+  .node.stop { fill: var(--bad-soft); stroke: var(--bad); stroke-width: 1.5; }
+  .node.dec { fill: var(--surface); stroke: var(--ink); stroke-width: 1.25; }
+  .grp { fill: var(--group); }
+  .ttl { font-family: var(--display); font-weight: 600; font-size: 13px; fill: var(--ink); text-anchor: middle; }
+  .sub { font-family: var(--body); font-size: 11px; fill: var(--muted); text-anchor: middle; }
+  .mono { font-family: var(--mono); font-size: 10.5px; fill: var(--muted); text-anchor: middle; }
+  .cap { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.1em; fill: var(--muted); }
+  .lbl {
+    font-family: var(--body);
+    font-weight: 500;
+    font-size: 11px;
+    fill: var(--muted);
+    text-anchor: middle;
+    dominant-baseline: middle;
+    paint-order: stroke;
+    stroke: var(--surface);
+    stroke-width: 5px;
+    stroke-linejoin: round;
+  }
+  .lbl.on-grp { stroke: var(--group); }
+  .lbl.start { text-anchor: start; }
+  .edge { fill: none; stroke: currentColor; stroke-width: 1.4; }
+  .edge.fiscal { stroke: var(--fiscal); }
+  .bracket { fill: none; stroke: var(--accent); stroke-width: 1.4; stroke-dasharray: 4 3; }
+  .bracket-lbl { font-family: var(--body); font-size: 11px; font-weight: 600; fill: var(--accent); text-anchor: middle; }
+  .arrow-f { fill: var(--fiscal); }
+
+  @media (max-width: 560px) {
+    .wrap { padding-block: 28px 56px; }
+    .canvas { padding: 10px; }
+  }
+</style>
+
+<div class="wrap">
+  <header>
+    <span class="eyebrow">ERP de facturación · NCF y e-CF · República Dominicana</span>
+    <h1>Flujos del ERP e-CF</h1>
+    <p class="lede">Cómo se mueven las ventas, las compras, el inventario y los comprobantes fiscales dentro del sistema. Está dibujado a partir del código actual (rama <span class="code">Lamar</span>, 30 de septiembre de 2026), para que el equipo decida sobre esta base qué se queda y qué se cambia.</p>
+  </header>
+
+  <nav aria-label="Secciones">
+    <a href="#mapa">Mapa general</a>
+    <a href="#venta">Venta</a>
+    <a href="#compra">Compra</a>
+    <a href="#anulacion">Anulación</a>
+    <a href="#caja">Caja</a>
+    <a href="#decidir">Por decidir</a>
+  </nav>
+
+  <!-- 1. MAPA GENERAL -->
+  <section id="mapa">
+    <h2>Mapa general</h2>
+    <p>Los maestros alimentan dos operaciones: ventas y compras. Las dos pasan por el Kardex para mover stock, abren cuentas cuando son a crédito y dejan rastro fiscal ante la DGII.</p>
+    <figure>
+      <div class="canvas w-1000">
+        <svg viewBox="0 0 1000 420" role="img" aria-label="Mapa general: maestros alimentan ventas y compras; ambas mueven stock por el Kardex, abren cuentas por cobrar o pagar a crédito, y generan datos fiscales: NCF, envío de e-CF y reportes 606, 607 y 608.">
+          <defs>
+            <marker id="a1" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="currentColor"/></marker>
+            <marker id="a1f" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="arrow-f" d="M0 0 L10 5 L0 10 z"/></marker>
+          </defs>
+
+          <rect class="grp" x="20" y="24" width="190" height="384" rx="10"/>
+          <text class="cap" x="36" y="48">MAESTROS</text>
+          <rect class="grp" x="790" y="24" width="190" height="384" rx="10"/>
+          <text class="cap" x="806" y="48">DGII · FISCAL</text>
+
+          <!-- edges -->
+          <path class="edge" d="M194 95 L290 106" marker-end="url(#a1)"/>
+          <path class="edge" d="M194 169 L290 128" marker-end="url(#a1)"/>
+          <path class="edge" d="M194 243 L290 146" marker-end="url(#a1)"/>
+          <path class="edge" d="M194 353 L290 336" marker-end="url(#a1)"/>
+          <path class="edge" d="M480 114 L560 114" marker-end="url(#a1)"/>
+          <path class="edge" d="M480 146 L560 210" marker-end="url(#a1)"/>
+          <path class="edge" d="M480 312 L560 248" marker-end="url(#a1)"/>
+          <path class="edge" d="M480 344 L560 344" marker-end="url(#a1)"/>
+          <path class="edge fiscal" d="M806 90 H770 V62 H385 V86" marker-end="url(#a1f)"/>
+          <path class="edge fiscal" d="M480 152 L806 189" marker-end="url(#a1f)"/>
+          <path class="edge fiscal" d="M440 158 V286 H770 V329 H806" marker-end="url(#a1f)"/>
+          <path class="edge fiscal" d="M385 372 V394 H885 V358" marker-end="url(#a1f)"/>
+
+          <text class="lbl" x="242" y="100">cliente</text>
+          <text class="lbl" x="242" y="148">precio</text>
+          <text class="lbl" x="242" y="194">descuento</text>
+          <text class="lbl" x="242" y="344">proveedor</text>
+          <text class="lbl" x="520" y="114">a crédito</text>
+          <text class="lbl" x="520" y="178">salida</text>
+          <text class="lbl" x="520" y="280">entrada</text>
+          <text class="lbl" x="520" y="344">a crédito</text>
+          <text class="lbl" x="580" y="62">asigna NCF</text>
+          <text class="lbl" x="645" y="170">transmite e-CF</text>
+          <text class="lbl" x="645" y="286">607 ventas · 608 anuladas</text>
+          <text class="lbl" x="645" y="394">606 compras</text>
+
+          <!-- maestros -->
+          <rect class="node" x="36" y="72" width="158" height="46" rx="6"/>
+          <text class="ttl" x="115" y="100">Clientes</text>
+          <rect class="node" x="36" y="140" width="158" height="58" rx="6"/>
+          <text class="ttl" x="115" y="164">Productos</text>
+          <text class="sub" x="115" y="182">presentaciones · precios</text>
+          <rect class="node" x="36" y="220" width="158" height="46" rx="6"/>
+          <text class="ttl" x="115" y="248">Descuentos</text>
+          <rect class="node" x="36" y="330" width="158" height="46" rx="6"/>
+          <text class="ttl" x="115" y="358">Proveedores</text>
+
+          <!-- operación -->
+          <rect class="node key" x="290" y="86" width="190" height="72" rx="6"/>
+          <text class="ttl" x="385" y="112">Ventas</text>
+          <text class="sub" x="385" y="130">Caja · Facturación</text>
+          <text class="sub" x="385" y="146">POS táctil · display</text>
+          <rect class="node key" x="290" y="300" width="190" height="72" rx="6"/>
+          <text class="ttl" x="385" y="326">Compras</text>
+          <text class="sub" x="385" y="344">Pedido → Compra</text>
+          <text class="sub" x="385" y="360">Devolución a proveedor</text>
+
+          <!-- kardex y finanzas -->
+          <rect class="node key" x="560" y="192" width="170" height="72" rx="6"/>
+          <text class="ttl" x="645" y="220">Kardex</text>
+          <text class="sub" x="645" y="238">el único punto que</text>
+          <text class="sub" x="645" y="254">mueve el stock</text>
+          <rect class="node" x="560" y="86" width="170" height="56" rx="6"/>
+          <text class="ttl" x="645" y="111">Cuentas por cobrar</text>
+          <text class="sub" x="645" y="128">pagos de clientes</text>
+          <rect class="node" x="560" y="316" width="170" height="56" rx="6"/>
+          <text class="ttl" x="645" y="341">Cuentas por pagar</text>
+          <text class="sub" x="645" y="358">pagos a proveedores</text>
+
+          <!-- fiscal -->
+          <rect class="node fiscal" x="806" y="72" width="158" height="52" rx="6"/>
+          <text class="ttl" x="885" y="94">Secuencias NCF</text>
+          <text class="mono" x="885" y="112">B01 · B02 · E31 · E32…</text>
+          <rect class="node fiscal" x="806" y="160" width="158" height="58" rx="6"/>
+          <text class="ttl" x="885" y="184">Envío e-CF</text>
+          <text class="sub" x="885" y="202">cola → PAC → DGII</text>
+          <rect class="node fiscal" x="806" y="300" width="158" height="58" rx="6"/>
+          <text class="ttl" x="885" y="324">Reportes DGII</text>
+          <text class="mono" x="885" y="342">606 · 607 · 608</text>
+        </svg>
+      </div>
+      <figcaption>Las flechas ámbar son el rastro fiscal. Las azules son operación. Todo lo de este mapa está separado por empresa: cada empresa ve solo sus registros, sus roles y sus secuencias.</figcaption>
+    </figure>
+    <ul class="rules">
+      <li><strong>Multiempresa:</strong> cada tabla de negocio lleva <code>empresa_id</code>, y los roles (Administrador, Vendedor, Almacenista) son propios de cada empresa.</li>
+      <li><strong>Stock:</strong> solo <code>InventarioService</code> lo mueve. Bloquea la fila del producto y nunca deja el stock en negativo.</li>
+      <li><strong>Módulos:</strong> cada empresa activa los que usa (Caja, Compras, CxC, e-CF…). Lo que no tiene activo no aparece en el menú.</li>
+      <li><strong>Avisos:</strong> stock bajo, NCF por agotarse, e-CF rechazado y cuentas vencidas llegan a quien tenga el permiso correspondiente.</li>
+    </ul>
+  </section>
+
+  <!-- 2. VENTA -->
+  <section id="venta">
+    <h2>Venta</h2>
+    <p>Desde que el cajero abre la caja hasta que la DGII responde. Lo importante es el orden: primero se valida, después se toma el NCF, y si algo falla dentro de la transacción no se pierde ningún número.</p>
+    <figure>
+      <div class="canvas w-800">
+        <svg viewBox="0 0 800 1050" role="img" aria-label="Flujo de una venta: abrir caja, agregar productos, elegir cliente y comprobante, validar, asignar NCF, guardar y descontar stock, abrir cuenta por cobrar si es a crédito, imprimir, y si es electrónico enviarlo por cola al PAC y la DGII, que responde aceptado, aceptado condicional, RFCE o rechazado.">
+          <defs>
+            <marker id="a2" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="currentColor"/></marker>
+            <marker id="a2f" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="arrow-f" d="M0 0 L10 5 L0 10 z"/></marker>
+          </defs>
+
+          <!-- edges -->
+          <path class="edge" d="M300 72 V100" marker-end="url(#a2)"/>
+          <path class="edge" d="M300 152 V180" marker-end="url(#a2)"/>
+          <path class="edge" d="M300 232 V260" marker-end="url(#a2)"/>
+          <path class="edge" d="M420 300 H520" marker-end="url(#a2)"/>
+          <path class="edge" d="M300 340 V372" marker-end="url(#a2)"/>
+          <path class="edge" d="M300 424 V452" marker-end="url(#a2)"/>
+          <path class="edge" d="M300 504 V524" marker-end="url(#a2)"/>
+          <path class="edge" d="M400 560 H520" marker-end="url(#a2)"/>
+          <path class="edge" d="M300 596 V630" marker-end="url(#a2)"/>
+          <path class="edge" d="M650 586 V656 H450" marker-end="url(#a2)"/>
+          <path class="edge" d="M300 682 V702" marker-end="url(#a2)"/>
+          <path class="edge" d="M420 740 H520" marker-end="url(#a2)"/>
+          <path class="edge fiscal" d="M300 778 V810" marker-end="url(#a2f)"/>
+          <path class="edge fiscal" d="M300 862 V890" marker-end="url(#a2f)"/>
+          <path class="edge fiscal" d="M300 942 V960"/>
+          <path class="edge fiscal" d="M105 960 H651"/>
+          <path class="edge fiscal" d="M105 960 V980" marker-end="url(#a2f)"/>
+          <path class="edge fiscal" d="M287 960 V980" marker-end="url(#a2f)"/>
+          <path class="edge fiscal" d="M469 960 V980" marker-end="url(#a2f)"/>
+          <path class="edge fiscal" d="M651 960 V980" marker-end="url(#a2f)"/>
+
+          <text class="lbl" x="470" y="300">no</text>
+          <text class="lbl" x="300" y="356">sí</text>
+          <text class="lbl" x="460" y="560">sí</text>
+          <text class="lbl" x="300" y="612">no</text>
+          <text class="lbl" x="550" y="656">luego</text>
+          <text class="lbl" x="470" y="740">no</text>
+          <text class="lbl" x="300" y="794">sí</text>
+          <text class="lbl" x="196" y="960">estado fiscal</text>
+
+          <!-- transaction bracket -->
+          <path class="bracket" d="M142 372 H124 V596 H142"/>
+          <text class="bracket-lbl" x="110" y="484" transform="rotate(-90 110 484)">una sola transacción</text>
+
+          <!-- main column -->
+          <rect class="node key" x="150" y="20" width="300" height="52" rx="6"/>
+          <text class="ttl" x="300" y="42">Abrir caja</text>
+          <text class="sub" x="300" y="59">arqueo con fondo inicial</text>
+
+          <rect class="node" x="150" y="100" width="300" height="52" rx="6"/>
+          <text class="ttl" x="300" y="122">Agregar productos</text>
+          <text class="sub" x="300" y="139">escáner o búsqueda · precio según lista · peso</text>
+
+          <rect class="node" x="150" y="180" width="300" height="52" rx="6"/>
+          <text class="ttl" x="300" y="202">Cliente y comprobante</text>
+          <text class="sub" x="300" y="219">B01 · B02 · E31 · E32 · al portador · sin NCF</text>
+
+          <polygon class="node dec" points="180,300 300,260 420,300 300,340"/>
+          <text class="ttl" x="300" y="297">¿Pasa las</text>
+          <text class="ttl" x="300" y="313">validaciones?</text>
+
+          <rect class="node" x="150" y="372" width="300" height="52" rx="6"/>
+          <text class="ttl" x="300" y="394">Asignar NCF</text>
+          <text class="sub" x="300" y="411">siguiente número de la secuencia</text>
+
+          <rect class="node key" x="150" y="452" width="300" height="52" rx="6"/>
+          <text class="ttl" x="300" y="474">Guardar venta y descontar stock</text>
+          <text class="sub" x="300" y="491">Kardex · si falta stock, se revierte todo</text>
+
+          <polygon class="node dec" points="200,560 300,524 400,560 300,596"/>
+          <text class="ttl" x="300" y="565">¿A crédito?</text>
+
+          <rect class="node" x="150" y="630" width="300" height="52" rx="6"/>
+          <text class="ttl" x="300" y="652">Imprimir</text>
+          <text class="sub" x="300" y="669">ticket térmico o comprobante</text>
+
+          <polygon class="node dec" points="180,740 300,702 420,740 300,778"/>
+          <text class="ttl" x="300" y="737">¿Comprobante</text>
+          <text class="ttl" x="300" y="753">electrónico?</text>
+
+          <rect class="node fiscal" x="150" y="810" width="300" height="52" rx="6"/>
+          <text class="ttl" x="300" y="832">Cola de envío</text>
+          <text class="sub" x="300" y="849">sale después del commit · no frena el cobro</text>
+
+          <rect class="node fiscal" x="150" y="890" width="300" height="52" rx="6"/>
+          <text class="ttl" x="300" y="912">PAC → DGII</text>
+          <text class="sub" x="300" y="929">firma, envía y consulta el estado</text>
+
+          <!-- side column -->
+          <rect class="node stop" x="520" y="274" width="260" height="52" rx="6"/>
+          <text class="ttl" x="650" y="296">Se rechaza la venta</text>
+          <text class="sub" x="650" y="313">no se consume ningún NCF</text>
+
+          <rect class="node" x="520" y="534" width="260" height="52" rx="6"/>
+          <text class="ttl" x="650" y="556">Abrir cuenta por cobrar</text>
+          <text class="sub" x="650" y="573">a nombre del cliente</text>
+
+          <rect class="node" x="520" y="714" width="260" height="52" rx="6"/>
+          <text class="ttl" x="650" y="736">Listo</text>
+          <text class="sub" x="650" y="753">tipo B o sin NCF: no se transmite</text>
+
+          <!-- results -->
+          <rect class="node ok" x="20" y="980" width="170" height="56" rx="6"/>
+          <text class="ttl" x="105" y="1002">Aceptado</text>
+          <text class="sub" x="105" y="1020">válido ante la DGII</text>
+          <rect class="node ok" x="202" y="980" width="170" height="56" rx="6"/>
+          <text class="ttl" x="287" y="1002">Aceptado condicional</text>
+          <text class="sub" x="287" y="1020">válido, con observaciones</text>
+          <rect class="node fiscal" x="384" y="980" width="170" height="56" rx="6"/>
+          <text class="ttl" x="469" y="1002">RFCE</text>
+          <text class="sub" x="469" y="1020">consumo bajo el umbral</text>
+          <rect class="node stop" x="566" y="980" width="170" height="56" rx="6"/>
+          <text class="ttl" x="651" y="1002">Rechazado</text>
+          <text class="sub" x="651" y="1020">avisa a quien tenga permiso</text>
+        </svg>
+      </div>
+      <figcaption>La línea punteada marca la transacción: si falla el stock o la cuenta por cobrar, se deshace también el NCF. El envío a la DGII sale después, por cola, así que el cliente se lleva su ticket aunque el PAC tarde.</figcaption>
+    </figure>
+    <ul class="rules">
+      <li><strong>Crédito fiscal</strong> (<code>B01</code>/<code>E31</code>) siempre exige RNC. <strong>Consumo</strong> lo exige a partir del umbral.</li>
+      <li><strong>Venta a crédito</strong> exige cliente: una deuda al portador no se puede cobrar.</li>
+      <li><strong>Tipos de compra</strong> (<code>41</code>, <code>43</code>, <code>47</code>) no se pueden usar en una venta, aunque se manipule el formulario.</li>
+      <li><strong>Empresa sin e-CF:</strong> solo emite tipo B y nunca transmite al PAC.</li>
+    </ul>
+  </section>
+
+  <!-- 3. COMPRA -->
+  <section id="compra">
+    <h2>Compra</h2>
+    <p>El stock bajo dispara el pedido. Cuando llega la mercancía se pulsa <strong>Recibir</strong> en el pedido: la compra se abre ya llena con el proveedor y las líneas, se le pone el NCF y entra al Kardex con su costo.</p>
+    <figure>
+      <div class="canvas w-1000">
+        <svg viewBox="0 0 1000 364" role="img" aria-label="Flujo de una compra: stock bajo genera un pedido; al llegar, si el proveedor es formal se registra su NCF y si es informal se genera un NCF 41; la mercancía entra al Kardex y actualiza el costo; a crédito abre una cuenta por pagar que se salda con pagos; una devolución saca del Kardex y reduce el saldo.">
+          <defs>
+            <marker id="a3" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="currentColor"/></marker>
+          </defs>
+
+          <path class="edge" d="M160 86 H220" marker-end="url(#a3)"/>
+          <path class="edge" d="M380 86 H430" marker-end="url(#a3)"/>
+          <path class="edge" d="M520 46 V30 H650" marker-end="url(#a3)"/>
+          <path class="edge" d="M520 126 V142 H650" marker-end="url(#a3)"/>
+          <path class="edge" d="M820 30 H838 V78 H856" marker-end="url(#a3)"/>
+          <path class="edge" d="M820 142 H838 V94 H856" marker-end="url(#a3)"/>
+          <path class="edge" d="M924 112 V196" marker-end="url(#a3)"/>
+          <path class="edge" d="M854 230 H770" marker-end="url(#a3)"/>
+          <path class="edge" d="M600 230 H550" marker-end="url(#a3)"/>
+          <path class="edge" d="M924 264 V300" marker-end="url(#a3)"/>
+          <path class="edge" d="M550 326 H685 V256" marker-end="url(#a3)"/>
+
+          <text class="lbl" x="190" y="86">genera</text>
+          <text class="lbl" x="405" y="86">Recibir</text>
+          <text class="lbl" x="585" y="30">sí</text>
+          <text class="lbl" x="585" y="142">no</text>
+          <text class="lbl" x="812" y="230">sí</text>
+          <text class="lbl" x="575" y="230">paga</text>
+          <text class="lbl" x="924" y="282">no</text>
+          <text class="lbl" x="620" y="326">reduce el saldo</text>
+
+          <rect class="node" x="20" y="60" width="140" height="52" rx="6"/>
+          <text class="ttl" x="90" y="82">Stock bajo</text>
+          <text class="sub" x="90" y="99">alerta por producto</text>
+
+          <rect class="node" x="220" y="60" width="160" height="52" rx="6"/>
+          <text class="ttl" x="300" y="82">Pedido de compra</text>
+          <text class="sub" x="300" y="99">se envía al proveedor</text>
+
+          <polygon class="node dec" points="430,86 520,46 610,86 520,126"/>
+          <text class="ttl" x="520" y="83">¿Proveedor</text>
+          <text class="ttl" x="520" y="99">formal?</text>
+
+          <rect class="node" x="650" y="4" width="170" height="52" rx="6"/>
+          <text class="ttl" x="735" y="26">Registra su NCF</text>
+          <text class="sub" x="735" y="43">el que entregó el proveedor</text>
+
+          <rect class="node fiscal" x="650" y="116" width="170" height="52" rx="6"/>
+          <text class="ttl" x="735" y="138">Genera NCF 41</text>
+          <text class="sub" x="735" y="155">comprobante de compras</text>
+
+          <rect class="node key" x="856" y="60" width="136" height="52" rx="6"/>
+          <text class="ttl" x="924" y="82">Entra al Kardex</text>
+          <text class="sub" x="924" y="99">actualiza el costo</text>
+
+          <polygon class="node dec" points="854,230 924,196 994,230 924,264"/>
+          <text class="ttl" x="924" y="234">¿A crédito?</text>
+
+          <rect class="node" x="600" y="204" width="170" height="52" rx="6"/>
+          <text class="ttl" x="685" y="226">Cuenta por pagar</text>
+          <text class="sub" x="685" y="243">vence según la condición</text>
+
+          <rect class="node" x="380" y="204" width="170" height="52" rx="6"/>
+          <text class="ttl" x="465" y="226">Pago al proveedor</text>
+          <text class="sub" x="465" y="243">abona o salda la cuenta</text>
+
+          <rect class="node" x="854" y="300" width="140" height="44" rx="6"/>
+          <text class="ttl" x="924" y="327">Pagada al contado</text>
+
+          <rect class="node" x="380" y="300" width="170" height="52" rx="6"/>
+          <text class="ttl" x="465" y="322">Devolución</text>
+          <text class="sub" x="465" y="339">sale del Kardex</text>
+        </svg>
+      </div>
+      <figcaption>Un proveedor informal no emite comprobante, así que el sistema le genera uno con la secuencia <span class="code">41</span>. Todas las compras con NCF del mes, menos las anuladas, van al Reporte 606.</figcaption>
+    </figure>
+    <ul class="rules">
+      <li><strong>Pedido recibido:</strong> la compra queda ligada al pedido y este pasa a Recibido. Si se anula la compra, el pedido vuelve a Pendiente.</li>
+      <li><strong>Costo vigente:</strong> el de la línea de compra más reciente, sin ITBIS.</li>
+      <li><strong>Catálogo:</strong> comprarle a un proveedor lo vincula al producto. El primero queda como proveedor principal.</li>
+      <li><strong>Cálculos:</strong> compras y devoluciones usan aritmética exacta (bcmath), sin errores de redondeo por acumulación.</li>
+    </ul>
+  </section>
+
+  <!-- 4. ANULACIÓN -->
+  <section id="anulacion">
+    <h2>Anulación de una venta</h2>
+    <p>Depende del tipo de comprobante. Uno físico se anula con un motivo que va al 608. Uno electrónico no se anula directamente: se emite una nota de crédito que lo cancela ante la DGII.</p>
+    <figure>
+      <div class="canvas w-1000">
+        <svg viewBox="0 0 1000 290" role="img" aria-label="Anulación: si el comprobante es físico se elige el motivo 608, se anula la venta reponiendo stock y aparece en el Reporte 608; si es electrónico se emite una nota de crédito E34, se transmite a la DGII y se repone el stock.">
+          <defs>
+            <marker id="a4" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="currentColor"/></marker>
+          </defs>
+
+          <path class="edge" d="M170 150 H200" marker-end="url(#a4)"/>
+          <path class="edge" d="M290 110 V56 H430" marker-end="url(#a4)"/>
+          <path class="edge" d="M290 190 V244 H430" marker-end="url(#a4)"/>
+          <path class="edge" d="M620 56 H650" marker-end="url(#a4)"/>
+          <path class="edge" d="M820 56 H850" marker-end="url(#a4)"/>
+          <path class="edge" d="M620 244 H650" marker-end="url(#a4)"/>
+          <path class="edge" d="M820 244 H850" marker-end="url(#a4)"/>
+
+          <text class="lbl" x="360" y="56">físico (B)</text>
+          <text class="lbl" x="360" y="244">electrónico (E)</text>
+
+          <rect class="node" x="20" y="124" width="150" height="52" rx="6"/>
+          <text class="ttl" x="95" y="146">Venta emitida</text>
+          <text class="sub" x="95" y="163">con NCF asignado</text>
+
+          <polygon class="node dec" points="200,150 290,110 380,150 290,190"/>
+          <text class="ttl" x="290" y="147">¿Tipo de</text>
+          <text class="ttl" x="290" y="163">comprobante?</text>
+
+          <rect class="node" x="430" y="30" width="190" height="52" rx="6"/>
+          <text class="ttl" x="525" y="52">Elegir motivo 608</text>
+          <text class="sub" x="525" y="69">se valida antes de tocar nada</text>
+
+          <rect class="node key" x="650" y="30" width="170" height="52" rx="6"/>
+          <text class="ttl" x="735" y="52">Anula la venta</text>
+          <text class="sub" x="735" y="69">repone stock · cierra la CxC</text>
+
+          <rect class="node fiscal" x="850" y="30" width="140" height="52" rx="6"/>
+          <text class="ttl" x="920" y="52">Reporte 608</text>
+          <text class="sub" x="920" y="69">anulados del mes</text>
+
+          <rect class="node fiscal" x="430" y="218" width="190" height="52" rx="6"/>
+          <text class="ttl" x="525" y="240">Emite nota de crédito</text>
+          <text class="sub" x="525" y="257">secuencia E34 · NCF modificado</text>
+
+          <rect class="node fiscal" x="650" y="218" width="170" height="52" rx="6"/>
+          <text class="ttl" x="735" y="240">Transmite a la DGII</text>
+          <text class="sub" x="735" y="257">misma cola que la venta</text>
+
+          <rect class="node key" x="850" y="218" width="140" height="52" rx="6"/>
+          <text class="ttl" x="920" y="240">Repone stock</text>
+          <text class="sub" x="920" y="257">y cierra la CxC</text>
+        </svg>
+      </div>
+      <figcaption>Para correcciones parciales de un e-CF hay dos documentos más: la nota de crédito parcial (devuelve parte de la venta) y la nota de débito <span class="code">E33</span> (cobra un monto adicional).</figcaption>
+    </figure>
+    <div class="callout ok"><strong>Corregido el 30 de septiembre.</strong> Anular un comprobante tipo B daba error porque el motivo 608 no llegaba dentro de la transacción. Ahora funciona como muestra el diagrama: el motivo se valida primero, contra el catálogo de la DGII, y solo después se repone el stock (commit <code>2bc658a</code>).</div>
+  </section>
+
+  <!-- 5. CAJA -->
+  <section id="caja">
+    <h2>Turno de caja</h2>
+    <p>Cada venta del POS queda ligada al arqueo abierto, y el cierre compara el efectivo contado con lo que el sistema espera.</p>
+    <figure>
+      <div class="canvas w-1000">
+        <svg viewBox="0 0 1000 120" role="img" aria-label="Turno de caja: abrir caja con fondo inicial, registrar las ventas del turno, cerrar contando el efectivo y obtener la diferencia, sobrante o faltante.">
+          <defs>
+            <marker id="a5" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="currentColor"/></marker>
+          </defs>
+          <path class="edge" d="M210 60 H270" marker-end="url(#a5)"/>
+          <path class="edge" d="M470 60 H530" marker-end="url(#a5)"/>
+          <path class="edge" d="M730 60 H790" marker-end="url(#a5)"/>
+          <text class="lbl" x="240" y="60">vende</text>
+          <text class="lbl" x="500" y="60">fin de turno</text>
+          <text class="lbl" x="760" y="60">compara</text>
+
+          <rect class="node key" x="20" y="32" width="190" height="56" rx="6"/>
+          <text class="ttl" x="115" y="56">Abrir caja</text>
+          <text class="sub" x="115" y="74">fondo inicial · un turno por caja</text>
+          <rect class="node" x="270" y="32" width="200" height="56" rx="6"/>
+          <text class="ttl" x="370" y="56">Ventas del turno</text>
+          <text class="sub" x="370" y="74">quedan ligadas al arqueo</text>
+          <rect class="node" x="530" y="32" width="200" height="56" rx="6"/>
+          <text class="ttl" x="630" y="56">Cerrar caja</text>
+          <text class="sub" x="630" y="74">se cuenta el efectivo</text>
+          <rect class="node" x="790" y="32" width="190" height="56" rx="6"/>
+          <text class="ttl" x="885" y="56">Diferencia</text>
+          <text class="sub" x="885" y="74">sobrante o faltante</text>
+        </svg>
+      </div>
+      <figcaption>Normalmente cierra la caja el mismo cajero que la abrió. Un Administrador puede cerrar la de otro cajero, por ejemplo si alguien se fue sin cerrar.</figcaption>
+    </figure>
+  </section>
+
+  <!-- 6. POR DECIDIR -->
+  <section id="decidir">
+    <h2>Por decidir</h2>
+    <p>Puntos donde el sistema actual y lo que queremos todavía no coinciden, o donde falta una decisión del equipo.</p>
+    <ol class="todo">
+      <li><strong>Notas de crédito y débito físicas (B04 y B03)</strong><span>Hoy solo existen las electrónicas (E34 y E33). Una empresa que factura en tipo B no tiene cómo hacer una devolución parcial. ¿Las agregamos?</span></li>
+      <li><strong>Envío de e-CF en producción</strong><span>La cola depende de un worker que hoy se arranca a mano. En producción necesita un supervisor que lo mantenga vivo; si se cae, los e-CF se quedan pendientes. Falta definir en qué servidor va a correr.</span></li>
+      <li><strong>Recepción parcial de pedidos</strong><span>Hoy, si llega menos de lo pedido, el pedido se cierra igual. ¿Debe quedar abierto por lo que falta?</span></li>
+    </ol>
+    <h3>Resuelto</h3>
+    <ol class="todo">
+      <li class="done"><strong>Anulación de tipo B</strong><span>El motivo 608 se valida antes de reponer stock y ya no da error. Commit <span class="code">2bc658a</span>.</span></li>
+      <li class="done"><strong>Del pedido a la compra</strong><span>El botón Recibir crea la compra prellenada y la deja ligada al pedido. Commit <span class="code">35d20df</span>.</span></li>
+    </ol>
+  </section>
+</div>
+
+</body>
+</html>
