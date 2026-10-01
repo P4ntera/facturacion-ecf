@@ -9,5 +9,6 @@ enum OrigenMovimiento: string
     case AJUSTE            = 'ajuste';
     case ANULACION         = 'anulacion';
     case DEVOLUCION_COMPRA = 'devolucion_compra';
-    case DEVOLUCION_VENTA  = 'devolucion_venta';
+    case DEVOLUCION_VENTA      = 'devolucion_venta';
+    case RECEPCION_ORDEN_COMPRA = 'recepcion_orden_compra';
 }

@@ -17,6 +17,7 @@ use App\Filament\Resources\ArqueoCajaResource;
 use App\Filament\Resources\CajaResource;
 use App\Filament\Resources\CajaResource\Pages\CreateCaja;
 use App\Filament\Resources\ClienteResource;
+use App\Filament\Resources\CompraResource\Pages\CreateCompra;
 use App\Filament\Resources\DescuentoResource;
 use App\Filament\Resources\DescuentoResource\Pages\CreateDescuento;
 use App\Filament\Resources\EmpresaResource;
@@ -964,5 +965,53 @@ class AislamientoEntreEmpresasTest extends TestCase
 
         $this->assertEquals(1, $secuenciaNcTobogan->fresh()->secuencia_actual);
         $this->assertSame(EstadoVenta::EMITIDA, $venta->fresh()->estado);
+    }
+
+    /**
+     * 27. Recibir un pedido de compra: una empresa no puede recibir el pedido de OTRA, ni
+     * manipulando el pedido_compra_id que llega al service, ni abriendo el formulario con
+     * ?pedido={id} de la otra empresa (no se prellena nada).
+     */
+    public function test_27_no_se_puede_recibir_un_pedido_de_compra_de_otra_empresa(): void
+    {
+        ['empresa' => $empresaA, 'admin' => $adminA, 'producto' => $productoA, 'proveedor' => $proveedorA] =
+            $this->crearEmpresaConDatos('Empresa A', '131000001');
+        ['empresa' => $empresaTobogan, 'admin' => $adminTobogan, 'producto' => $productoTobogan, 'proveedor' => $proveedorTobogan] =
+            $this->crearEmpresaConDatos('Tobogán', '131000002');
+
+        $this->comoEmpresa($empresaTobogan);
+        $pedidoTobogan = app(PedidoCompraService::class)->crear([
+            'proveedor_id' => $proveedorTobogan->id,
+            'fecha' => now(),
+            'notas' => null,
+            'lineas' => [['producto_id' => $productoTobogan->id, 'cantidad' => 3, 'costo_unitario' => 50]],
+        ], $adminTobogan->id, $empresaTobogan);
+
+        $this->comoEmpresa($empresaA);
+
+        try {
+            app(CompraService::class)->crear([
+                'proveedor_id' => $proveedorA->id,
+                'pedido_compra_id' => $pedidoTobogan->id,
+                'tipo_comprobante' => TipoComprobante::FACTURA_CREDITO_FISCAL_FISICA,
+                'ncf' => 'B0100000001',
+                'fecha' => now(),
+                'itbis_incluido' => false,
+                'lineas' => [['producto_id' => $productoA->id, 'cantidad' => 1, 'costo_unitario' => 50]],
+            ], $adminA->id, $empresaA);
+            $this->fail('Debió rechazar el pedido de otra empresa.');
+        } catch (RuntimeException $e) {
+            $this->assertStringContainsString('no existe', $e->getMessage());
+        }
+
+        $this->assertDatabaseMissing('compras', ['empresa_id' => $empresaA->id]);
+        $this->assertTrue($pedidoTobogan->fresh()->estaPendiente());
+
+        Livewire::actingAs($adminA)
+            ->withQueryParams(['pedido' => $pedidoTobogan->id])
+            ->test(CreateCompra::class)
+            ->assertSet('data.pedido_compra_id', null)
+            ->assertSet('data.proveedor_id', null)
+            ->assertNotified('El pedido de compra no existe o ya no está pendiente.');
     }
 }

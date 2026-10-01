@@ -2,11 +2,13 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\EstadoCompra;
 use App\Enums\EstadoPedidoCompra;
 use App\Enums\Modulo;
 use App\Filament\Concerns\RestringidoPorModulo;
 use App\Filament\Resources\PedidoCompraResource\Pages;
 use App\Mail\PedidoCompraEnviado;
+use App\Models\Compra;
 use App\Models\PedidoCompra;
 use App\Models\Producto;
 use App\Services\PedidoCompraService;
@@ -238,11 +240,8 @@ class PedidoCompraResource extends Resource
                     TextEntry::make('proveedor.nombre')->label('Proveedor'),
                     TextEntry::make('fecha')->label('Fecha')->dateTime('d/m/Y H:i'),
                     TextEntry::make('estado')->label('Estado')->badge()
-                        ->formatStateUsing(fn (EstadoPedidoCompra $state) => match ($state) {
-                            EstadoPedidoCompra::PENDIENTE => 'Pendiente',
-                            EstadoPedidoCompra::CANCELADO => 'Cancelado',
-                        })
-                        ->color(fn (EstadoPedidoCompra $state) => $state === EstadoPedidoCompra::CANCELADO ? 'danger' : 'gray'),
+                        ->formatStateUsing(fn (EstadoPedidoCompra $state) => $state->etiqueta())
+                        ->color(fn (EstadoPedidoCompra $state) => $state->color()),
                     TextEntry::make('notas')->label('Notas')->placeholder('—')->columnSpanFull(),
                     TextEntry::make('enviado_en')->label('Enviado el')->dateTime('d/m/Y H:i')
                         ->visible(fn (PedidoCompra $record) => $record->fueEnviado()),
@@ -253,6 +252,12 @@ class PedidoCompraResource extends Resource
                     TextEntry::make('total')->label('Total')->money('DOP'),
                     TextEntry::make('motivo_cancelacion')->label('Motivo de cancelación')->placeholder('—')
                         ->visible(fn (PedidoCompra $record) => $record->estaCancelado()),
+                    TextEntry::make('recibido_en')->label('Recibido el')->dateTime('d/m/Y H:i')
+                        ->visible(fn (PedidoCompra $record) => $record->estaRecibido()),
+                    TextEntry::make('compra_recibida')->label('Compra')
+                        ->state(fn (PedidoCompra $record) => ($compra = self::compraVigente($record)) ? "Compra #{$compra->id}".($compra->ncf ? " · {$compra->ncf}" : '') : null)
+                        ->url(fn (PedidoCompra $record) => ($compra = self::compraVigente($record)) ? CompraResource::getUrl('view', ['record' => $compra]) : null)
+                        ->visible(fn (PedidoCompra $record) => $record->estaRecibido()),
                 ]),
 
             RepeatableEntry::make('detalles')
@@ -298,11 +303,8 @@ class PedidoCompraResource extends Resource
                 TextColumn::make('estado')
                     ->label('Estado')
                     ->badge()
-                    ->formatStateUsing(fn (EstadoPedidoCompra $state) => match ($state) {
-                        EstadoPedidoCompra::PENDIENTE => 'Pendiente',
-                        EstadoPedidoCompra::CANCELADO => 'Cancelado',
-                    })
-                    ->color(fn (EstadoPedidoCompra $state) => $state === EstadoPedidoCompra::CANCELADO ? 'danger' : 'gray'),
+                    ->formatStateUsing(fn (EstadoPedidoCompra $state) => $state->etiqueta())
+                    ->color(fn (EstadoPedidoCompra $state) => $state->color()),
 
                 IconColumn::make('enviado')
                     ->label('Enviado')
@@ -323,10 +325,7 @@ class PedidoCompraResource extends Resource
 
                 SelectFilter::make('estado')
                     ->label('Estado')
-                    ->options([
-                        EstadoPedidoCompra::PENDIENTE->value => 'Pendiente',
-                        EstadoPedidoCompra::CANCELADO->value => 'Cancelado',
-                    ]),
+                    ->options(collect(EstadoPedidoCompra::cases())->mapWithKeys(fn (EstadoPedidoCompra $estado) => [$estado->value => $estado->etiqueta()])->all()),
 
                 Filter::make('fecha')
                     ->schema([
@@ -342,6 +341,16 @@ class PedidoCompraResource extends Resource
             ->recordActions([
                 ViewAction::make(),
 
+                // Abre el formulario de compra prellenado con el proveedor y las líneas del
+                // pedido (ver CreateCompra::mount()). La compra queda ligada al pedido y lo marca
+                // RECIBIDO al guardarse.
+                Action::make('recibir')
+                    ->label('Recibir')
+                    ->icon('heroicon-o-inbox-arrow-down')
+                    ->color('success')
+                    ->visible(fn (PedidoCompra $record): bool => $record->estaPendiente() && (auth()->user()?->can('compras.crear') ?? false))
+                    ->url(fn (PedidoCompra $record) => CompraResource::getUrl('create', ['pedido' => $record->id])),
+
                 Action::make('descargarPdf')
                     ->label('Descargar PDF')
                     ->icon('heroicon-o-document-arrow-down')
@@ -352,7 +361,7 @@ class PedidoCompraResource extends Resource
                     ->label('Enviar por correo')
                     ->icon('heroicon-o-envelope')
                     ->color('gray')
-                    ->visible(fn (PedidoCompra $record): bool => ! $record->estaCancelado() && (auth()->user()?->can('compras.crear') ?? false))
+                    ->visible(fn (PedidoCompra $record): bool => $record->estaPendiente() && (auth()->user()?->can('compras.crear') ?? false))
                     ->schema([
                         TextInput::make('email')
                             ->label('Correo del proveedor')
@@ -378,7 +387,7 @@ class PedidoCompraResource extends Resource
                     ->icon('heroicon-o-x-circle')
                     ->color('danger')
                     ->requiresConfirmation()
-                    ->visible(fn (PedidoCompra $record): bool => ! $record->estaCancelado() && (auth()->user()?->can('compras.anular') ?? false))
+                    ->visible(fn (PedidoCompra $record): bool => $record->estaPendiente() && (auth()->user()?->can('compras.anular') ?? false))
                     ->schema([
                         Textarea::make('motivo')
                             ->label('Motivo de cancelación')
@@ -398,6 +407,12 @@ class PedidoCompraResource extends Resource
                     }),
             ])
             ->defaultSort('fecha', 'desc');
+    }
+
+    /** La compra no anulada que recibió el pedido (si se anuló, el pedido ya volvió a pendiente). */
+    private static function compraVigente(PedidoCompra $pedido): ?Compra
+    {
+        return $pedido->compras()->where('estado', '!=', EstadoCompra::ANULADA)->latest('id')->first();
     }
 
     public static function getPages(): array

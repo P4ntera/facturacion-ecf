@@ -27,9 +27,11 @@ class ReporteFiscal606 extends ReportePage
 {
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedDocumentText;
 
+    protected static string|\UnitEnum|null $navigationGroup = 'Fiscales';
+
     protected static ?string $navigationLabel = 'Fiscal 606';
 
-    protected static ?int $navigationSort = 54;
+    protected static ?int $navigationSort = 60;
 
     protected static ?string $title = 'Formato 606 — Compras de bienes y servicios';
 

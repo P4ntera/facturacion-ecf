@@ -122,12 +122,35 @@ class NotaCreditoAnulacionTest extends TestCase
         $this->secuencia(TipoComprobante::FACTURA_CONSUMO_FISICA, 'B02');
         $venta = $this->vender(['tipo_comprobante' => TipoComprobante::FACTURA_CONSUMO_FISICA->value]);
 
-        $anulada = app(VentaService::class)->anular($venta, 'Devolución');
+        $anulada = app(VentaService::class)->anular($venta, 'Devolución', null, '06');
 
         $this->assertSame(EstadoVenta::ANULADA, $anulada->estado);
         $this->assertSame(EstadoFiscal::NO_APLICA, $anulada->estado_fiscal);
+        $this->assertSame('06', $anulada->tipo_anulacion_608);
         $this->assertEquals(100, (float) $this->producto->fresh()->stock);
         $this->assertSame(0, $this->notasCredito());
+    }
+
+    /**
+     * Tipo B sin tipo de anulación 608 (o con un código fuera del catálogo DGII): se rechaza
+     * ANTES de tocar nada — la venta sigue emitida y el stock no se repone.
+     */
+    public function test_anular_tipo_b_sin_tipo_608_valido_se_rechaza_sin_tocar_stock(): void
+    {
+        $this->secuencia(TipoComprobante::FACTURA_CONSUMO_FISICA, 'B02');
+        $venta = $this->vender(['tipo_comprobante' => TipoComprobante::FACTURA_CONSUMO_FISICA->value], 10);
+
+        foreach ([null, '', '99'] as $tipoInvalido) {
+            try {
+                app(VentaService::class)->anular($venta, 'Devolución', null, $tipoInvalido);
+                $this->fail('Debió rechazar el tipo de anulación '.var_export($tipoInvalido, true));
+            } catch (VentaInvalidaException $e) {
+                $this->assertStringContainsString('608', $e->getMessage());
+            }
+        }
+
+        $this->assertSame(EstadoVenta::EMITIDA, $venta->fresh()->estado);
+        $this->assertEquals(90, (float) $this->producto->fresh()->stock);
     }
 
     public function test_anular_ecf_aceptado_emite_nota_de_credito_34(): void
@@ -276,7 +299,7 @@ class NotaCreditoAnulacionTest extends TestCase
         $venta = $this->vender(['tipo_comprobante' => TipoComprobante::FACTURA_CONSUMO_FISICA->value], 10);
         $this->assertEquals(90, (float) $this->producto->fresh()->stock);
 
-        app(VentaService::class)->anular($venta, 'Devolución');
+        app(VentaService::class)->anular($venta, 'Devolución', null, '06');
         $this->assertEquals(100, (float) $this->producto->fresh()->stock);
     }
 

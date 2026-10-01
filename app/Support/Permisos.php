@@ -47,6 +47,14 @@ class Permisos
                 'listas_precio.editar' => 'Editar listas de precio',
                 'listas_precio.desactivar' => 'Activar/Desactivar listas de precio',
             ],
+            'Cotizaciones' => [
+                'cotizaciones.ver' => 'Ver cotizaciones',
+                'cotizaciones.crear' => 'Crear cotizaciones',
+                'cotizaciones.editar' => 'Editar cotizaciones',
+                'cotizaciones.aprobar' => 'Aprobar cotizaciones',
+                'cotizaciones.facturar' => 'Convertir cotización a venta',
+                'cotizaciones.exportar' => 'Exportar cotización a PDF',
+            ],
             'Ventas' => [
                 'pos.acceder' => 'Acceder a Caja (venta rápida)',
                 'facturacion.acceder' => 'Acceder a Facturación (comprobantes avanzados)',
@@ -67,6 +75,13 @@ class Permisos
                 'compras.anular' => 'Anular compras',
                 'devoluciones.ver' => 'Ver devoluciones a proveedor',
                 'devoluciones.crear' => 'Registrar devoluciones a proveedor',
+                'ordenes_compra.ver' => 'Ver órdenes de compra',
+                'ordenes_compra.crear' => 'Crear órdenes de compra',
+                'ordenes_compra.editar' => 'Editar órdenes de compra',
+                'ordenes_compra.aprobar' => 'Aprobar órdenes de compra',
+                'ordenes_compra.recibir' => 'Registrar recepción de mercancía',
+                'ordenes_compra.cancelar' => 'Cancelar órdenes de compra',
+                'ordenes_compra.exportar' => 'Exportar OC a PDF',
             ],
             'Cuentas' => [
                 'cxc.ver' => 'Ver cuentas por cobrar',
@@ -79,6 +94,12 @@ class Permisos
             'Reportes' => [
                 'reportes.ver' => 'Ver reportes',
                 'reportes.exportar' => 'Exportar reportes (PDF/Excel)',
+                'reportes.compras' => 'Ver reporte de compras',
+                'reportes.arqueos' => 'Ver reporte de arqueos',
+                'reportes.kardex' => 'Ver reporte de kardex',
+                'reportes.cxc' => 'Ver reporte de cuentas por cobrar',
+                'reportes.cxp' => 'Ver reporte de cuentas por pagar',
+                'reportes.margen' => 'Ver reporte de margen por producto',
             ],
             'Configuración' => [
                 'empresa.administrar' => 'Administrar datos de la empresa',

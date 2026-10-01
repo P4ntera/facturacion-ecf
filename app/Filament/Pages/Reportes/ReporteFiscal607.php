@@ -27,9 +27,11 @@ class ReporteFiscal607 extends ReportePage
 {
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedDocumentText;
 
+    protected static string|\UnitEnum|null $navigationGroup = 'Fiscales';
+
     protected static ?string $navigationLabel = 'Fiscal 607';
 
-    protected static ?int $navigationSort = 55;
+    protected static ?int $navigationSort = 61;
 
     protected static ?string $title = 'Formato 607 — Envío de ventas';
 

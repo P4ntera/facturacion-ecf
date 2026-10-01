@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Pages\Reportes;
 
+use App\Filament\Clusters\Reportes;
 use Filament\Actions\Action;
 use Filament\Actions\ExportAction;
 use Filament\Actions\Exports\Exporter;
@@ -20,7 +21,9 @@ abstract class ReportePage extends Page implements HasTable
 {
     use InteractsWithTable;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Fiscal';
+    protected static ?string $cluster = Reportes::class;
+
+    protected static string|UnitEnum|null $navigationGroup = 'Operativos';
 
     public static function canAccess(): bool
     {

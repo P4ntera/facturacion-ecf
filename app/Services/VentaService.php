@@ -323,7 +323,7 @@ class VentaService
             throw new VentaInvalidaException('Debe indicar el motivo de la anulación.');
         }
 
-        return DB::transaction(function () use ($venta, $motivo, $userId) {
+        return DB::transaction(function () use ($venta, $motivo, $userId, $tipoAnulacion608) {
             // Bloquea la fila: dos anulaciones simultáneas no pueden emitir dos Notas de Crédito
             // ni reponer el stock dos veces.
             $venta = Venta::query()->lockForUpdate()->findOrFail($venta->id);
@@ -335,6 +335,17 @@ class VentaService
             if ($venta->esNotaCreditoDeAnulacion()) {
                 throw new VentaInvalidaException(
                     "El documento #{$venta->id} es una Nota de Crédito de anulación: no se anula (la venta que anuló ya no se puede revivir)."
+                );
+            }
+
+            // Para comprobantes físicos (tipo B), el tipo de anulación es obligatorio porque va al
+            // Formato 608 de la DGII. Los e-CF no van al 608 (se anulan vía Nota de Crédito E34),
+            // así que no lo necesitan. Se valida antes de tocar CxC o stock, y contra el catálogo
+            // de la DGII: el código viene del formulario y es client-controllable.
+            if ($venta->tipo_comprobante?->esFisico()
+                && ! array_key_exists((string) $tipoAnulacion608, ReporteService::TIPO_ANULACION_608)) {
+                throw new VentaInvalidaException(
+                    'Debe seleccionar un tipo de anulación válido para el reporte 608 (comprobante físico).'
                 );
             }
 
@@ -382,15 +393,6 @@ class VentaService
                         $motivo,
                     );
                 }
-            }
-
-            // Para comprobantes físicos (tipo B), el tipo de anulación es obligatorio
-            // porque va al Formato 608 de la DGII. Los e-CF no van al 608 (se anulan
-            // vía Nota de Crédito E34), así que no lo necesitan.
-            if ($venta->tipo_comprobante?->esFisico() && blank($tipoAnulacion608)) {
-                throw new VentaInvalidaException(
-                    'Debe seleccionar el tipo de anulación para el reporte 608 (comprobante físico).'
-                );
             }
 
             $venta->update([

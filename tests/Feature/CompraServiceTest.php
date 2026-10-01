@@ -335,7 +335,8 @@ class CompraServiceTest extends TestCase
 
     public function test_bcmath_precision_itbis_incluido(): void
     {
-        [$user, $proveedor] = $this->setup();
+        $proveedor = Proveedor::factory()->create();
+        $user = User::factory()->create();
         $producto = $this->crearProducto(['tasa_itbis' => TasaItbis::DIECIOCHO]);
 
         // 33.33 con ITBIS incluido: base = 33.33 / 1.18 = 28.2457...

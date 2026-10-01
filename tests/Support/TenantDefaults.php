@@ -6,13 +6,16 @@ use App\Models\Caja;
 use App\Models\Categoria;
 use App\Models\Cliente;
 use App\Models\Compra;
+use App\Models\Cotizacion;
 use App\Models\Descuento;
 use App\Models\DevolucionCompra;
 use App\Models\Empresa;
 use App\Models\Impresora;
 use App\Models\MovimientoInventario;
+use App\Models\OrdenCompra;
 use App\Models\Producto;
 use App\Models\Proveedor;
+use App\Models\RecepcionCompra;
 use App\Models\SecuenciaNcf;
 use App\Models\User;
 use App\Models\Venta;
@@ -40,6 +43,9 @@ class TenantDefaults
         MovimientoInventario::class,
         Impresora::class,
         DevolucionCompra::class,
+        OrdenCompra::class,
+        RecepcionCompra::class,
+        Cotizacion::class,
         User::class,
         Descuento::class,
         Caja::class,

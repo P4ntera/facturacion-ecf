@@ -78,6 +78,11 @@ class CompraResource extends Resource
                 ->columnSpanFull()
                 ->columns(3)
                 ->schema([
+                    // Lo llena CreateCompra::mount() al venir de "Recibir" en Pedidos de Compra.
+                    // CompraService revalida que el pedido sea de la empresa, del proveedor y
+                    // siga pendiente.
+                    Hidden::make('pedido_compra_id'),
+
                     Select::make('proveedor_id')
                         ->label('Proveedor')
                         // Scope manual obligatorio — Filament NO aplica tenant scope dentro de
@@ -87,6 +92,11 @@ class CompraResource extends Resource
                         ->preload()
                         ->live()
                         ->required()
+                        // Al recibir un pedido el proveedor es el del pedido: dehydrated() porque
+                        // un campo disabled no viaja en el submit por defecto.
+                        ->disabled(fn (Get $get): bool => filled($get('pedido_compra_id')))
+                        ->dehydrated()
+                        ->helperText(fn (Get $get): ?string => filled($get('pedido_compra_id')) ? "Recibiendo el pedido de compra #{$get('pedido_compra_id')}." : null)
                         ->createOptionForm([
                             TextInput::make('rnc')
                                 ->label('RNC / Cédula')
@@ -459,6 +469,10 @@ class CompraResource extends Resource
                             EstadoCompra::ANULADA => 'Anulada',
                         })
                         ->color(fn (EstadoCompra $state) => $state === EstadoCompra::ANULADA ? 'danger' : 'success'),
+                    TextEntry::make('pedido_compra_id')->label('Pedido de compra')
+                        ->formatStateUsing(fn ($state) => "Pedido #{$state}")
+                        ->url(fn (Compra $record) => $record->pedido_compra_id ? PedidoCompraResource::getUrl('view', ['record' => $record->pedido_compra_id]) : null)
+                        ->visible(fn (Compra $record) => $record->pedido_compra_id !== null),
                     TextEntry::make('subtotal')->label('Subtotal')->money('DOP'),
                     TextEntry::make('itbis')->label('ITBIS')->money('DOP'),
                     TextEntry::make('total')->label('Total')->money('DOP'),

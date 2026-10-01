@@ -5,6 +5,7 @@ namespace App\Filament\Resources\CompraResource\Pages;
 use App\Enums\TipoComprobante;
 use App\Exceptions\StockInsuficienteException;
 use App\Filament\Resources\CompraResource;
+use App\Models\PedidoCompra;
 use App\Services\CompraService;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
@@ -14,11 +15,54 @@ use Filament\Support\Exceptions\Halt;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
+use Livewire\Attributes\Url;
 use RuntimeException;
 
 class CreateCompra extends CreateRecord
 {
     protected static string $resource = CompraResource::class;
+
+    /** ?pedido={id}: viene de "Recibir" en Pedidos de Compra. */
+    #[Url(as: 'pedido')]
+    public ?string $pedidoId = null;
+
+    public function mount(): void
+    {
+        parent::mount();
+
+        if (blank($this->pedidoId)) {
+            return;
+        }
+
+        // El id viene de la URL: solo pedidos pendientes de la empresa activa. Si no aplica, se
+        // avisa y queda el formulario vacío en vez de prellenar con datos ajenos.
+        $pedido = PedidoCompra::query()
+            ->where('empresa_id', Filament::getTenant()->id)
+            ->with('detalles')
+            ->find($this->pedidoId);
+
+        if ($pedido === null || ! $pedido->estaPendiente()) {
+            Notification::make()->title('El pedido de compra no existe o ya no está pendiente.')->warning()->send();
+
+            return;
+        }
+
+        $lineas = [];
+        foreach ($pedido->detalles as $detalle) {
+            $lineas[(string) Str::uuid()] = [
+                'producto_id'    => $detalle->producto_id,
+                'cantidad'       => (float) $detalle->cantidad,
+                'costo_unitario' => (float) $detalle->costo_unitario,
+            ];
+        }
+
+        $this->form->fill([
+            ...$this->data,
+            'pedido_compra_id' => $pedido->id,
+            'proveedor_id'     => $pedido->proveedor_id,
+            'lineas'           => $lineas,
+        ]);
+    }
 
     protected function getRedirectUrl(): string
     {
@@ -89,6 +133,7 @@ class CreateCompra extends CreateRecord
         try {
             return app(CompraService::class)->crear([
                 'proveedor_id'         => $data['proveedor_id'],
+                'pedido_compra_id'     => $data['pedido_compra_id'] ?? null,
                 'tipo_comprobante'     => filled($data['tipo_comprobante'] ?? null) ? TipoComprobante::from($data['tipo_comprobante']) : null,
                 'ncf'                  => $data['ncf'] ?? null,
                 'fecha'                => $data['fecha'],
