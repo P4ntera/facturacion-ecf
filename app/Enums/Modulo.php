@@ -20,6 +20,8 @@ enum Modulo: string
     case MAESTROS_DESCUENTOS = 'maestros_descuentos';
     case MAESTROS_LISTAS_PRECIO = 'maestros_listas_precio';
 
+    case COTIZACIONES = 'cotizaciones';
+
     case VENTAS_POS = 'ventas_pos';
     case VENTAS_LISTADO = 'ventas_listado';
     case VENTAS_ARQUEO_CAJA = 'ventas_arqueo_caja';
@@ -50,6 +52,7 @@ enum Modulo: string
             self::MAESTROS_CATEGORIAS => 'Categorías',
             self::MAESTROS_DESCUENTOS => 'Descuentos',
             self::MAESTROS_LISTAS_PRECIO => 'Listas de Precio',
+            self::COTIZACIONES => 'Cotizaciones',
             self::VENTAS_POS => 'Punto de Venta',
             self::VENTAS_LISTADO => 'Ventas',
             self::VENTAS_ARQUEO_CAJA => 'Arqueos de Caja',
@@ -75,6 +78,8 @@ enum Modulo: string
             self::MAESTROS_CLIENTES, self::MAESTROS_PROVEEDORES,
             self::MAESTROS_PRODUCTOS, self::MAESTROS_CATEGORIAS,
             self::MAESTROS_DESCUENTOS, self::MAESTROS_LISTAS_PRECIO => 'Maestros',
+
+            self::COTIZACIONES => 'Comercial',
 
             self::VENTAS_POS, self::VENTAS_LISTADO, self::VENTAS_ARQUEO_CAJA,
             self::VENTAS_CAJAS => 'Ventas',

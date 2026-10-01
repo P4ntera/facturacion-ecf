@@ -11,7 +11,10 @@ use Filament\Forms\Components\DatePicker;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\Summarizers\Sum;
 use Filament\Tables\Columns\TextColumn;
+use App\Models\Cliente;
+use Filament\Facades\Filament;
 use Filament\Tables\Filters\Filter;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 
 class ReporteVentasPorCliente extends ReportePage
@@ -20,7 +23,7 @@ class ReporteVentasPorCliente extends ReportePage
 
     protected static ?string $navigationLabel = 'Ventas por Cliente';
 
-    protected static ?int $navigationSort = 51;
+    protected static ?int $navigationSort = 41;
 
     protected static ?string $title = 'Ventas por cliente';
 
@@ -57,6 +60,12 @@ class ReporteVentasPorCliente extends ReportePage
                             ->label('Hasta')
                             ->default(fn () => now()->endOfMonth()->toDateString()),
                     ]),
+
+                SelectFilter::make('cliente_id')
+                    ->label('Cliente')
+                    ->options(fn () => Cliente::query()->where('empresa_id', Filament::getTenant()->id)->pluck('nombre', 'id'))
+                    ->searchable()
+                    ->query(fn ($query, array $data) => $query->when($data['value'] ?? null, fn ($q, $v) => $q->where('ventas.cliente_id', $v))),
             ])
             ->defaultSort('total_vendido', 'desc')
             // La consulta agrupa por cliente, no por ventas.id: el desempate por clave

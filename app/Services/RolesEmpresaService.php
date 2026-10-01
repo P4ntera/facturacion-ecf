@@ -60,6 +60,10 @@ class RolesEmpresaService
                 // ventas/compras.
                 'cxc.ver',
                 'cxc.cobrar',
+                'cotizaciones.ver',
+                'cotizaciones.crear',
+                'cotizaciones.editar',
+                'cotizaciones.exportar',
             ]);
 
             $almacenista = Role::firstOrCreate([
@@ -76,6 +80,9 @@ class RolesEmpresaService
                 // de inventario que se reserva al Administrador (regla ya existente y probada).
                 'devoluciones.ver',
                 'devoluciones.crear',
+                'ordenes_compra.ver',
+                'ordenes_compra.crear',
+                'ordenes_compra.recibir',
                 'productos.ver',
                 'productos.crear',
                 'productos.editar',

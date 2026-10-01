@@ -9,6 +9,10 @@ use App\Enums\EstadoVenta;
 use App\Enums\TipoComprobante;
 use App\Enums\TipoDocumentoCliente;
 use App\Models\Compra;
+use App\Models\ArqueoCaja;
+use App\Models\CuentaPorCobrar;
+use App\Models\CuentaPorPagar;
+use App\Models\MovimientoInventario;
 use App\Models\Producto;
 use App\Models\Venta;
 use Illuminate\Database\Eloquent\Builder;
@@ -592,5 +596,88 @@ class ReporteService
     public function productosBajoMinimo(): Collection
     {
         return $this->productosBajoMinimoQuery()->orderBy('nombre')->get();
+    }
+
+    // ──────────────────────────────────────────────────────────────────────
+    // Compras
+    // ──────────────────────────────────────────────────────────────────────
+
+    public function comprasEnRangoQuery(Carbon $desde, Carbon $hasta, ?int $empresaId = null): Builder
+    {
+        return Compra::query()
+            ->whereBetween('fecha', [$desde->copy()->startOfDay(), $hasta->copy()->endOfDay()])
+            ->when($empresaId, fn (Builder $q, int $id) => $q->where('empresa_id', $id))
+            ->with(['proveedor', 'user']);
+    }
+
+    // ──────────────────────────────────────────────────────────────────────
+    // Arqueos de caja
+    // ──────────────────────────────────────────────────────────────────────
+
+    public function arqueosEnRangoQuery(Carbon $desde, Carbon $hasta, ?int $empresaId = null): Builder
+    {
+        return ArqueoCaja::query()
+            ->whereBetween('abierto_en', [$desde->copy()->startOfDay(), $hasta->copy()->endOfDay()])
+            ->when($empresaId, fn (Builder $q, int $id) => $q->where('empresa_id', $id))
+            ->with(['user', 'caja']);
+    }
+
+    // ──────────────────────────────────────────────────────────────────────
+    // Kardex (movimientos de inventario)
+    // ──────────────────────────────────────────────────────────────────────
+
+    public function kardexQuery(Carbon $desde, Carbon $hasta, ?int $productoId = null, ?int $empresaId = null): Builder
+    {
+        return MovimientoInventario::query()
+            ->whereBetween('created_at', [$desde->copy()->startOfDay(), $hasta->copy()->endOfDay()])
+            ->when($empresaId, fn (Builder $q, int $id) => $q->where('empresa_id', $id))
+            ->when($productoId, fn (Builder $q, int $id) => $q->where('producto_id', $id))
+            ->with(['producto', 'user']);
+    }
+
+    // ──────────────────────────────────────────────────────────────────────
+    // Cuentas por cobrar (saldos abiertos)
+    // ──────────────────────────────────────────────────────────────────────
+
+    public function cuentasPorCobrarQuery(?int $empresaId = null): Builder
+    {
+        return CuentaPorCobrar::query()
+            ->when($empresaId, fn (Builder $q, int $id) => $q->where('empresa_id', $id))
+            ->whereRaw('(monto_total - monto_pagado) > 0')
+            ->with(['cliente', 'venta']);
+    }
+
+    // ──────────────────────────────────────────────────────────────────────
+    // Cuentas por pagar (saldos abiertos)
+    // ──────────────────────────────────────────────────────────────────────
+
+    public function cuentasPorPagarQuery(?int $empresaId = null): Builder
+    {
+        return CuentaPorPagar::query()
+            ->when($empresaId, fn (Builder $q, int $id) => $q->where('empresa_id', $id))
+            ->whereRaw('(monto_total - monto_pagado) > 0')
+            ->with(['proveedor', 'compra']);
+    }
+
+    // ──────────────────────────────────────────────────────────────────────
+    // Margen por producto
+    // ──────────────────────────────────────────────────────────────────────
+
+    public function margenPorProductoQuery(Carbon $desde, Carbon $hasta, ?int $empresaId = null): Builder
+    {
+        return Producto::query()
+            ->join('detalle_ventas', 'detalle_ventas.producto_id', '=', 'productos.id')
+            ->join('ventas', 'ventas.id', '=', 'detalle_ventas.venta_id')
+            ->whereBetween('ventas.fecha', [$desde->copy()->startOfDay(), $hasta->copy()->endOfDay()])
+            ->where('ventas.estado', '!=', EstadoVenta::ANULADA)
+            ->whereNull('ventas.venta_modificada_id')
+            ->when($empresaId, fn (Builder $q, int $id) => $q->where('ventas.empresa_id', $id))
+            ->groupBy('productos.id', 'productos.codigo', 'productos.nombre', 'productos.costo')
+            ->selectRaw('productos.id, productos.codigo, productos.nombre, productos.costo')
+            ->selectRaw('COALESCE(SUM(detalle_ventas.cantidad), 0) as unidades_vendidas')
+            ->selectRaw('COALESCE(SUM(detalle_ventas.subtotal), 0) as ingresos')
+            ->selectRaw('COALESCE(SUM(detalle_ventas.cantidad * productos.costo), 0) as costo_total')
+            ->selectRaw('COALESCE(SUM(detalle_ventas.subtotal) - SUM(detalle_ventas.cantidad * productos.costo), 0) as ganancia')
+            ->selectRaw("CASE WHEN SUM(detalle_ventas.subtotal) > 0 THEN ROUND(((SUM(detalle_ventas.subtotal) - SUM(detalle_ventas.cantidad * productos.costo)) / SUM(detalle_ventas.subtotal)) * 100, 2) ELSE 0 END as margen_porcentaje");
     }
 }

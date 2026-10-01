@@ -119,6 +119,7 @@ class AdminPanelProvider extends PanelProvider
             // resources/views/vendor/filament-panels/components/user-menu.blade.php queda sin uso.
             ->userMenu(position: UserMenuPosition::Topbar)
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')
+            ->discoverClusters(in: app_path('Filament/Clusters'), for: 'App\Filament\Clusters')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')
             ->pages([
                 Dashboard::class,

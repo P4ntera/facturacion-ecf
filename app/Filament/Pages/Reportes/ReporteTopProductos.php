@@ -10,7 +10,10 @@ use BackedEnum;
 use Filament\Forms\Components\DatePicker;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
+use App\Models\Categoria;
+use Filament\Facades\Filament;
 use Filament\Tables\Filters\Filter;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 
 class ReporteTopProductos extends ReportePage
@@ -19,7 +22,7 @@ class ReporteTopProductos extends ReportePage
 
     protected static ?string $navigationLabel = 'Top Productos';
 
-    protected static ?int $navigationSort = 53;
+    protected static ?int $navigationSort = 43;
 
     protected static ?string $title = 'Top de productos';
 
@@ -57,6 +60,12 @@ class ReporteTopProductos extends ReportePage
                             ->label('Hasta')
                             ->default(fn () => now()->endOfMonth()->toDateString()),
                     ]),
+
+                SelectFilter::make('categoria_id')
+                    ->label('Categoría')
+                    ->options(fn () => Categoria::query()->where('empresa_id', Filament::getTenant()->id)->pluck('nombre', 'id'))
+                    ->searchable()
+                    ->query(fn ($query, array $data) => $query->when($data['value'] ?? null, fn ($q, $v) => $q->where('productos.categoria_id', $v))),
             ])
             ->defaultSort('ingresos', 'desc');
     }

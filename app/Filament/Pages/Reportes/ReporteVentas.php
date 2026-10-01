@@ -17,6 +17,7 @@ use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\Summarizers\Summarizer;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 
@@ -26,7 +27,7 @@ class ReporteVentas extends ReportePage
 
     protected static ?string $navigationLabel = 'Ventas';
 
-    protected static ?int $navigationSort = 50;
+    protected static ?int $navigationSort = 40;
 
     protected static ?string $title = 'Reporte de ventas';
 
@@ -107,6 +108,22 @@ class ReporteVentas extends ReportePage
                             ->label('Hasta')
                             ->default(fn () => now()->endOfMonth()->toDateString()),
                     ]),
+
+                SelectFilter::make('forma_pago')
+                    ->label('Forma de Pago')
+                    ->options(\App\Enums\FormaPago::class),
+
+                SelectFilter::make('tipo_comprobante')
+                    ->label('Tipo Comprobante')
+                    ->options(TipoComprobante::class),
+
+                SelectFilter::make('estado_fiscal')
+                    ->label('Estado Fiscal')
+                    ->options(EstadoFiscal::class),
+
+                SelectFilter::make('caja_id')
+                    ->label('Caja')
+                    ->relationship('caja', 'nombre'),
             ])
             ->defaultSort('fecha', 'desc');
     }

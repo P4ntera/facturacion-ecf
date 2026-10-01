@@ -15,6 +15,8 @@ use Filament\Support\Enums\FontWeight;
 use Filament\Support\Enums\TextSize;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Support\Number;
 
@@ -22,9 +24,11 @@ class ReporteInventario extends ReportePage
 {
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedArchiveBox;
 
+    protected static string|\UnitEnum|null $navigationGroup = 'Inventario';
+
     protected static ?string $navigationLabel = 'Inventario';
 
-    protected static ?int $navigationSort = 54;
+    protected static ?int $navigationSort = 50;
 
     protected static ?string $title = 'Reporte de inventario';
 
@@ -77,6 +81,24 @@ class ReporteInventario extends ReportePage
                 TextColumn::make('costo')
                     ->label('Costo')
                     ->money('DOP'),
+            ])
+            ->filters([
+                SelectFilter::make('categoria_id')
+                    ->label('Categoría')
+                    ->relationship('categoria', 'nombre')
+                    ->searchable()
+                    ->preload(),
+
+                TernaryFilter::make('bajo_minimo')
+                    ->label('Bajo Mínimo')
+                    ->queries(
+                        true: fn ($q) => $q->whereColumn('stock', '<', 'stock_minimo'),
+                        false: fn ($q) => $q->whereColumn('stock', '>=', 'stock_minimo'),
+                    ),
+
+                SelectFilter::make('activo')
+                    ->label('Estado')
+                    ->options([1 => 'Activo', 0 => 'Inactivo']),
             ])
             ->defaultSort('nombre');
     }

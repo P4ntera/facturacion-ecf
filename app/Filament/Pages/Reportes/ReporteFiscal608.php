@@ -26,9 +26,11 @@ class ReporteFiscal608 extends ReportePage
 {
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedDocumentText;
 
+    protected static string|\UnitEnum|null $navigationGroup = 'Fiscales';
+
     protected static ?string $navigationLabel = 'Fiscal 608';
 
-    protected static ?int $navigationSort = 56;
+    protected static ?int $navigationSort = 62;
 
     protected static ?string $title = 'Formato 608 — Comprobantes fiscales anulados';
 

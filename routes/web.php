@@ -1,12 +1,20 @@
 <?php
 
 use App\Http\Controllers\AprobacionComercialEcfController;
+use App\Http\Controllers\CotizacionPdfController;
 use App\Http\Controllers\ArqueoCajaPdfController;
 use App\Http\Controllers\ImpresoraPruebaController;
+use App\Http\Controllers\OrdenCompraPdfController;
 use App\Http\Controllers\PedidoCompraPdfController;
 use App\Http\Controllers\RecepcionEcfController;
+use App\Http\Controllers\Reportes\ReporteArqueosPdfController;
+use App\Http\Controllers\Reportes\ReporteComprasPdfController;
+use App\Http\Controllers\Reportes\ReporteCxcPdfController;
+use App\Http\Controllers\Reportes\ReporteCxpPdfController;
 use App\Http\Controllers\Reportes\ReporteFiscal607PdfController;
 use App\Http\Controllers\Reportes\ReporteInventarioPdfController;
+use App\Http\Controllers\Reportes\ReporteKardexPdfController;
+use App\Http\Controllers\Reportes\ReporteMargenPdfController;
 use App\Http\Controllers\Reportes\ReporteTopProductosPdfController;
 use App\Http\Controllers\Reportes\ReporteVentasPdfController;
 use App\Http\Controllers\Reportes\ReporteVentasPorClientePdfController;
@@ -37,6 +45,14 @@ Route::get('/pedidos-compra/{pedidoCompra}/pdf', PedidoCompraPdfController::clas
     ->middleware(['auth', 'can:compras.ver'])
     ->name('pedidos-compra.pdf');
 
+Route::get('/ordenes-compra/{ordenCompra}/pdf', OrdenCompraPdfController::class)
+    ->middleware(['auth', 'can:ordenes_compra.exportar'])
+    ->name('ordenes-compra.pdf');
+
+Route::get('/cotizaciones/{cotizacion}/pdf', CotizacionPdfController::class)
+    ->middleware(['auth', 'can:cotizaciones.exportar'])
+    ->name('cotizaciones.pdf');
+
 Route::get('/arqueos-caja/{arqueoCaja}/pdf', ArqueoCajaPdfController::class)
     ->middleware(['auth', 'can:gestionar_arqueo_caja'])
     ->name('arqueos-caja.pdf');
@@ -58,6 +74,12 @@ Route::middleware(['auth', 'can:reportes.exportar'])->prefix('reportes')->name('
     Route::get('/ventas-por-vendedor/pdf', ReporteVentasPorVendedorPdfController::class)->name('ventas-por-vendedor.pdf');
     Route::get('/inventario/pdf', ReporteInventarioPdfController::class)->name('inventario.pdf');
     Route::get('/fiscal-607/pdf', ReporteFiscal607PdfController::class)->name('fiscal-607.pdf');
+    Route::get('/compras/pdf', ReporteComprasPdfController::class)->name('compras.pdf');
+    Route::get('/arqueos/pdf', ReporteArqueosPdfController::class)->name('arqueos.pdf');
+    Route::get('/kardex/pdf', ReporteKardexPdfController::class)->name('kardex.pdf');
+    Route::get('/cxc/pdf', ReporteCxcPdfController::class)->name('cxc.pdf');
+    Route::get('/cxp/pdf', ReporteCxpPdfController::class)->name('cxp.pdf');
+    Route::get('/margen/pdf', ReporteMargenPdfController::class)->name('margen.pdf');
 });
 
 // Display del cliente de una caja registradora (segundo monitor/TV): público, sin login — el
