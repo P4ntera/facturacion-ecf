@@ -56,6 +56,15 @@ class CategoriaResource extends Resource
                 ->maxLength(500)
                 ->columnSpanFull(),
 
+            TextInput::make('margen_ganancia')
+                ->label('Porcentaje de ganancia')
+                ->numeric()
+                ->minValue(0)
+                ->maxValue(1000)
+                ->suffix('%')
+                ->placeholder('Sin porcentaje')
+                ->helperText('Sobre el costo: con costo RD$50 y 30 %, el precio sugerido es RD$65. Aplica a los productos de esta categoría que no tengan su propio porcentaje. Vacío = sin precio sugerido.'),
+
             Toggle::make('activo')
                 ->label('Activo')
                 ->default(true),
@@ -76,6 +85,13 @@ class CategoriaResource extends Resource
                     ->limit(50)
                     ->placeholder('—')
                     ->toggleable(isToggledHiddenByDefault: true),
+
+                TextColumn::make('margen_ganancia')
+                    ->label('% ganancia')
+                    ->suffix(' %')
+                    ->placeholder('—')
+                    ->alignEnd()
+                    ->sortable(),
 
                 TextColumn::make('productos_count')
                     ->label('Productos')

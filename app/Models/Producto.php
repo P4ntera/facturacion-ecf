@@ -26,7 +26,7 @@ class Producto extends Model
         'empresa_id', 'codigo', 'codigo_barra', 'nombre', 'descripcion', 'tipo', 'categoria_id',
         'costo', 'precio', 'tasa_itbis', 'controla_stock',
         'stock', 'stock_minimo', 'activo',
-        'tipo_venta', 'unidad_base', 'precio_por_peso',
+        'tipo_venta', 'unidad_base', 'precio_por_peso', 'margen_ganancia',
     ];
 
     protected $casts = [
@@ -40,6 +40,7 @@ class Producto extends Model
         'stock' => 'decimal:3',
         'stock_minimo' => 'decimal:3',
         'precio_por_peso' => 'decimal:2',
+        'margen_ganancia' => 'decimal:2',
     ];
 
     public function empresa(): BelongsTo

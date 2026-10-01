@@ -14,7 +14,7 @@ class DetalleVenta extends Model
     protected $fillable = [
         'venta_id', 'producto_id', 'presentacion_id', 'descripcion',
         'cantidad', 'factor', 'precio_unitario', 'descuento',
-        'tasa_itbis', 'itbis_monto', 'subtotal',
+        'tasa_itbis', 'itbis_monto', 'subtotal', 'costo_unitario',
     ];
 
     protected $casts = [
@@ -25,6 +25,7 @@ class DetalleVenta extends Model
         'descuento' => 'decimal:2',
         'itbis_monto' => 'decimal:2',
         'subtotal' => 'decimal:2',
+        'costo_unitario' => 'decimal:2',
     ];
 
     public function venta(): BelongsTo

@@ -36,6 +36,7 @@ use App\Models\User;
 use App\Models\Venta;
 use App\Services\ArqueoCajaService;
 use App\Services\CompraService;
+use App\Services\CostoPrecioService;
 use App\Services\DevolucionCompraService;
 use App\Services\PedidoCompraService;
 use App\Services\RolesEmpresaService;
@@ -1013,5 +1014,29 @@ class AislamientoEntreEmpresasTest extends TestCase
             ->assertSet('data.pedido_compra_id', null)
             ->assertSet('data.proveedor_id', null)
             ->assertNotified('El pedido de compra no existe o ya no está pendiente.');
+    }
+
+    /**
+     * 28. Precios sugeridos: aplicar precios solo toca productos de la empresa activa, aunque se
+     * manipule el producto_id que llega desde el modal de "Revisar precios".
+     */
+    public function test_28_no_se_puede_cambiar_el_precio_de_un_producto_de_otra_empresa(): void
+    {
+        ['empresa' => $empresaA, 'producto' => $productoA] = $this->crearEmpresaConDatos('Empresa A', '131000001');
+        ['producto' => $productoTobogan] = $this->crearEmpresaConDatos('Tobogán', '131000002');
+        $this->comoEmpresa($empresaA);
+
+        try {
+            app(CostoPrecioService::class)->aplicarPrecios([$productoTobogan->id => '999.00'], $empresaA);
+            $this->fail('Debió rechazar el producto de otra empresa.');
+        } catch (RuntimeException $e) {
+            $this->assertStringContainsString('no existe', $e->getMessage());
+        }
+
+        $this->assertSame('100.00', (string) $productoTobogan->fresh()->precio);
+
+        // Con un producto propio sí funciona.
+        app(CostoPrecioService::class)->aplicarPrecios([$productoA->id => '120.00'], $empresaA);
+        $this->assertSame('120.00', (string) $productoA->fresh()->precio);
     }
 }

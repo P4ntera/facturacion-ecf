@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\AmbienteEcf;
+use App\Enums\MetodoCosto;
+use App\Enums\RedondeoPrecio;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Spatie\Activitylog\LogOptions;
@@ -36,6 +38,8 @@ class EmpresaConfiguracion extends Model
         'certificado_path',
         'certificado_password',
         'certificado_vence',
+        'metodo_costo',
+        'redondeo_precio',
     ];
 
     protected $casts = [
@@ -46,6 +50,8 @@ class EmpresaConfiguracion extends Model
         'dgii_api_key' => 'encrypted',
         'certificado_password' => 'encrypted',
         'certificado_vence' => 'date',
+        'metodo_costo' => MetodoCosto::class,
+        'redondeo_precio' => RedondeoPrecio::class,
     ];
 
     // Reflejan los defaults de la columna en la migración: sin esto, un ::create()/firstOrCreate()
@@ -60,6 +66,8 @@ class EmpresaConfiguracion extends Model
         'moneda' => 'DOP',
         'dgii_ambiente' => 'TesteCF',
         'dgii_base_url' => 'https://sandbox.pac-ecf.example.do/api/v1',
+        'metodo_costo' => 'ultima_compra',
+        'redondeo_precio' => 'ninguno',
     ];
 
     public function empresa(): BelongsTo

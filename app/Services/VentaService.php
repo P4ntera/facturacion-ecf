@@ -449,7 +449,7 @@ class VentaService
         $notaCredito->detalles()->createMany(
             $venta->detalles->map(fn ($detalle) => $detalle->only([
                 'producto_id', 'presentacion_id', 'descripcion', 'cantidad', 'factor',
-                'precio_unitario', 'descuento', 'tasa_itbis', 'itbis_monto', 'subtotal',
+                'precio_unitario', 'descuento', 'tasa_itbis', 'itbis_monto', 'subtotal', 'costo_unitario',
             ]))->all()
         );
 
@@ -674,6 +674,8 @@ class VentaService
                     'tasa_itbis' => $tasaEfectiva,
                     'itbis_monto' => $itbis,
                     'subtotal' => $base,
+                    // Lo devuelto vale lo que costó al venderse, no el costo de hoy.
+                    'costo_unitario' => $detalleOriginal->costo_unitario,
                 ];
 
                 $stockMovimientos[] = [
@@ -1035,6 +1037,10 @@ class VentaService
                 'tasa_itbis' => $tasaEfectiva,
                 'itbis_monto' => $desglose->itbis,
                 'subtotal' => $desglose->base,
+                // Costo del momento (sin ITBIS) por unidad VENDIDA: una caja de 24 cuesta 24
+                // veces el costo base. Queda fijo en la línea para que los reportes de ganancia
+                // no cambien cuando luego cambie el costo del producto.
+                'costo_unitario' => bcadd(bcmul((string) $producto->costo, number_format($factor, 3, '.', ''), 6), '0.005', 2),
             ];
 
             // El inventario SIEMPRE se mueve en unidad base: cantidad × factor (una caja de 24

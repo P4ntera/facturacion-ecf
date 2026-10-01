@@ -27,6 +27,7 @@ class CompraService
         private readonly InventarioService $inventarioService,
         private readonly SecuenciaNcfService $ncfService,
         private readonly CuentaPorPagarService $cuentaPorPagarService,
+        private readonly CostoPrecioService $costoPrecioService,
     ) {}
 
     /**
@@ -118,7 +119,7 @@ class CompraService
 
                 $producto = Producto::where('empresa_id', $empresa->id)->find($linea['producto_id']);
                 if ($producto) {
-                    $this->inventarioService->registrarMovimiento(
+                    $movimiento = $this->inventarioService->registrarMovimiento(
                         $producto,
                         TipoMovimiento::ENTRADA,
                         OrigenMovimiento::COMPRA,
@@ -127,8 +128,9 @@ class CompraService
                         $userId,
                     );
 
-                    // Costo vigente = costo (sin ITBIS) de la línea de compra más reciente.
-                    $producto->update(['costo' => $linea['costo_unitario']]);
+                    // El costo (sin ITBIS) se actualiza según el método de costo de la empresa:
+                    // manual, última compra o promedio ponderado.
+                    $this->costoPrecioService->aplicarEntrada($producto, $movimiento, $linea['cantidad'], $linea['costo_unitario'], $empresa);
 
                     // Vincula producto-proveedor en el catálogo automáticamente al comprarle:
                     // si es el primer proveedor del producto, queda como principal. En compras
@@ -213,7 +215,7 @@ class CompraService
             foreach ($compra->detalles as $detalle) {
                 $producto = $detalle->producto;
                 if ($producto) {
-                    $this->inventarioService->registrarMovimiento(
+                    $movimiento = $this->inventarioService->registrarMovimiento(
                         $producto,
                         TipoMovimiento::SALIDA,
                         OrigenMovimiento::ANULACION,
@@ -222,6 +224,9 @@ class CompraService
                         $userId,
                         "Anulación compra #{$compra->id}",
                     );
+
+                    // Con promedio ponderado, saca del promedio lo que esta compra había metido.
+                    $this->costoPrecioService->revertirEntrada($producto, $movimiento, $detalle->cantidad, $detalle->costo_unitario, $compra->empresa);
                 }
             }
 

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\MetodoCosto;
 use App\Enums\Modulo;
 use App\Enums\OrigenMovimiento;
 use App\Enums\TasaItbis;
@@ -11,7 +12,9 @@ use App\Enums\TipoVenta;
 use App\Exceptions\StockInsuficienteException;
 use App\Filament\Concerns\RestringidoPorModulo;
 use App\Filament\Resources\ProductoResource\Pages;
+use App\Models\Categoria;
 use App\Models\Producto;
+use App\Services\CostoPrecioService;
 use App\Services\InventarioService;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
@@ -20,6 +23,7 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
@@ -128,6 +132,7 @@ class ProductoResource extends Resource
                             ->relationship('categoria', 'nombre', modifyQueryUsing: fn (Builder $query) => $query->where('empresa_id', Filament::getTenant()->id))
                             ->searchable()
                             ->preload()
+                            ->live()
                             ->nullable(),
 
                         Textarea::make('descripcion')
@@ -163,7 +168,50 @@ class ProductoResource extends Resource
                             ->numeric()
                             ->prefix('RD$')
                             ->minValue(0)
-                            ->default(0),
+                            ->default(0)
+                            ->live(onBlur: true)
+                            ->helperText(fn (): string => match (Filament::getTenant()->config()->metodo_costo) {
+                                MetodoCosto::MANUAL => 'Sin ITBIS. Método manual: las compras no cambian este costo.',
+                                MetodoCosto::ULTIMA_COMPRA => 'Sin ITBIS. Se actualiza con cada compra (costo de la última compra).',
+                                MetodoCosto::PROMEDIO_PONDERADO => 'Sin ITBIS. Se recalcula con cada compra (promedio ponderado).',
+                            }),
+
+                        TextInput::make('margen_ganancia')
+                            ->label('% de ganancia')
+                            ->numeric()
+                            ->minValue(0)
+                            ->maxValue(1000)
+                            ->suffix('%')
+                            ->live(onBlur: true)
+                            ->placeholder(function (Get $get): string {
+                                $margenCategoria = self::categoriaDelFormulario($get)?->margen_ganancia;
+
+                                return $margenCategoria !== null ? "{$margenCategoria} % (de la categoría)" : 'Sin porcentaje';
+                            })
+                            ->helperText('Sobre el costo. Vacío = usa el de la categoría.'),
+
+                        TextEntry::make('precio_sugerido_preview')
+                            ->label('Precio sugerido')
+                            ->state(function (Get $get): string {
+                                $tipoVenta = TipoVenta::tryFrom((string) $get('tipo_venta'));
+                                $tasa = TasaItbis::tryFrom((string) $get('tasa_itbis'));
+
+                                if ($tasa === null) {
+                                    return '—';
+                                }
+
+                                $producto = new Producto([
+                                    'costo' => filled($get('costo')) ? $get('costo') : 0,
+                                    'margen_ganancia' => filled($get('margen_ganancia')) ? $get('margen_ganancia') : null,
+                                    'tasa_itbis' => $tasa,
+                                    'tipo_venta' => $tipoVenta ?? TipoVenta::CONTABLE,
+                                ]);
+                                $producto->setRelation('categoria', self::categoriaDelFormulario($get));
+
+                                $sugerido = app(CostoPrecioService::class)->precioSugerido($producto, Filament::getTenant());
+
+                                return $sugerido === null ? 'Sin porcentaje de ganancia o sin costo' : 'RD$ '.number_format((float) $sugerido, 2);
+                            }),
 
                         Select::make('tasa_itbis')
                             ->label('Tasa ITBIS')
@@ -433,6 +481,16 @@ class ProductoResource extends Resource
                     }),
             ])
             ->defaultSort('nombre');
+    }
+
+    /** Categoría elegida en el formulario, solo de la empresa activa (categoria_id es client-controllable). */
+    private static function categoriaDelFormulario(Get $get): ?Categoria
+    {
+        $categoriaId = $get('categoria_id');
+
+        return filled($categoriaId)
+            ? Categoria::where('empresa_id', Filament::getTenant()->id)->find($categoriaId)
+            : null;
     }
 
     public static function getPages(): array

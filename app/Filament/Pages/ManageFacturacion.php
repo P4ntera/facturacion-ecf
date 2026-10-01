@@ -2,6 +2,8 @@
 
 namespace App\Filament\Pages;
 
+use App\Enums\MetodoCosto;
+use App\Enums\RedondeoPrecio;
 use App\Enums\TasaItbis;
 use App\Enums\TipoComprobante;
 use App\Models\Empresa;
@@ -15,6 +17,8 @@ use Filament\Pages\Page;
 use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\EmbeddedSchema;
 use Filament\Schemas\Components\Form;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use UnitEnum;
@@ -50,6 +54,8 @@ class ManageFacturacion extends Page
             'tipo_comprobante_defecto' => $config->tipo_comprobante_defecto,
             'permite_ventas_sin_comprobante' => $config->permite_ventas_sin_comprobante,
             'moneda' => $config->moneda,
+            'metodo_costo' => $config->metodo_costo->value,
+            'redondeo_precio' => $config->redondeo_precio->value,
         ]);
     }
 
@@ -96,6 +102,26 @@ class ManageFacturacion extends Page
                         'USD' => 'USD — Dólar estadounidense',
                     ])
                     ->required(),
+
+                Section::make('Costo y precios')
+                    ->description('Cómo se calcula el costo de tus productos y cómo se redondea el precio sugerido por el porcentaje de ganancia.')
+                    ->columnSpanFull()
+                    ->columns(2)
+                    ->schema([
+                        Select::make('metodo_costo')
+                            ->label('Método de costo')
+                            ->options(collect(MetodoCosto::cases())->mapWithKeys(fn (MetodoCosto $metodo) => [$metodo->value => $metodo->etiqueta()]))
+                            ->live()
+                            ->helperText(fn (Get $get): string => (MetodoCosto::tryFrom((string) $get('metodo_costo'))?->descripcion() ?? '')
+                                .' Al cambiarlo, el costo actual de cada producto es el punto de partida; las compras anteriores no se recalculan.')
+                            ->required(),
+
+                        Select::make('redondeo_precio')
+                            ->label('Redondeo del precio sugerido')
+                            ->options(collect(RedondeoPrecio::cases())->mapWithKeys(fn (RedondeoPrecio $redondeo) => [$redondeo->value => $redondeo->etiqueta()]))
+                            ->helperText('Siempre hacia arriba, para no perder margen. El precio sugerido nunca se aplica solo: lo revisas y apruebas al registrar la compra.')
+                            ->required(),
+                    ]),
             ]);
     }
 

@@ -22,6 +22,7 @@ class OrdenCompraService
 {
     public function __construct(
         private readonly InventarioService $inventarioService,
+        private readonly CostoPrecioService $costoPrecioService,
     ) {}
 
     public function generarNumero(Empresa $empresa): string
@@ -164,7 +165,7 @@ class OrdenCompraService
                 ]);
 
                 $producto = Producto::findOrFail($detalle->producto_id);
-                $this->inventarioService->registrarMovimiento(
+                $movimiento = $this->inventarioService->registrarMovimiento(
                     producto: $producto,
                     tipo: TipoMovimiento::ENTRADA,
                     origen: OrigenMovimiento::RECEPCION_ORDEN_COMPRA,
@@ -172,6 +173,10 @@ class OrdenCompraService
                     referenciaId: $recepcion->id,
                     userId: auth()->id(),
                 );
+
+                // La mercancía entra con el precio pactado en la orden: el costo se actualiza
+                // según el método de costo de la empresa, igual que en una compra.
+                $this->costoPrecioService->aplicarEntrada($producto, $movimiento, $cantidadRecibida, (string) $detalle->precio_unitario, $empresa);
             }
 
             $ordenCompra->load('detalles');

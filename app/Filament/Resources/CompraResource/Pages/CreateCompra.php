@@ -5,8 +5,10 @@ namespace App\Filament\Resources\CompraResource\Pages;
 use App\Enums\TipoComprobante;
 use App\Exceptions\StockInsuficienteException;
 use App\Filament\Resources\CompraResource;
+use App\Models\Compra;
 use App\Models\PedidoCompra;
 use App\Services\CompraService;
+use App\Services\CostoPrecioService;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
@@ -131,7 +133,7 @@ class CreateCompra extends CreateRecord
     protected function handleRecordCreation(array $data): Model
     {
         try {
-            return app(CompraService::class)->crear([
+            $compra = app(CompraService::class)->crear([
                 'proveedor_id'         => $data['proveedor_id'],
                 'pedido_compra_id'     => $data['pedido_compra_id'] ?? null,
                 'tipo_comprobante'     => filled($data['tipo_comprobante'] ?? null) ? TipoComprobante::from($data['tipo_comprobante']) : null,
@@ -148,5 +150,40 @@ class CreateCompra extends CreateRecord
 
             throw new Halt();
         }
+
+        $this->avisarPreciosSugeridos($compra);
+
+        return $compra;
+    }
+
+    /**
+     * Si la compra dejó productos con un precio sugerido distinto al actual (costo nuevo + % de
+     * ganancia), avisa con un botón a "Revisar precios". Persistente: el formulario redirige y el
+     * aviso tiene que seguir ahí.
+     */
+    private function avisarPreciosSugeridos(Compra $compra): void
+    {
+        if (! (auth()->user()?->can('productos.editar') ?? false)) {
+            return;
+        }
+
+        $cantidad = app(CostoPrecioService::class)->sugerenciasParaCompra($compra)->count();
+
+        if ($cantidad === 0) {
+            return;
+        }
+
+        Notification::make()
+            ->title($cantidad === 1 ? '1 producto tiene un precio sugerido nuevo' : "{$cantidad} productos tienen un precio sugerido nuevo")
+            ->body('El costo cambió con esta compra. Revisa los precios antes de seguir vendiendo.')
+            ->warning()
+            ->persistent()
+            ->actions([
+                Action::make('revisarPrecios')
+                    ->label('Revisar precios')
+                    ->button()
+                    ->url(CompraResource::getUrl('view', ['record' => $compra])),
+            ])
+            ->send();
     }
 }

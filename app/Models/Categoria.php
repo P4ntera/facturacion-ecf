@@ -15,10 +15,11 @@ class Categoria extends Model
     use HasFactory;
     use LogsActivity;
 
-    protected $fillable = ['empresa_id', 'nombre', 'descripcion', 'activo'];
+    protected $fillable = ['empresa_id', 'nombre', 'descripcion', 'activo', 'margen_ganancia'];
 
     protected $casts = [
         'activo' => 'boolean',
+        'margen_ganancia' => 'decimal:2',
     ];
 
     public function scopeActivos(Builder $query): Builder
@@ -39,7 +40,7 @@ class Categoria extends Model
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
-            ->logOnly(['nombre', 'descripcion', 'activo'])
+            ->logOnly(['nombre', 'descripcion', 'activo', 'margen_ganancia'])
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs()
             ->useLogName('Categorias');
