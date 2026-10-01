@@ -18,7 +18,9 @@ class ReporteServiceReporte606Test extends TestCase
     private function crearProveedor(array $overrides = []): Proveedor
     {
         return Proveedor::create(array_merge([
-            'rnc' => '130000001',
+            // RNC único por proveedor: (empresa_id, rnc) es unique, y varios tests crean más de
+            // una compra (cada una con su proveedor).
+            'rnc' => fake()->unique()->numerify('1########'),
             'nombre' => 'Proveedor de prueba',
             'activo' => true,
         ], $overrides));
