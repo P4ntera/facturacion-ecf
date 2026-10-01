@@ -18,7 +18,7 @@ class PedidoCompra extends Model
         'empresa_id', 'proveedor_id', 'user_id', 'fecha', 'notas',
         'subtotal', 'monto_gravado_18', 'monto_gravado_16', 'monto_gravado_0', 'monto_exento',
         'itbis_18', 'itbis_16', 'itbis', 'total',
-        'estado', 'enviado_en', 'enviado_a', 'motivo_cancelacion', 'cancelado_en',
+        'estado', 'enviado_en', 'enviado_a', 'motivo_cancelacion', 'cancelado_en', 'recibido_en',
     ];
 
     protected $casts = [
@@ -26,6 +26,7 @@ class PedidoCompra extends Model
         'fecha' => 'datetime',
         'enviado_en' => 'datetime',
         'cancelado_en' => 'datetime',
+        'recibido_en' => 'datetime',
         'subtotal' => 'decimal:2',
         'monto_gravado_18' => 'decimal:2',
         'monto_gravado_16' => 'decimal:2',
@@ -57,9 +58,25 @@ class PedidoCompra extends Model
         return $this->hasMany(DetallePedidoCompra::class);
     }
 
+    /** Compras que recibieron este pedido (solo una vigente: si se anula, el pedido vuelve a pendiente). */
+    public function compras(): HasMany
+    {
+        return $this->hasMany(Compra::class);
+    }
+
     public function estaCancelado(): bool
     {
         return $this->estado === EstadoPedidoCompra::CANCELADO;
+    }
+
+    public function estaPendiente(): bool
+    {
+        return $this->estado === EstadoPedidoCompra::PENDIENTE;
+    }
+
+    public function estaRecibido(): bool
+    {
+        return $this->estado === EstadoPedidoCompra::RECIBIDO;
     }
 
     public function fueEnviado(): bool

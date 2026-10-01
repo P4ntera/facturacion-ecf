@@ -98,6 +98,10 @@ class PedidoCompraService
             throw new RuntimeException('El pedido ya está cancelado.');
         }
 
+        if ($pedido->estaRecibido()) {
+            throw new RuntimeException('El pedido ya fue recibido en una compra: para deshacerlo, anula esa compra.');
+        }
+
         $pedido->update([
             'estado' => EstadoPedidoCompra::CANCELADO,
             'motivo_cancelacion' => $motivo,
