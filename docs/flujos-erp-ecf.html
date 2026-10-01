@@ -573,7 +573,8 @@
     </figure>
     <ul class="rules">
       <li><strong>Pedido recibido:</strong> la compra queda ligada al pedido y este pasa a Recibido. Si se anula la compra, el pedido vuelve a Pendiente.</li>
-      <li><strong>Costo vigente:</strong> el de la línea de compra más reciente, sin ITBIS.</li>
+      <li><strong>Costo:</strong> según el método que elija cada empresa: manual, última compra o promedio ponderado. Cada venta guarda el costo de ese momento, para que los reportes de ganancia no cambien después.</li>
+      <li><strong>Precio sugerido:</strong> costo + el % de ganancia del producto o de su categoría, con el redondeo de la empresa. Al guardar la compra se sugiere; nunca cambia solo.</li>
       <li><strong>Catálogo:</strong> comprarle a un proveedor lo vincula al producto. El primero queda como proveedor principal.</li>
       <li><strong>Cálculos:</strong> compras y devoluciones usan aritmética exacta (bcmath), sin errores de redondeo por acumulación.</li>
     </ul>
@@ -679,12 +680,18 @@
     <h2>Por decidir</h2>
     <p>Puntos donde el sistema actual y lo que queremos todavía no coinciden, o donde falta una decisión del equipo.</p>
     <ol class="todo">
-      <li><strong>Notas de crédito y débito físicas (B04 y B03)</strong><span>Hoy solo existen las electrónicas (E34 y E33). Una empresa que factura en tipo B no tiene cómo hacer una devolución parcial. ¿Las agregamos?</span></li>
-      <li><strong>Envío de e-CF en producción</strong><span>La cola depende de un worker que hoy se arranca a mano. En producción necesita un supervisor que lo mantenga vivo; si se cae, los e-CF se quedan pendientes. Falta definir en qué servidor va a correr.</span></li>
-      <li><strong>Recepción parcial de pedidos</strong><span>Hoy, si llega menos de lo pedido, el pedido se cierra igual. ¿Debe quedar abierto por lo que falta?</span></li>
+      <li><strong>Pedido de compra y Orden de compra hacen lo mismo</strong><span>Hay dos pantallas para pedirle mercancía a un proveedor. Además, recibir una orden de compra mete el stock pero no crea la compra: no queda NCF, ni cuenta por pagar, ni sale en el 606. Si después se registra la compra a mano, el stock entra dos veces. Hay que quedarse con un solo flujo.</span></li>
+      <li><strong>Envío de e-CF en producción</strong><span>El envío usa la cola <span class="code">ecf</span>, que hoy ningún worker escucha, y los reintentos se acaban en unos 7 minutos. Hace falta un worker con supervisor y una tarea programada que reintente y refresque el estado.</span></li>
+      <li><strong>Sin internet no se vende</strong><span>¿Modo contingencia que facture en tipo B y regularice después, o un respaldo de internet?</span></li>
+    </ol>
+    <h3>Plan acordado</h3>
+    <ol class="todo">
+      <li><strong>Entrega 2: stock negativo</strong><span>Un interruptor por empresa, sin tope de unidades. Solo al vender; ajustes, anular compras y devolver al proveedor siguen bloqueados. Todo negativo queda marcado en el Kardex, con alerta hasta que entre la compra o se ajuste tras un conteo.</span></li>
+      <li><strong>Entrega 3: devoluciones de clientes</strong><span>Parámetros por empresa: si acepta, plazo, formas de reembolso, monto que necesita supervisor y si exige el ticket. La devolución va en la caja de hoy, puede ser parcial, cada producto vuelve al inventario o va a merma, con su documento: E34 parcial, B04 (nueva) o interno.</span></li>
     </ol>
     <h3>Resuelto</h3>
     <ol class="todo">
+      <li class="done"><strong>Costo y precio (entrega 1)</strong><span>Método de costo por empresa, costo guardado en cada venta, % de ganancia por categoría o producto, precio sugerido con redondeo que se aprueba al registrar la compra.</span></li>
       <li class="done"><strong>Anulación de tipo B</strong><span>El motivo 608 se valida antes de reponer stock y ya no da error. Commit <span class="code">2bc658a</span>.</span></li>
       <li class="done"><strong>Del pedido a la compra</strong><span>El botón Recibir crea la compra prellenada y la deja ligada al pedido. Commit <span class="code">35d20df</span>.</span></li>
     </ol>
