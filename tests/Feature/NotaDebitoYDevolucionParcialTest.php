@@ -90,9 +90,11 @@ class NotaDebitoYDevolucionParcialTest extends TestCase
         $this->assertTrue(bccomp($nd->total, '0', 2) > 0);
     }
 
-    public function test_nota_debito_no_permite_venta_no_electronica(): void
+    /** Sobre una venta física (B02) la nota de débito es la física B03, y no se transmite. */
+    public function test_nota_debito_sobre_venta_fisica_emite_b03(): void
     {
         $this->secuencia(TipoComprobante::FACTURA_CONSUMO_FISICA, 'B02');
+        $this->secuencia(TipoComprobante::NOTA_DEBITO_FISICA, 'B03');
         $producto = $this->producto('PB');
 
         $venta = app(VentaService::class)->registrar([
@@ -100,13 +102,16 @@ class NotaDebitoYDevolucionParcialTest extends TestCase
             'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
         ], $this->empresaDefault);
 
-        $this->expectException(VentaInvalidaException::class);
-
-        app(VentaService::class)->emitirNotaDebito(
+        $nd = app(VentaService::class)->emitirNotaDebito(
             $venta, $this->empresaDefault,
             [['producto_id' => $producto->id, 'cantidad' => 1, 'monto' => '10.00']],
             'Motivo',
         );
+
+        $this->assertSame(TipoComprobante::NOTA_DEBITO_FISICA, $nd->tipo_comprobante);
+        $this->assertStringStartsWith('B03', $nd->ncf);
+        $this->assertSame($venta->ncf, $nd->ncf_modifica);
+        $this->assertSame(EstadoFiscal::NO_APLICA, $nd->estado_fiscal);
     }
 
     public function test_nota_debito_no_permite_venta_anulada(): void
@@ -291,9 +296,11 @@ class NotaDebitoYDevolucionParcialTest extends TestCase
         );
     }
 
-    public function test_nc_parcial_no_permite_venta_no_electronica(): void
+    /** Sobre una venta física (B02) la devolución emite la nota de crédito física B04. */
+    public function test_nc_parcial_sobre_venta_fisica_emite_b04(): void
     {
         $this->secuencia(TipoComprobante::FACTURA_CONSUMO_FISICA, 'B02');
+        $this->secuencia(TipoComprobante::NOTA_CREDITO_FISICA, 'B04');
         $producto = $this->producto('PB');
 
         $venta = app(VentaService::class)->registrar([
@@ -301,15 +308,15 @@ class NotaDebitoYDevolucionParcialTest extends TestCase
             'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
         ], $this->empresaDefault);
 
-        $this->expectException(VentaInvalidaException::class);
-
-        $this->secuencia(TipoComprobante::NOTA_CREDITO, 'E34');
-
-        app(VentaService::class)->emitirNotaCreditoParcial(
+        $nc = app(VentaService::class)->emitirNotaCreditoParcial(
             $venta, $this->empresaDefault,
             [['producto_id' => $producto->id, 'cantidad' => 1]],
             'Motivo',
         );
+
+        $this->assertSame(TipoComprobante::NOTA_CREDITO_FISICA, $nc->tipo_comprobante);
+        $this->assertStringStartsWith('B04', $nc->ncf);
+        $this->assertSame(EstadoFiscal::NO_APLICA, $nc->estado_fiscal);
     }
 
     public function test_nc_parcial_no_permite_venta_anulada(): void

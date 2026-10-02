@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Enums\DestinoDevolucion;
 use App\Enums\EstadoFiscal;
 use App\Enums\EstadoVenta;
 use App\Enums\FormaPago;
+use App\Enums\FormaReembolso;
 use App\Enums\OrigenMovimiento;
 use App\Enums\TasaItbis;
 use App\Enums\TipoComprobante;
@@ -18,6 +20,7 @@ use App\Exceptions\SecuenciaNcfAgotadaException;
 use App\Exceptions\StockInsuficienteException;
 use App\Exceptions\VentaInvalidaException;
 use App\Exceptions\VentaYaAnuladaException;
+use App\Models\ArqueoCaja;
 use App\Models\Caja;
 use App\Models\Cliente;
 use App\Models\Descuento;
@@ -25,6 +28,7 @@ use App\Models\Empresa;
 use App\Models\EmpresaConfiguracion;
 use App\Models\Producto;
 use App\Models\ProductoPresentacion;
+use App\Models\User;
 use App\Models\Venta;
 use App\Strategies\Impuesto\ConItbisIncluido;
 use App\Strategies\Impuesto\ImpuestoStrategy;
@@ -141,7 +145,7 @@ class VentaService
             // que cliente_id/producto_id, ncf_modifica viene del formulario y es client-controllable.
             $ncfModifica = $sinComprobante ? null : ($datos['ncf_modifica'] ?? null);
 
-            if (in_array($tipoComprobante, [TipoComprobante::NOTA_CREDITO, TipoComprobante::NOTA_DEBITO], true)) {
+            if ($tipoComprobante?->esNotaCredito() || $tipoComprobante?->esNotaDebito()) {
                 if (blank($ncfModifica)) {
                     throw new VentaInvalidaException(
                         "El tipo de comprobante {$tipoComprobante->value} ({$tipoComprobante->etiqueta()}) requiere indicar el NCF que modifica."
@@ -472,7 +476,7 @@ class VentaService
      */
     public function emitirNotaDebito(Venta $ventaOriginal, Empresa $empresa, array $detalles, string $motivo): Venta
     {
-        $this->validarVentaModificable($ventaOriginal);
+        $this->validarVentaModificable($ventaOriginal, esNotaDebito: true);
 
         if (empty($detalles)) {
             throw new VentaInvalidaException('Debe incluir al menos un ítem en la Nota de Débito.');
@@ -484,7 +488,12 @@ class VentaService
 
         return DB::transaction(function () use ($ventaOriginal, $empresa, $detalles, $motivo) {
             $config = $empresa->config();
-            $ncf = $this->ncfService->siguiente(TipoComprobante::NOTA_DEBITO, $empresa);
+            // E33 si la venta es electrónica, B03 si es física.
+            // Recargada y bloqueada: los datos que se copian (moneda, tasa de cambio...) salen de
+            // la BD, no de un modelo en memoria que puede no tener los valores por defecto.
+            $ventaOriginal = Venta::query()->lockForUpdate()->findOrFail($ventaOriginal->id);
+            $tipoNota = TipoComprobante::notaDebitoPara($ventaOriginal->tipo_comprobante);
+            $ncf = $this->ncfService->siguiente($tipoNota, $empresa);
 
             $acumulado = [
                 'subtotal' => '0.00', 'monto_gravado_18' => '0.00', 'monto_gravado_16' => '0.00',
@@ -539,7 +548,7 @@ class VentaService
                 'empresa_id' => $empresa->id,
                 'cliente_id' => $ventaOriginal->cliente_id,
                 'user_id' => auth()->id(),
-                'tipo_comprobante' => TipoComprobante::NOTA_DEBITO,
+                'tipo_comprobante' => $tipoNota,
                 'ncf' => $ncf,
                 'ncf_modifica' => $ventaOriginal->ncf,
                 'venta_modificada_id' => $ventaOriginal->id,
@@ -559,7 +568,8 @@ class VentaService
                 'total_itbis' => $acumulado['total_itbis'],
                 'total' => $total,
                 'estado' => EstadoVenta::EMITIDA,
-                'estado_fiscal' => EstadoFiscal::PENDIENTE,
+                // La B03 no se transmite: su estado fiscal no aplica (la E33 va al PAC).
+                'estado_fiscal' => $tipoNota->esElectronico() ? EstadoFiscal::PENDIENTE : EstadoFiscal::NO_APLICA,
                 'motivo_anulacion' => $motivo,
             ]);
 
@@ -570,19 +580,66 @@ class VentaService
     }
 
     /**
-     * Nota de Crédito parcial (e-CF 34): devuelve ALGUNOS productos de una venta ya aceptada.
-     * Usa los precios originales de la venta (no los actuales del producto). Repone stock de los
-     * productos devueltos.
+     * Devolución parcial con los valores de antes (todo vuelve al inventario, reembolso por el
+     * mismo medio del pago). Se mantiene por compatibilidad: el flujo completo es
+     * registrarDevolucion().
      *
      * @param  array<int, array{producto_id: int, cantidad: float|int, presentacion_id?: int|null}>  $detalles
-     *
-     * @throws VentaInvalidaException
-     * @throws SecuenciaNcfAgotadaException
-     * @throws StockInsuficienteException  (no debería: es ENTRADA, pero por seguridad)
      */
     public function emitirNotaCreditoParcial(Venta $ventaOriginal, Empresa $empresa, array $detalles, string $motivo): Venta
     {
+        return $this->registrarDevolucion($ventaOriginal, $empresa, $detalles, $motivo, FormaReembolso::MISMO_MEDIO);
+    }
+
+    /**
+     * Devolución de un cliente, siempre en la caja de HOY (una caja cerrada no se toca): es una
+     * nota de crédito que hace referencia a la venta original. Puede ser parcial.
+     *
+     * - Documento: E34 si la venta es electrónica (debe estar aceptada), B04 si es física, o una
+     *   devolución interna sin NCF si la venta se hizo sin comprobante.
+     * - Cada línea vuelve al inventario o va a merma (entra y sale del Kardex como pérdida).
+     * - Dinero: si la venta fue a crédito, primero se rebaja lo que el cliente debe en su cuenta
+     *   por cobrar; el resto se reembolsa en efectivo (sale de la caja de hoy: hace falta $arqueo
+     *   abierto) o por el mismo medio del pago original.
+     * - Reglas de la empresa (EmpresaConfiguracion): si acepta devoluciones, plazo en días, formas
+     *   de reembolso permitidas, y monto a partir del cual hace falta el permiso
+     *   ventas.devolucion_autorizar (supervisor).
+     *
+     * Las líneas se pueden indicar por detalle_venta_id (lo que usa la pantalla) o por
+     * producto_id + presentacion_id. Ningún id se cree tal cual: todo se resuelve contra los
+     * detalles de la venta original.
+     *
+     * @param  array<int, array{detalle_venta_id?: int, producto_id?: int, presentacion_id?: int|null, cantidad: float|int|string, destino?: string|DestinoDevolucion|null}>  $detalles
+     *
+     * @throws VentaInvalidaException
+     * @throws SecuenciaNcfAgotadaException
+     */
+    public function registrarDevolucion(
+        Venta $ventaOriginal,
+        Empresa $empresa,
+        array $detalles,
+        string $motivo,
+        ?FormaReembolso $reembolso = null,
+        ?ArqueoCaja $arqueo = null,
+        ?User $usuario = null,
+    ): Venta {
+        $usuario ??= auth()->user();
         $this->validarVentaModificable($ventaOriginal);
+
+        if ((int) $ventaOriginal->empresa_id !== (int) $empresa->id) {
+            throw new VentaInvalidaException('La venta no pertenece a esta empresa.');
+        }
+
+        $config = $empresa->config();
+
+        if (! $config->acepta_devoluciones) {
+            throw new VentaInvalidaException('Esta empresa no acepta devoluciones.');
+        }
+
+        if ($config->devolucion_plazo_dias !== null
+            && $ventaOriginal->fecha->copy()->startOfDay()->addDays($config->devolucion_plazo_dias)->lt(now()->startOfDay())) {
+            throw new VentaInvalidaException("Pasó el plazo de devolución ({$config->devolucion_plazo_dias} días desde la venta del {$ventaOriginal->fecha->format('d/m/Y')}).");
+        }
 
         if (empty($detalles)) {
             throw new VentaInvalidaException('Debe incluir al menos un producto a devolver.');
@@ -592,7 +649,7 @@ class VentaService
             throw new VentaInvalidaException('El motivo es obligatorio para devoluciones parciales.');
         }
 
-        return DB::transaction(function () use ($ventaOriginal, $empresa, $detalles, $motivo) {
+        return DB::transaction(function () use ($ventaOriginal, $empresa, $detalles, $motivo, $reembolso, $arqueo, $usuario, $config) {
             $ventaOriginal = Venta::query()->lockForUpdate()->findOrFail($ventaOriginal->id);
 
             $acumulado = [
@@ -609,27 +666,37 @@ class VentaService
                     throw new VentaInvalidaException('La cantidad a devolver debe ser mayor que cero.');
                 }
 
-                $detalleOriginal = $ventaOriginal->detalles()
-                    ->where('producto_id', $detalle['producto_id'])
-                    ->when(
-                        filled($detalle['presentacion_id'] ?? null),
-                        fn ($q) => $q->where('presentacion_id', $detalle['presentacion_id']),
-                        fn ($q) => $q->whereNull('presentacion_id'),
-                    )
-                    ->first();
+                // Por detalle_venta_id (pantalla) o por producto + presentación. Siempre dentro de
+                // los detalles de ESTA venta: un id de otra venta no se encuentra.
+                $detalleOriginal = filled($detalle['detalle_venta_id'] ?? null)
+                    ? $ventaOriginal->detalles()->whereKey($detalle['detalle_venta_id'])->first()
+                    : $ventaOriginal->detalles()
+                        ->where('producto_id', $detalle['producto_id'] ?? null)
+                        ->when(
+                            filled($detalle['presentacion_id'] ?? null),
+                            fn ($q) => $q->where('presentacion_id', $detalle['presentacion_id']),
+                            fn ($q) => $q->whereNull('presentacion_id'),
+                        )
+                        ->first();
 
                 if ($detalleOriginal === null) {
                     throw new VentaInvalidaException('El producto no pertenece a la venta original.');
                 }
 
+                $destino = $detalle['destino'] ?? DestinoDevolucion::INVENTARIO;
+                $destino = $destino instanceof DestinoDevolucion ? $destino : DestinoDevolucion::from($destino);
+
+                // Lo ya devuelto en notas de crédito anteriores (E34, B04 o internas sin NCF; no
+                // las notas de débito, que también apuntan a la venta).
                 $yaDevuelto = Venta::where('venta_modificada_id', $ventaOriginal->id)
-                    ->where('tipo_comprobante', TipoComprobante::NOTA_CREDITO)
+                    ->where(fn ($q) => $q->whereNull('tipo_comprobante')
+                        ->orWhereIn('tipo_comprobante', [TipoComprobante::NOTA_CREDITO->value, TipoComprobante::NOTA_CREDITO_FISICA->value]))
                     ->where('estado', '!=', EstadoVenta::ANULADA)
                     ->join('detalle_ventas', 'ventas.id', '=', 'detalle_ventas.venta_id')
-                    ->where('detalle_ventas.producto_id', $detalle['producto_id'])
+                    ->where('detalle_ventas.producto_id', $detalleOriginal->producto_id)
                     ->when(
-                        filled($detalle['presentacion_id'] ?? null),
-                        fn ($q) => $q->where('detalle_ventas.presentacion_id', $detalle['presentacion_id']),
+                        $detalleOriginal->presentacion_id !== null,
+                        fn ($q) => $q->where('detalle_ventas.presentacion_id', $detalleOriginal->presentacion_id),
                         fn ($q) => $q->whereNull('detalle_ventas.presentacion_id'),
                     )
                     ->sum('detalle_ventas.cantidad');
@@ -680,27 +747,81 @@ class VentaService
                     'subtotal' => $base,
                     // Lo devuelto vale lo que costó al venderse, no el costo de hoy.
                     'costo_unitario' => $detalleOriginal->costo_unitario,
+                    'destino_devolucion' => $destino,
                 ];
 
                 $stockMovimientos[] = [
                     'producto' => $detalleOriginal->producto,
                     'cantidad' => $cantidad * (float) $detalleOriginal->factor,
+                    'destino' => $destino,
                 ];
             }
 
             $total = bcadd($acumulado['subtotal'], $acumulado['total_itbis'], 2);
-            $ncf = $this->ncfService->siguiente(TipoComprobante::NOTA_CREDITO, $empresa);
+
+            // Por encima del monto de la empresa hace falta un supervisor.
+            if ($config->devolucion_monto_supervisor !== null
+                && bccomp($total, (string) $config->devolucion_monto_supervisor, 2) > 0
+                && ! ($usuario?->can('ventas.devolucion_autorizar') ?? false)) {
+                throw new VentaInvalidaException(
+                    'Una devolución de RD$'.number_format((float) $total, 2).' necesita la autorización de un supervisor (límite: RD$'.number_format((float) $config->devolucion_monto_supervisor, 2).').'
+                );
+            }
+
+            // Venta a crédito: primero se rebaja lo que el cliente todavía debe.
+            $rebajaCxc = '0.00';
+            $cuenta = $ventaOriginal->tipo_pago === TipoPago::CREDITO ? $ventaOriginal->cuentaPorCobrar()->lockForUpdate()->first() : null;
+
+            if ($cuenta !== null) {
+                $pendiente = bcsub((string) $cuenta->monto_total, (string) $cuenta->monto_pagado, 2);
+                $rebajaCxc = bccomp($pendiente, $total, 2) < 0 ? $pendiente : $total;
+                $rebajaCxc = bccomp($rebajaCxc, '0', 2) < 0 ? '0.00' : $rebajaCxc;
+
+                if (bccomp($rebajaCxc, '0', 2) > 0) {
+                    $cuenta->update(['monto_total' => bcsub((string) $cuenta->monto_total, $rebajaCxc, 2)]);
+                }
+            }
+
+            // Lo que no cubrió la cuenta por cobrar se le reembolsa al cliente.
+            $aReembolsar = bcsub($total, $rebajaCxc, 2);
+            $hayReembolso = bccomp($aReembolsar, '0', 2) > 0;
+
+            if ($hayReembolso) {
+                if ($reembolso === null) {
+                    throw new VentaInvalidaException('Indica cómo se le devuelve el dinero al cliente.');
+                }
+
+                if (! in_array($reembolso, $config->reembolsosPermitidos(), true)) {
+                    throw new VentaInvalidaException("Esta empresa no acepta reembolsos: {$reembolso->etiqueta()}.");
+                }
+
+                // El efectivo sale de la caja de hoy: tiene que haber una abierta, de esta empresa.
+                if ($reembolso === FormaReembolso::EFECTIVO
+                    && ($arqueo === null || ! $arqueo->estaAbierto() || (int) $arqueo->empresa_id !== (int) $empresa->id)) {
+                    throw new VentaInvalidaException('Para devolver efectivo tienes que tener la caja abierta: sale de la caja de hoy.');
+                }
+            }
+
+            // E34 / B04 / devolución interna sin NCF (venta sin comprobante).
+            $tipoNota = TipoComprobante::notaCreditoPara($ventaOriginal->tipo_comprobante);
+            $ncf = $tipoNota !== null ? $this->ncfService->siguiente($tipoNota, $empresa) : null;
+            $efectivoDeCaja = $hayReembolso && $reembolso === FormaReembolso::EFECTIVO;
 
             $notaCredito = Venta::create([
                 'empresa_id' => $empresa->id,
                 'cliente_id' => $ventaOriginal->cliente_id,
-                'user_id' => auth()->id(),
-                'tipo_comprobante' => TipoComprobante::NOTA_CREDITO,
+                'user_id' => $usuario?->id,
+                'tipo_comprobante' => $tipoNota,
                 'ncf' => $ncf,
                 'ncf_modifica' => $ventaOriginal->ncf,
                 'venta_modificada_id' => $ventaOriginal->id,
-                'forma_pago' => $ventaOriginal->forma_pago,
+                'forma_pago' => $efectivoDeCaja ? FormaPago::EFECTIVO : $ventaOriginal->forma_pago,
                 'tipo_pago' => $ventaOriginal->tipo_pago,
+                // Ligada a la caja de hoy solo si el efectivo salió de ella (se resta en el cierre).
+                'arqueo_caja_id' => $efectivoDeCaja ? $arqueo->id : null,
+                'forma_reembolso' => $hayReembolso ? $reembolso : null,
+                'monto_reembolso' => $hayReembolso ? $aReembolsar : null,
+                'monto_rebaja_cxc' => bccomp($rebajaCxc, '0', 2) > 0 ? $rebajaCxc : null,
                 'fecha' => now(),
                 'moneda' => $ventaOriginal->moneda,
                 'tasa_cambio' => $ventaOriginal->tasa_cambio,
@@ -715,22 +836,39 @@ class VentaService
                 'total_itbis' => $acumulado['total_itbis'],
                 'total' => $total,
                 'estado' => EstadoVenta::EMITIDA,
-                'estado_fiscal' => EstadoFiscal::PENDIENTE,
+                // Solo la E34 va al PAC; la B04 y la devolución interna no se transmiten.
+                'estado_fiscal' => $tipoNota?->esElectronico() ? EstadoFiscal::PENDIENTE : EstadoFiscal::NO_APLICA,
                 'motivo_anulacion' => $motivo,
             ]);
 
             $notaCredito->detalles()->createMany($detallesCrear);
 
             foreach ($stockMovimientos as $mov) {
-                if ($mov['producto'] !== null) {
+                if ($mov['producto'] === null) {
+                    continue;
+                }
+
+                $this->inventarioService->registrarMovimiento(
+                    $mov['producto'],
+                    TipoMovimiento::ENTRADA,
+                    OrigenMovimiento::DEVOLUCION_VENTA,
+                    $mov['cantidad'],
+                    $notaCredito->id,
+                    $usuario?->id,
+                    $motivo,
+                );
+
+                // Dañado o vencido: no vuelve a la venta. Sale como merma, con su costo, para que
+                // la pérdida quede en el Kardex.
+                if ($mov['destino'] === DestinoDevolucion::MERMA) {
                     $this->inventarioService->registrarMovimiento(
                         $mov['producto'],
-                        TipoMovimiento::ENTRADA,
-                        OrigenMovimiento::DEVOLUCION_VENTA,
+                        TipoMovimiento::SALIDA,
+                        OrigenMovimiento::MERMA,
                         $mov['cantidad'],
                         $notaCredito->id,
-                        auth()->id(),
-                        $motivo,
+                        $usuario?->id,
+                        "Merma por devolución: {$motivo}",
                     );
                 }
             }
@@ -740,25 +878,27 @@ class VentaService
     }
 
     /**
-     * Validaciones comunes para ND y NC parcial: la venta debe ser electrónica, aceptada, no
-     * anulada, y no ser ella misma una nota.
+     * Validaciones comunes para notas de débito y devoluciones: la venta no puede estar anulada ni
+     * ser ella misma una nota; si es electrónica, la DGII tiene que haberla aceptado. Una venta
+     * física (tipo B) admite B04/B03 y una sin comprobante admite devolución interna (pero no
+     * nota de débito: no hay NCF que modificar).
      */
-    private function validarVentaModificable(Venta $venta): void
+    private function validarVentaModificable(Venta $venta, bool $esNotaDebito = false): void
     {
-        if (! $venta->esElectronica()) {
-            throw new VentaInvalidaException('Solo se pueden emitir notas sobre ventas electrónicas.');
-        }
-
-        if (! $venta->estado_fiscal->esAceptado()) {
-            throw new VentaInvalidaException('La venta debe estar aceptada por la DGII.');
-        }
-
         if ($venta->estaAnulada()) {
             throw new VentaInvalidaException('No se puede emitir una nota sobre una venta anulada.');
         }
 
         if ($venta->esNotaCreditoDeAnulacion()) {
             throw new VentaInvalidaException('No se puede emitir una nota sobre otra nota.');
+        }
+
+        if ($venta->esElectronica() && ! $venta->estado_fiscal->esAceptado()) {
+            throw new VentaInvalidaException('La venta debe estar aceptada por la DGII.');
+        }
+
+        if ($esNotaDebito && $venta->tipo_comprobante === null) {
+            throw new VentaInvalidaException('Una venta sin comprobante no admite nota de débito: no tiene NCF que modificar.');
         }
     }
 

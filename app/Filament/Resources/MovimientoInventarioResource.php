@@ -60,13 +60,7 @@ class MovimientoInventarioResource extends Resource
                 TipoMovimiento::SALIDA => 'Salida',
                 TipoMovimiento::AJUSTE => 'Ajuste',
             }),
-            TextEntry::make('origen')->label('Origen')->formatStateUsing(fn (OrigenMovimiento $state) => match ($state) {
-                OrigenMovimiento::VENTA => 'Venta',
-                OrigenMovimiento::COMPRA => 'Compra',
-                OrigenMovimiento::AJUSTE => 'Ajuste',
-                OrigenMovimiento::ANULACION => 'Anulación',
-                OrigenMovimiento::DEVOLUCION_COMPRA => 'Devolución a proveedor',
-            }),
+            TextEntry::make('origen')->label('Origen')->formatStateUsing(fn (OrigenMovimiento $state) => $state->etiqueta()),
             TextEntry::make('cantidad')->label('Cantidad')->numeric(decimalPlaces: 2),
             TextEntry::make('stock_anterior')->label('Stock anterior')->numeric(decimalPlaces: 2),
             TextEntry::make('stock_nuevo')->label('Stock nuevo')->numeric(decimalPlaces: 2),
@@ -104,14 +98,7 @@ class MovimientoInventarioResource extends Resource
                 TextColumn::make('origen')
                     ->label('Origen')
                     ->badge()
-                    ->formatStateUsing(fn ($state) => match ($state) {
-                        OrigenMovimiento::VENTA => 'Venta',
-                        OrigenMovimiento::COMPRA => 'Compra',
-                        OrigenMovimiento::AJUSTE => 'Ajuste',
-                        OrigenMovimiento::ANULACION => 'Anulación',
-                        OrigenMovimiento::DEVOLUCION_COMPRA => 'Devolución a proveedor',
-                        default => $state,
-                    }),
+                    ->formatStateUsing(fn ($state) => $state instanceof OrigenMovimiento ? $state->etiqueta() : $state),
 
                 TextColumn::make('cantidad')
                     ->label('Cantidad')

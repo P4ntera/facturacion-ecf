@@ -30,6 +30,8 @@ enum TipoComprobante: string
     // contraparte electrónica de arriba, código DGII distinto.
     case FACTURA_CREDITO_FISCAL_FISICA = 'B01';
     case FACTURA_CONSUMO_FISICA        = 'B02';
+    case NOTA_DEBITO_FISICA            = 'B03';
+    case NOTA_CREDITO_FISICA           = 'B04';
     case REGIMENES_ESPECIALES_FISICA   = 'B14';
     case GUBERNAMENTAL_FISICA          = 'B15';
     case EXPORTACIONES_FISICA          = 'B16';
@@ -50,6 +52,8 @@ enum TipoComprobante: string
             self::PAGOS_EXTERIOR         => 'Pagos al Exterior',
             self::FACTURA_CREDITO_FISCAL_FISICA => 'Factura de Crédito Fiscal (física)',
             self::FACTURA_CONSUMO_FISICA        => 'Factura de Consumo (física)',
+            self::NOTA_DEBITO_FISICA            => 'Nota de Débito (física)',
+            self::NOTA_CREDITO_FISICA           => 'Nota de Crédito (física)',
             self::REGIMENES_ESPECIALES_FISICA   => 'Regímenes Especiales de Tributación (física)',
             self::GUBERNAMENTAL_FISICA          => 'Gubernamental (física)',
             self::EXPORTACIONES_FISICA          => 'Exportaciones (física)',
@@ -74,6 +78,7 @@ enum TipoComprobante: string
             self::FACTURA_CREDITO_FISCAL, self::FACTURA_CONSUMO, self::NOTA_DEBITO, self::NOTA_CREDITO,
             self::REGIMENES_ESPECIALES, self::GUBERNAMENTAL, self::EXPORTACIONES,
             self::FACTURA_CREDITO_FISCAL_FISICA, self::FACTURA_CONSUMO_FISICA,
+            self::NOTA_DEBITO_FISICA, self::NOTA_CREDITO_FISICA,
             self::REGIMENES_ESPECIALES_FISICA, self::GUBERNAMENTAL_FISICA, self::EXPORTACIONES_FISICA => true,
             self::COMPRAS, self::GASTOS_MENORES, self::PAGOS_EXTERIOR, self::PAGOS_EXTERIOR_FISICA => false,
         };
@@ -93,6 +98,35 @@ enum TipoComprobante: string
     public function esFisico(): bool
     {
         return ! $this->esElectronico();
+    }
+
+    public function esNotaCredito(): bool
+    {
+        return $this === self::NOTA_CREDITO || $this === self::NOTA_CREDITO_FISICA;
+    }
+
+    public function esNotaDebito(): bool
+    {
+        return $this === self::NOTA_DEBITO || $this === self::NOTA_DEBITO_FISICA;
+    }
+
+    /**
+     * Nota de crédito que corresponde a una venta: E34 si la venta es electrónica, B04 si es
+     * física, y ninguna (null: devolución interna, sin NCF) si la venta se hizo sin comprobante.
+     */
+    public static function notaCreditoPara(?self $tipoVenta): ?self
+    {
+        return match (true) {
+            $tipoVenta === null => null,
+            $tipoVenta->esElectronico() => self::NOTA_CREDITO,
+            default => self::NOTA_CREDITO_FISICA,
+        };
+    }
+
+    /** Nota de débito que corresponde a una venta: E33 si es electrónica, B03 si es física. */
+    public static function notaDebitoPara(self $tipoVenta): self
+    {
+        return $tipoVenta->esElectronico() ? self::NOTA_DEBITO : self::NOTA_DEBITO_FISICA;
     }
 
     /**

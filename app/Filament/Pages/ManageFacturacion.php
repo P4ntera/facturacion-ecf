@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use App\Enums\FormaReembolso;
 use App\Enums\MetodoCosto;
 use App\Enums\RedondeoPrecio;
 use App\Enums\TasaItbis;
@@ -10,7 +11,9 @@ use App\Models\Empresa;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -57,6 +60,10 @@ class ManageFacturacion extends Page
             'metodo_costo' => $config->metodo_costo->value,
             'redondeo_precio' => $config->redondeo_precio->value,
             'permite_stock_negativo' => $config->permite_stock_negativo,
+            'acepta_devoluciones' => $config->acepta_devoluciones,
+            'devolucion_plazo_dias' => $config->devolucion_plazo_dias,
+            'devolucion_reembolsos' => collect($config->reembolsosPermitidos())->map(fn (FormaReembolso $f) => $f->value)->all(),
+            'devolucion_monto_supervisor' => $config->devolucion_monto_supervisor,
         ]);
     }
 
@@ -130,6 +137,42 @@ class ManageFacturacion extends Page
                         Toggle::make('permite_stock_negativo')
                             ->label('Permitir vender sin stock')
                             ->helperText('Para cuando la mercancía está en la tienda pero la compra todavía no se registró. Solo al vender: el producto queda en negativo, la venta queda marcada en el Kardex y sale una alerta hasta que entre la compra o se ajuste tras contar. Ajustes, anular compras y devolver al proveedor siguen sin poder dejar el stock en negativo.'),
+                    ]),
+
+                Section::make('Devoluciones de clientes')
+                    ->description('Las reglas de tu negocio. La devolución siempre se registra en la caja de hoy; una caja cerrada no se toca.')
+                    ->columnSpanFull()
+                    ->columns(2)
+                    ->schema([
+                        Toggle::make('acepta_devoluciones')
+                            ->label('Aceptar devoluciones')
+                            ->live()
+                            ->columnSpanFull(),
+
+                        TextInput::make('devolucion_plazo_dias')
+                            ->label('Plazo máximo (días desde la venta)')
+                            ->numeric()
+                            ->minValue(1)
+                            ->maxValue(3650)
+                            ->placeholder('Sin límite')
+                            ->visible(fn (Get $get): bool => (bool) $get('acepta_devoluciones')),
+
+                        TextInput::make('devolucion_monto_supervisor')
+                            ->label('Necesita supervisor a partir de')
+                            ->numeric()
+                            ->minValue(0)
+                            ->prefix('RD$')
+                            ->placeholder('Nunca')
+                            ->helperText('Por encima de este monto, solo un usuario con el permiso "Autorizar devoluciones" puede registrarla.')
+                            ->visible(fn (Get $get): bool => (bool) $get('acepta_devoluciones')),
+
+                        CheckboxList::make('devolucion_reembolsos')
+                            ->label('Cómo se le puede devolver el dinero al cliente')
+                            ->options(collect(FormaReembolso::cases())->mapWithKeys(fn (FormaReembolso $f) => [$f->value => $f->etiqueta()]))
+                            ->helperText('Si la venta fue a crédito, primero se rebaja lo que el cliente debe; solo el resto se reembolsa.')
+                            ->required(fn (Get $get): bool => (bool) $get('acepta_devoluciones'))
+                            ->visible(fn (Get $get): bool => (bool) $get('acepta_devoluciones'))
+                            ->columnSpanFull(),
                     ]),
             ]);
     }

@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Enums\EstadoFiscal;
 use App\Enums\EstadoVenta;
+use App\Enums\FormaReembolso;
 use App\Enums\TasaItbis;
 use App\Enums\TipoComprobante;
 use App\Enums\TipoDocumentoCliente;
@@ -1042,5 +1043,39 @@ class AislamientoEntreEmpresasTest extends TestCase
         // Con un producto propio sí funciona.
         app(CostoPrecioService::class)->aplicarPrecios([$productoA->id => '120.00'], $empresaA);
         $this->assertSame('120.00', (string) $productoA->fresh()->precio);
+    }
+
+    /**
+     * 29. Devoluciones: una empresa no puede registrar una devolución sobre la venta de OTRA
+     * (ni mover su stock ni emitir su nota de crédito), aunque mande el id de esa venta.
+     */
+    public function test_29_no_se_puede_devolver_una_venta_de_otra_empresa(): void
+    {
+        ['empresa' => $empresaA] = $this->crearEmpresaConDatos('Empresa A', '131000001');
+        ['empresa' => $empresaTobogan, 'producto' => $productoTobogan] = $this->crearEmpresaConDatos('Tobogán', '131000002');
+
+        $this->comoEmpresa($empresaTobogan);
+        $empresaTobogan->config()->update(['permite_ventas_sin_comprobante' => true]);
+        $productoTobogan->update(['controla_stock' => true, 'stock' => 10]);
+        $ventaTobogan = app(VentaService::class)->registrar([
+            'sin_comprobante' => true,
+            'lineas' => [['producto_id' => $productoTobogan->id, 'cantidad' => 2]],
+        ], $empresaTobogan);
+
+        $this->comoEmpresa($empresaA);
+
+        try {
+            app(VentaService::class)->registrarDevolucion(
+                $ventaTobogan->fresh(), $empresaA,
+                [['detalle_venta_id' => $ventaTobogan->detalles()->first()->id, 'cantidad' => 1]],
+                'Intento', FormaReembolso::MISMO_MEDIO,
+            );
+            $this->fail('Debió rechazar la venta de otra empresa.');
+        } catch (VentaInvalidaException $e) {
+            $this->assertStringContainsString('no pertenece a esta empresa', $e->getMessage());
+        }
+
+        $this->assertSame(0, Venta::where('venta_modificada_id', $ventaTobogan->id)->count());
+        $this->assertEquals(8, (float) $productoTobogan->fresh()->stock);
     }
 }
