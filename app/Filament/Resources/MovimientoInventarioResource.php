@@ -131,6 +131,14 @@ class MovimientoInventarioResource extends Resource
                     ->alignEnd()
                     ->toggleable(isToggledHiddenByDefault: true),
 
+                // Marca de "vender sin stock": esta salida dejó el producto en negativo.
+                TextColumn::make('dejo_stock_negativo')
+                    ->label('')
+                    ->badge()
+                    ->color('danger')
+                    ->formatStateUsing(fn (bool $state): ?string => $state ? 'Vendido sin stock' : null)
+                    ->state(fn (MovimientoInventario $record): ?bool => $record->dejo_stock_negativo ?: null),
+
                 TextColumn::make('user.name')
                     ->label('Usuario')
                     ->placeholder('Sistema')
@@ -149,6 +157,11 @@ class MovimientoInventarioResource extends Resource
                     ->relationship('producto', 'nombre', modifyQueryUsing: fn (Builder $query) => $query->where('empresa_id', Filament::getTenant()->id))
                     ->searchable()
                     ->preload(),
+
+                Filter::make('dejo_stock_negativo')
+                    ->label('Solo vendidos sin stock')
+                    ->toggle()
+                    ->query(fn (Builder $query): Builder => $query->where('dejo_stock_negativo', true)),
 
                 Filter::make('fecha')
                     ->schema([

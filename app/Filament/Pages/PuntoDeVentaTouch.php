@@ -251,7 +251,8 @@ class PuntoDeVentaTouch extends PuntoDeVenta
                     'nombre' => $producto->nombre,
                     'precio_texto' => number_format((float) $precio, 2).($esPesado ? ' / '.$producto->unidad_base : ''),
                     'pesado' => $esPesado,
-                    'agotado' => $producto->controla_stock && (float) $producto->stock <= 0,
+                    // Con "vender sin stock" activo el botón no se bloquea (al tocarlo sale el aviso).
+                    'agotado' => $producto->controla_stock && (float) $producto->stock <= 0 && ! $this->permiteVenderSinStock(),
                 ];
             });
     }

@@ -231,6 +231,9 @@ class VentaService
 
             $venta->detalles()->createMany($detalles);
 
+            // Vender sin stock solo si la empresa lo activó: la salida queda marcada en el Kardex.
+            $permitirNegativo = $config->permite_stock_negativo;
+
             foreach ($productosLineas as $item) {
                 $this->inventarioService->registrarMovimiento(
                     $item['producto'],
@@ -239,6 +242,7 @@ class VentaService
                     $item['cantidad'],
                     $venta->id,
                     $datos['user_id'] ?? null,
+                    permitirNegativo: $permitirNegativo,
                 );
             }
 

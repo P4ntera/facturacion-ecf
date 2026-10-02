@@ -40,6 +40,7 @@ class EmpresaConfiguracion extends Model
         'certificado_vence',
         'metodo_costo',
         'redondeo_precio',
+        'permite_stock_negativo',
     ];
 
     protected $casts = [
@@ -52,6 +53,7 @@ class EmpresaConfiguracion extends Model
         'certificado_vence' => 'date',
         'metodo_costo' => MetodoCosto::class,
         'redondeo_precio' => RedondeoPrecio::class,
+        'permite_stock_negativo' => 'boolean',
     ];
 
     // Reflejan los defaults de la columna en la migración: sin esto, un ::create()/firstOrCreate()
@@ -68,6 +70,7 @@ class EmpresaConfiguracion extends Model
         'dgii_base_url' => 'https://sandbox.pac-ecf.example.do/api/v1',
         'metodo_costo' => 'ultima_compra',
         'redondeo_precio' => 'ninguno',
+        'permite_stock_negativo' => false,
     ];
 
     public function empresa(): BelongsTo

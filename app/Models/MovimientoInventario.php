@@ -17,7 +17,7 @@ class MovimientoInventario extends Model
     protected $fillable = [
         'empresa_id', 'producto_id', 'tipo', 'origen', 'referencia_id',
         'cantidad', 'stock_anterior', 'stock_nuevo',
-        'user_id', 'observacion',
+        'user_id', 'observacion', 'dejo_stock_negativo',
     ];
 
     protected $casts = [
@@ -26,6 +26,7 @@ class MovimientoInventario extends Model
         'cantidad' => 'decimal:3',
         'stock_anterior' => 'decimal:3',
         'stock_nuevo' => 'decimal:3',
+        'dejo_stock_negativo' => 'boolean',
     ];
 
     public function empresa(): BelongsTo

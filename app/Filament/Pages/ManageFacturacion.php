@@ -56,6 +56,7 @@ class ManageFacturacion extends Page
             'moneda' => $config->moneda,
             'metodo_costo' => $config->metodo_costo->value,
             'redondeo_precio' => $config->redondeo_precio->value,
+            'permite_stock_negativo' => $config->permite_stock_negativo,
         ]);
     }
 
@@ -121,6 +122,14 @@ class ManageFacturacion extends Page
                             ->options(collect(RedondeoPrecio::cases())->mapWithKeys(fn (RedondeoPrecio $redondeo) => [$redondeo->value => $redondeo->etiqueta()]))
                             ->helperText('Siempre hacia arriba, para no perder margen. El precio sugerido nunca se aplica solo: lo revisas y apruebas al registrar la compra.')
                             ->required(),
+                    ]),
+
+                Section::make('Inventario')
+                    ->columnSpanFull()
+                    ->schema([
+                        Toggle::make('permite_stock_negativo')
+                            ->label('Permitir vender sin stock')
+                            ->helperText('Para cuando la mercancía está en la tienda pero la compra todavía no se registró. Solo al vender: el producto queda en negativo, la venta queda marcada en el Kardex y sale una alerta hasta que entre la compra o se ajuste tras contar. Ajustes, anular compras y devolver al proveedor siguen sin poder dejar el stock en negativo.'),
                     ]),
             ]);
     }
