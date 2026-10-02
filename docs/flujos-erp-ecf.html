@@ -497,7 +497,7 @@
   <!-- 3. COMPRA -->
   <section id="compra">
     <h2>Compra</h2>
-    <p>El stock bajo dispara el pedido. Cuando llega la mercancía se pulsa <strong>Recibir</strong> en el pedido: la compra se abre ya llena con el proveedor y las líneas, se le pone el NCF y entra al Kardex con su costo.</p>
+    <p>El stock bajo dispara la orden de compra. Cuando llega la mercancía se pulsa <strong>Recibir mercancía</strong> en la orden: la compra se abre ya llena con lo pendiente, se le pone el NCF de la factura y entra al Kardex con su costo. Si llega en varias entregas, cada una es una compra con su factura.</p>
     <figure>
       <div class="canvas w-1000">
         <svg viewBox="0 0 1000 364" role="img" aria-label="Flujo de una compra: stock bajo genera un pedido; al llegar, si el proveedor es formal se registra su NCF y si es informal se genera un NCF 41; la mercancía entra al Kardex y actualiza el costo; a crédito abre una cuenta por pagar que se salda con pagos; una devolución saca del Kardex y reduce el saldo.">
@@ -531,8 +531,8 @@
           <text class="sub" x="90" y="99">alerta por producto</text>
 
           <rect class="node" x="220" y="60" width="160" height="52" rx="6"/>
-          <text class="ttl" x="300" y="82">Pedido de compra</text>
-          <text class="sub" x="300" y="99">se envía al proveedor</text>
+          <text class="ttl" x="300" y="82">Orden de compra</text>
+          <text class="sub" x="300" y="99">se aprueba y se envía</text>
 
           <polygon class="node dec" points="430,86 520,46 610,86 520,126"/>
           <text class="ttl" x="520" y="83">¿Proveedor</text>
@@ -572,7 +572,7 @@
       <figcaption>Un proveedor informal no emite comprobante, así que el sistema le genera uno con la secuencia <span class="code">41</span>. Todas las compras con NCF del mes, menos las anuladas, van al Reporte 606.</figcaption>
     </figure>
     <ul class="rules">
-      <li><strong>Pedido recibido:</strong> la compra queda ligada al pedido y este pasa a Recibido. Si se anula la compra, el pedido vuelve a Pendiente.</li>
+      <li><strong>Orden recibida:</strong> cada compra queda ligada a la orden y descuenta de lo pendiente: parcial o completada. Si se anula la compra, lo recibido con ella vuelve a quedar pendiente. El stock entra una sola vez, por la compra.</li>
       <li><strong>Costo:</strong> según el método que elija cada empresa: manual, última compra o promedio ponderado. Cada venta guarda el costo de ese momento, para que los reportes de ganancia no cambien después.</li>
       <li><strong>Precio sugerido:</strong> costo + el % de ganancia del producto o de su categoría, con el redondeo de la empresa. Al guardar la compra se sugiere; nunca cambia solo.</li>
       <li><strong>Catálogo:</strong> comprarle a un proveedor lo vincula al producto. El primero queda como proveedor principal.</li>
@@ -680,7 +680,6 @@
     <h2>Por decidir</h2>
     <p>Puntos donde el sistema actual y lo que queremos todavía no coinciden, o donde falta una decisión del equipo.</p>
     <ol class="todo">
-      <li><strong>Pedido de compra y Orden de compra hacen lo mismo</strong><span>Hay dos pantallas para pedirle mercancía a un proveedor. Además, recibir una orden de compra mete el stock pero no crea la compra: no queda NCF, ni cuenta por pagar, ni sale en el 606. Si después se registra la compra a mano, el stock entra dos veces. Hay que quedarse con un solo flujo.</span></li>
       <li><strong>Envío de e-CF en producción</strong><span>El envío usa la cola <span class="code">ecf</span>, que hoy ningún worker escucha, y los reintentos se acaban en unos 7 minutos. Hace falta un worker con supervisor y una tarea programada que reintente y refresque el estado.</span></li>
       <li><strong>Sin internet no se vende</strong><span>¿Modo contingencia que facture en tipo B y regularice después, o un respaldo de internet?</span></li>
     </ol>
@@ -691,9 +690,9 @@
     </ol>
     <h3>Resuelto</h3>
     <ol class="todo">
+      <li class="done"><strong>Un solo flujo de compras</strong><span>Se quedó la Orden de compra; el Pedido se retiró y los pendientes pasaron a órdenes. Recibir mercancía es registrar la compra, así el stock entra una sola vez y queda NCF, cuenta por pagar y 606.</span></li>
       <li class="done"><strong>Costo y precio (entrega 1)</strong><span>Método de costo por empresa, costo guardado en cada venta, % de ganancia por categoría o producto, precio sugerido con redondeo que se aprueba al registrar la compra.</span></li>
       <li class="done"><strong>Anulación de tipo B</strong><span>El motivo 608 se valida antes de reponer stock y ya no da error. Commit <span class="code">2bc658a</span>.</span></li>
-      <li class="done"><strong>Del pedido a la compra</strong><span>El botón Recibir crea la compra prellenada y la deja ligada al pedido. Commit <span class="code">35d20df</span>.</span></li>
     </ol>
   </section>
 </div>
