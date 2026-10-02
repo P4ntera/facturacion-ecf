@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\OrdenCompraResource\RelationManagers;
 
+use App\Filament\Resources\CompraResource;
+use App\Models\RecepcionCompra;
 use Filament\Resources\RelationManagers\RelationManager;
-use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 
@@ -23,6 +24,21 @@ class RecepcionesRelationManager extends RelationManager
                     ->label('Fecha')
                     ->date('d/m/Y')
                     ->sortable(),
+
+                // Cada recepción es una compra registrada (con su factura).
+                TextColumn::make('compra.ncf')
+                    ->label('Compra')
+                    ->state(fn (RecepcionCompra $record): ?string => $record->compra_id === null
+                        ? null
+                        : "Compra #{$record->compra_id}".($record->compra?->ncf ? " · {$record->compra->ncf}" : ''))
+                    ->url(fn (RecepcionCompra $record): ?string => $record->compra_id ? CompraResource::getUrl('view', ['record' => $record->compra_id]) : null)
+                    ->placeholder('—'),
+
+                TextColumn::make('estado')
+                    ->label('Estado')
+                    ->badge()
+                    ->state(fn (RecepcionCompra $record): string => $record->estaAnulada() ? 'Anulada' : 'Recibida')
+                    ->color(fn (RecepcionCompra $record): string => $record->estaAnulada() ? 'danger' : 'success'),
 
                 TextColumn::make('user.name')
                     ->label('Recibido por')

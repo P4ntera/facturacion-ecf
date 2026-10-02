@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Enums\EstadoCompra;
-use App\Enums\EstadoPedidoCompra;
 use App\Enums\OrigenMovimiento;
 use App\Enums\TasaItbis;
 use App\Enums\TipoComprobante;
@@ -13,7 +12,6 @@ use App\Exceptions\CuentaConPagosRegistradosException;
 use App\Models\Compra;
 use App\Models\DetalleCompra;
 use App\Models\Empresa;
-use App\Models\PedidoCompra;
 use App\Models\Producto;
 use App\Models\ProductoProveedor;
 use App\Models\Proveedor;
@@ -28,6 +26,7 @@ class CompraService
         private readonly SecuenciaNcfService $ncfService,
         private readonly CuentaPorPagarService $cuentaPorPagarService,
         private readonly CostoPrecioService $costoPrecioService,
+        private readonly OrdenCompraService $ordenCompraService,
     ) {}
 
     /**
@@ -45,7 +44,7 @@ class CompraService
      *     costo_unitario: float,
      *   }>
      * } $datos  tipo_comprobante/ncf se ignoran y se autogeneran si el proveedor es informal.
-     *            pedido_compra_id (opcional): el pedido que esta compra recibe; queda RECIBIDO.
+     *            orden_compra_id (opcional): la orden de compra cuya mercancía recibe esta compra.
      */
     public function crear(array $datos, int $userId, Empresa $empresa): Compra
     {
@@ -62,7 +61,9 @@ class CompraService
 
         return DB::transaction(function () use ($datos, $userId, $empresa) {
             $proveedor = Proveedor::where('empresa_id', $empresa->id)->findOrFail($datos['proveedor_id']);
-            $pedido = $this->pedidoARecibir($datos['pedido_compra_id'] ?? null, $proveedor, $empresa);
+            $orden = filled($datos['orden_compra_id'] ?? null)
+                ? $this->ordenCompraService->ordenParaRecibir($datos['orden_compra_id'], $proveedor, $empresa)
+                : null;
             $itbisIncluido = (bool) ($datos['itbis_incluido'] ?? false);
 
             $detallesCalc = $this->calcularLineas($datos['lineas'], $itbisIncluido, $empresa);
@@ -93,7 +94,7 @@ class CompraService
                 // tests).
                 'empresa_id' => $proveedor->empresa_id,
                 'proveedor_id' => $proveedor->id,
-                'pedido_compra_id' => $pedido?->id,
+                'orden_compra_id' => $orden?->id,
                 'user_id' => $userId,
                 'tipo_comprobante' => $tipoComprobante,
                 'ncf' => $ncf,
@@ -151,45 +152,14 @@ class CompraService
                 $this->cuentaPorPagarService->crearDesdeCompra($compra);
             }
 
-            $pedido?->update([
-                'estado' => EstadoPedidoCompra::RECIBIDO,
-                'recibido_en' => now(),
-            ]);
+            // La mercancía de la orden entró con esta compra (stock, costo, CxP, 606): la orden
+            // solo anota cuánto se recibió. Si se pasa de lo pendiente, se revierte todo.
+            if ($orden !== null) {
+                $this->ordenCompraService->registrarRecepcionDeCompra($orden, $compra, $detallesCalc, $userId);
+            }
 
             return $compra->load('detalles.producto', 'proveedor');
         });
-    }
-
-    /**
-     * Valida el pedido que la compra dice recibir. pedido_compra_id viene del formulario (query
-     * string de "Recibir"), así que es client-controllable: se revalida que sea de esta empresa,
-     * del mismo proveedor y que siga pendiente. lockForUpdate: dos compras simultáneas no pueden
-     * recibir el mismo pedido.
-     */
-    private function pedidoARecibir(mixed $pedidoId, Proveedor $proveedor, Empresa $empresa): ?PedidoCompra
-    {
-        if (blank($pedidoId)) {
-            return null;
-        }
-
-        $pedido = PedidoCompra::query()
-            ->where('empresa_id', $empresa->id)
-            ->lockForUpdate()
-            ->find($pedidoId);
-
-        if ($pedido === null) {
-            throw new RuntimeException('El pedido de compra indicado no existe.');
-        }
-
-        if (! $pedido->estaPendiente()) {
-            throw new RuntimeException("El pedido de compra #{$pedido->id} ya no está pendiente ({$pedido->estado->etiqueta()}).");
-        }
-
-        if ($pedido->proveedor_id !== $proveedor->id) {
-            throw new RuntimeException("El pedido de compra #{$pedido->id} es de otro proveedor.");
-        }
-
-        return $pedido;
     }
 
     /**
@@ -236,12 +206,10 @@ class CompraService
                 'anulada_en' => now(),
             ]);
 
-            // La mercancía del pedido ya no cuenta como recibida: el pedido vuelve a pendiente
-            // para que se pueda recibir otra vez (o cancelar).
-            $compra->pedidoCompra?->update([
-                'estado' => EstadoPedidoCompra::PENDIENTE,
-                'recibido_en' => null,
-            ]);
+            // Si recibió una orden de compra, lo recibido con esta compra vuelve a quedar pendiente.
+            if ($compra->orden_compra_id !== null) {
+                $this->ordenCompraService->revertirRecepcionDeCompra($compra);
+            }
 
             return $compra->refresh();
         });

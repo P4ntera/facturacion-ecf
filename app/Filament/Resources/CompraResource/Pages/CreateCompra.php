@@ -6,7 +6,7 @@ use App\Enums\TipoComprobante;
 use App\Exceptions\StockInsuficienteException;
 use App\Filament\Resources\CompraResource;
 use App\Models\Compra;
-use App\Models\PedidoCompra;
+use App\Models\OrdenCompra;
 use App\Services\CompraService;
 use App\Services\CostoPrecioService;
 use Filament\Actions\Action;
@@ -24,45 +24,50 @@ class CreateCompra extends CreateRecord
 {
     protected static string $resource = CompraResource::class;
 
-    /** ?pedido={id}: viene de "Recibir" en Pedidos de Compra. */
-    #[Url(as: 'pedido')]
-    public ?string $pedidoId = null;
+    /** ?orden={id}: viene de "Recibir mercancía" en Órdenes de Compra. */
+    #[Url(as: 'orden')]
+    public ?string $ordenId = null;
 
     public function mount(): void
     {
         parent::mount();
 
-        if (blank($this->pedidoId)) {
+        if (blank($this->ordenId)) {
             return;
         }
 
-        // El id viene de la URL: solo pedidos pendientes de la empresa activa. Si no aplica, se
-        // avisa y queda el formulario vacío en vez de prellenar con datos ajenos.
-        $pedido = PedidoCompra::query()
+        // El id viene de la URL: solo órdenes de la empresa activa que admitan recepciones. Si no
+        // aplica, se avisa y queda el formulario vacío en vez de prellenar con datos ajenos.
+        $orden = OrdenCompra::query()
             ->where('empresa_id', Filament::getTenant()->id)
             ->with('detalles')
-            ->find($this->pedidoId);
+            ->find($this->ordenId);
 
-        if ($pedido === null || ! $pedido->estaPendiente()) {
-            Notification::make()->title('El pedido de compra no existe o ya no está pendiente.')->warning()->send();
+        if ($orden === null || ! $orden->puedeRecibir()) {
+            Notification::make()->title('La orden de compra no existe o no admite recepciones.')->warning()->send();
 
             return;
         }
 
+        // Solo lo pendiente, al precio pactado en la orden. El usuario ajusta si llegó distinto.
         $lineas = [];
-        foreach ($pedido->detalles as $detalle) {
+        foreach ($orden->detalles as $detalle) {
+            if (bccomp($detalle->cantidadPendiente(), '0', 4) <= 0) {
+                continue;
+            }
+
             $lineas[(string) Str::uuid()] = [
                 'producto_id'    => $detalle->producto_id,
-                'cantidad'       => (float) $detalle->cantidad,
-                'costo_unitario' => (float) $detalle->costo_unitario,
+                'cantidad'       => (float) $detalle->cantidadPendiente(),
+                'costo_unitario' => (float) $detalle->precio_unitario,
             ];
         }
 
         $this->form->fill([
             ...$this->data,
-            'pedido_compra_id' => $pedido->id,
-            'proveedor_id'     => $pedido->proveedor_id,
-            'lineas'           => $lineas,
+            'orden_compra_id' => $orden->id,
+            'proveedor_id'    => $orden->proveedor_id,
+            'lineas'          => $lineas,
         ]);
     }
 
@@ -135,7 +140,7 @@ class CreateCompra extends CreateRecord
         try {
             $compra = app(CompraService::class)->crear([
                 'proveedor_id'         => $data['proveedor_id'],
-                'pedido_compra_id'     => $data['pedido_compra_id'] ?? null,
+                'orden_compra_id'      => $data['orden_compra_id'] ?? null,
                 'tipo_comprobante'     => filled($data['tipo_comprobante'] ?? null) ? TipoComprobante::from($data['tipo_comprobante']) : null,
                 'ncf'                  => $data['ncf'] ?? null,
                 'fecha'                => $data['fecha'],

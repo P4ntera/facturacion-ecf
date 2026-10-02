@@ -161,9 +161,16 @@ class CostoYPrecioTest extends TestCase
         ], $this->user->id, $this->empresaDefault);
         $servicio->aprobar($orden);
 
-        $servicio->registrarRecepcion($orden, [
-            ['detalle_orden_compra_id' => $orden->detalles->first()->id, 'cantidad_recibida' => 10],
-        ], $this->empresaDefault);
+        // Recibir la orden es registrar la compra: el costo se actualiza una sola vez.
+        app(CompraService::class)->crear([
+            'proveedor_id' => $this->proveedor->id,
+            'orden_compra_id' => $orden->id,
+            'tipo_comprobante' => TipoComprobante::FACTURA_CREDITO_FISCAL_FISICA,
+            'ncf' => 'B0100000009',
+            'fecha' => now(),
+            'itbis_incluido' => false,
+            'lineas' => [['producto_id' => $this->producto->id, 'cantidad' => 10, 'costo_unitario' => 70]],
+        ], $this->user->id, $this->empresaDefault);
 
         $this->assertSame('51.82', $this->costo());
     }

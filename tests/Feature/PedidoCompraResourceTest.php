@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Enums\TasaItbis;
 use App\Enums\TipoProducto;
 use App\Filament\Resources\PedidoCompraResource;
-use App\Filament\Resources\PedidoCompraResource\Pages\CreatePedidoCompra;
 use App\Filament\Resources\PedidoCompraResource\Pages\ListPedidosCompra;
 use App\Mail\PedidoCompraEnviado;
 use App\Models\Producto;
@@ -66,31 +65,16 @@ class PedidoCompraResourceTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_el_formulario_de_crear_pedido_carga_sin_errores(): void
+    /** Los pedidos se unificaron con las órdenes de compra: ya no se crean pedidos nuevos. */
+    public function test_ya_no_se_pueden_crear_pedidos_nuevos(): void
     {
         $usuario = $this->usuarioConPermiso();
 
-        Livewire::actingAs($usuario)
-            ->test(CreatePedidoCompra::class)
-            ->assertOk();
-    }
+        $this->assertFalse(PedidoCompraResource::canCreate());
 
-    public function test_crear_pedido_prefill_desde_query_params_del_dashboard(): void
-    {
-        $usuario = $this->usuarioConPermiso();
-        $proveedor = Proveedor::factory()->create();
-        $producto = $this->crearProducto();
-
-        $producto->proveedores()->attach($proveedor->id, ['es_principal' => true]);
-
-        Livewire::actingAs($usuario)
-            ->withQueryParams([
-                'proveedor_id' => $proveedor->id,
-                'producto_ids' => (string) $producto->id,
-            ])
-            ->test(CreatePedidoCompra::class)
-            ->assertOk()
-            ->assertFormSet(['proveedor_id' => $proveedor->id]);
+        $this->actingAs($usuario)
+            ->get(PedidoCompraResource::getUrl('create'))
+            ->assertForbidden();
     }
 
     public function test_enviar_pedido_por_correo_envia_mailable_con_pdf_adjunto(): void

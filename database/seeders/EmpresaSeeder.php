@@ -11,20 +11,20 @@ use App\Enums\TipoProveedor;
 use App\Models\ArqueoCaja;
 use App\Models\Cliente;
 use App\Models\Empresa;
-use App\Models\PedidoCompra;
+use App\Models\OrdenCompra;
 use App\Models\Producto;
 use App\Models\Proveedor;
 use App\Models\User;
 use App\Services\ArqueoCajaService;
 use App\Services\ModulosEmpresaService;
-use App\Services\PedidoCompraService;
+use App\Services\OrdenCompraService;
 use App\Services\RolesEmpresaService;
 use Illuminate\Database\Seeder;
 
 /**
  * Dos empresas de prueba para verificar aislamiento entre tenants (cada una con su propio
  * usuario administrador y datos propios): "Empresa A" y "Tobogán". Nombres de producto/cliente/
- * proveedor a propósito distintos entre sí (incluye un ArqueoCaja y un PedidoCompra por empresa)
+ * proveedor a propósito distintos entre sí (incluye un ArqueoCaja y una OrdenCompra por empresa)
  * para que una fuga entre empresas sea obvia a simple vista.
  */
 class EmpresaSeeder extends Seeder
@@ -123,13 +123,14 @@ class EmpresaSeeder extends Seeder
             ],
         );
 
-        if ($primerProducto !== null && ! PedidoCompra::where('empresa_id', $empresa->id)->exists()) {
-            app(PedidoCompraService::class)->crear([
+        if ($primerProducto !== null && ! OrdenCompra::where('empresa_id', $empresa->id)->exists()) {
+            app(OrdenCompraService::class)->crear([
                 'proveedor_id' => $proveedorCreado->id,
-                'fecha' => now(),
-                'notas' => 'Pedido de prueba sembrado por EmpresaSeeder.',
+                'fecha' => now()->toDateString(),
+                'fecha_esperada' => null,
+                'notas' => 'Orden de prueba sembrada por EmpresaSeeder.',
                 'lineas' => [
-                    ['producto_id' => $primerProducto->id, 'cantidad' => 10, 'costo_unitario' => (float) $primerProducto->costo],
+                    ['producto_id' => $primerProducto->id, 'cantidad_solicitada' => 10, 'precio_unitario' => (float) $primerProducto->costo],
                 ],
             ], $admin->id, $empresa);
         }
