@@ -4,6 +4,7 @@ namespace App\Providers\Filament;
 
 use App\Filament\Pages\Auth\EditProfile;
 use App\Http\Middleware\EstablecerEmpresaPermisos;
+use App\Http\Middleware\VerificarLicencia;
 use App\Models\Empresa;
 use Filament\Actions\Action;
 use Filament\Enums\UserMenuPosition;
@@ -163,6 +164,7 @@ class AdminPanelProvider extends PanelProvider
             // interacción posterior ve permisos vacíos, como si no tuviera ningún rol.
             ->middleware([
                 EstablecerEmpresaPermisos::class,
+                VerificarLicencia::class,
             ], isPersistent: true)
             ->authMiddleware([
                 Authenticate::class,

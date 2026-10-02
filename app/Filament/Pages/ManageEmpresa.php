@@ -4,6 +4,8 @@ namespace App\Filament\Pages;
 
 use App\Enums\AmbienteEcf;
 use App\Models\Empresa;
+use App\Models\EmpresaLicenseState;
+use App\Services\LicenseService;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
@@ -48,6 +50,8 @@ class ManageEmpresa extends Page
         $empresa = $this->empresa();
         $config = $empresa->config();
 
+        $licenseState = EmpresaLicenseState::where('empresa_id', $empresa->id)->first();
+
         $this->form->fill([
             'razon_social' => $empresa->razon_social,
             'nombre_comercial' => $empresa->nombre_comercial,
@@ -63,6 +67,7 @@ class ManageEmpresa extends Page
             // arranca vacío siempre; solo se toca la fila si se sube un archivo nuevo (ver save()).
             'certificado_upload' => null,
             'certificado_password' => null,
+            'license_key' => $licenseState?->license_key,
         ]);
     }
 
@@ -173,6 +178,22 @@ class ManageEmpresa extends Page
                             ->requiredWith('certificado_upload')
                             ->helperText('Requerida para validar el archivo subido. Se guarda cifrada.'),
                     ]),
+
+                Section::make('Licencia')
+                    ->description('Clave de licencia asignada a esta empresa. Cuando la validación de licencias está activada (LICENSE_ENABLED=true), el sistema verifica periódicamente que la licencia sea válida.')
+                    ->columnSpanFull()
+                    ->visible(fn () => app(LicenseService::class)->isEnabled())
+                    ->components([
+                        TextEntry::make('license_estado')
+                            ->label('Estado de la licencia')
+                            ->state(fn () => $this->estadoLicencia())
+                            ->columnSpanFull(),
+
+                        TextInput::make('license_key')
+                            ->label('Clave de licencia')
+                            ->maxLength(255)
+                            ->helperText('La clave proporcionada por el proveedor para esta empresa.'),
+                    ]),
             ]);
     }
 
@@ -224,6 +245,16 @@ class ManageEmpresa extends Page
 
         $config->update($configData);
 
+        // Guardar license_key si la validación de licencias está activada.
+        if (app(LicenseService::class)->isEnabled()) {
+            $licenseKey = $data['license_key'] ?? null;
+
+            EmpresaLicenseState::updateOrCreate(
+                ['empresa_id' => $empresa->id],
+                ['license_key' => $licenseKey]
+            );
+        }
+
         Notification::make()->title('Datos guardados')->success()->send();
 
         $this->form->fill([...$data, 'certificado_upload' => null, 'certificado_password' => null]);
@@ -265,6 +296,41 @@ class ManageEmpresa extends Page
         return $config->certificadoPorVencer()
             ? "Certificado cargado. Vence el {$vence} (vence pronto o ya venció)."
             : "Certificado cargado. Vence el {$vence}.";
+    }
+
+    private function estadoLicencia(): string
+    {
+        $state = EmpresaLicenseState::where('empresa_id', $this->empresa()->id)->first();
+
+        if ($state === null || blank($state->license_key)) {
+            return 'Sin clave de licencia configurada.';
+        }
+
+        $statusLabels = [
+            'valid' => 'Válida',
+            'expired' => 'Vencida',
+            'invalid' => 'No válida',
+            'unknown' => 'Sin verificar',
+        ];
+
+        $label = $statusLabels[$state->status] ?? $state->status;
+
+        if ($state->isValid()) {
+            $days = $state->daysLeft();
+            $vence = $state->license_expires_at->format('d/m/Y');
+
+            return "Licencia {$label}. Vence el {$vence} ({$days} día(s) restantes).";
+        }
+
+        if ($state->license_expires_at !== null) {
+            $vence = $state->license_expires_at->format('d/m/Y');
+
+            return "Licencia {$label}. Venció el {$vence}.";
+        }
+
+        $reason = $state->last_reason ? " Motivo: {$state->last_reason}." : '';
+
+        return "Licencia {$label}.{$reason}";
     }
 
     /**

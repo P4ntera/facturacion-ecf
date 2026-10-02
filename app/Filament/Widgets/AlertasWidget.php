@@ -11,6 +11,7 @@ use App\Models\CuentaPorCobrar;
 use App\Models\CuentaPorPagar;
 use App\Models\SecuenciaNcf;
 use App\Models\Venta;
+use App\Services\LicenseService;
 use App\Services\ReporteService;
 use App\Services\SecuenciaNcfService;
 use Filament\Facades\Filament;
@@ -69,7 +70,7 @@ class AlertasWidget extends Widget
     /** @return Collection<int, array{color: string, titulo: string, detalle: string}> */
     public function getAlertas(): Collection
     {
-        return collect([
+        $alertas = collect([
             TipoNotificacion::STOCK_BAJO->value => fn () => $this->alertasStockBajo(),
             TipoNotificacion::NCF_AGOTANDOSE->value => fn () => $this->alertasSecuenciasPorAgotarse(),
             TipoNotificacion::ECF_RECHAZADO->value => fn () => [...$this->alertasEcfRechazado(), ...$this->alertasEcfPendiente()],
@@ -79,6 +80,14 @@ class AlertasWidget extends Widget
             ->filter(fn ($calcular, string $tipo) => self::puedeVer(TipoNotificacion::from($tipo)))
             ->flatMap(fn ($calcular) => $calcular())
             ->values();
+
+        // Las alertas de licencia se agregan al inicio (son críticas) y no dependen de
+        // permisos de notificación — cualquier usuario debe ver si la licencia tiene problemas.
+        $licenciaAlertas = $this->alertasLicencia();
+
+        return $licenciaAlertas->isNotEmpty()
+            ? $licenciaAlertas->merge($alertas)
+            : $alertas;
     }
 
     /** @return array<int, array{color: string, titulo: string, detalle: string}> */
@@ -206,5 +215,41 @@ class AlertasWidget extends Widget
             'titulo' => 'Cuentas por cobrar vencidas',
             'detalle' => $cantidad.' factura(s) — '.Number::currency((float) $vencidas->monto, 'DOP'),
         ]];
+    }
+
+    /** @return Collection<int, array{color: string, titulo: string, detalle: string}> */
+    private function alertasLicencia(): Collection
+    {
+        $service = app(LicenseService::class);
+
+        if (! $service->isEnabled()) {
+            return collect();
+        }
+
+        $tenant = Filament::getTenant();
+
+        if ($tenant === null) {
+            return collect();
+        }
+
+        $state = $service->stateForEmpresa($tenant);
+
+        if (! $state['valid']) {
+            return collect([[
+                'color' => 'rojo',
+                'titulo' => 'Licencia no válida',
+                'detalle' => 'El sistema está en modo solo lectura. Contacte al administrador para renovar la licencia.',
+            ]]);
+        }
+
+        if ($state['days_left'] <= LicenseService::DAYS_WARNING_THRESHOLD) {
+            return collect([[
+                'color' => 'naranja',
+                'titulo' => 'Licencia por vencer',
+                'detalle' => "La licencia vence en {$state['days_left']} día(s). Renuévela para evitar interrupciones.",
+            ]]);
+        }
+
+        return collect();
     }
 }

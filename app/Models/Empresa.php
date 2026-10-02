@@ -64,6 +64,11 @@ class Empresa extends Model implements HasName
         return $this->hasOne(EmpresaConfiguracion::class);
     }
 
+    public function licenseState(): HasOne
+    {
+        return $this->hasOne(EmpresaLicenseState::class);
+    }
+
     /** Configuración fiscal de la empresa; la crea con los defaults de la migración si no existe. */
     public function config(): EmpresaConfiguracion
     {

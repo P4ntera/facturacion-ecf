@@ -12,3 +12,7 @@ Artisan::command('inspire', function () {
 Schedule::call(fn () => app(CotizacionService::class)->vencerExpiradas())
     ->dailyAt('00:00')
     ->description('Vencer cotizaciones expiradas');
+
+Schedule::command('license:refresh')
+    ->everyFourHours()
+    ->description('Revalidar licencias de todas las empresas');
