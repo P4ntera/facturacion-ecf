@@ -41,7 +41,7 @@
 
                                 @if ($comanda)
                                     <div class="mt-2 text-xs text-gray-600 dark:text-gray-400">
-                                        <div>{{ $comanda->mesero->name }}</div>
+                                        <div>{{ $comanda->mesero?->name ?? 'Sin mesero' }}</div>
                                         <div>{{ $comanda->comensales }} comensal{{ $comanda->comensales > 1 ? 'es' : '' }}</div>
                                         <div class="font-mono">{{ $comanda->created_at->diffForHumans(short: true) }}</div>
                                         <div class="font-semibold text-gray-900 dark:text-gray-100 mt-1">
@@ -66,7 +66,7 @@
                                         </div>
 
                                         <div class="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                                            Mesero: {{ $comanda->mesero->name }} |
+                                            Mesero: {{ $comanda->mesero?->name ?? 'Sin mesero' }} |
                                             Estado: {{ $comanda->estado->etiqueta() }} |
                                             {{ $comanda->comensales }} comensal{{ $comanda->comensales > 1 ? 'es' : '' }}
                                         </div>
