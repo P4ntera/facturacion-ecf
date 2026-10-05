@@ -571,6 +571,12 @@ class PuntoDeVenta extends Page
      */
     public function lineaConStockInsuficiente(array $linea): bool
     {
+        // Con "vender sin stock" activo no se bloquea: la venta deja el producto en negativo y
+        // queda marcada en el Kardex (ver InventarioService).
+        if ($this->permiteVenderSinStock()) {
+            return false;
+        }
+
         $stock = $this->stockDeLinea($linea);
 
         if ($stock === null) {
@@ -591,12 +597,28 @@ class PuntoDeVenta extends Page
         }
 
         if ($producto->controla_stock && (float) $producto->stock <= 0) {
+            if ($this->permiteVenderSinStock()) {
+                Notification::make()
+                    ->title("«{$producto->nombre}» no tiene stock en el sistema")
+                    ->body('Se puede vender igual: el producto quedará en negativo hasta que entre la compra o se ajuste.')
+                    ->warning()
+                    ->send();
+
+                return true;
+            }
+
             Notification::make()->title("«{$producto->nombre}» no tiene stock disponible")->danger()->send();
 
             return false;
         }
 
         return true;
+    }
+
+    /** Configuración de la empresa: ¿se puede vender un producto sin stock (queda en negativo)? */
+    public function permiteVenderSinStock(): bool
+    {
+        return $this->empresa()->config()->permite_stock_negativo;
     }
 
     private function buscarPresentacionPorCodigo(string $texto): ?ProductoPresentacion

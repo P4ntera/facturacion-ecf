@@ -59,7 +59,7 @@ enum Modulo: string
             self::VENTAS_CAJAS => 'Cajas registradoras (POS táctil y display)',
             self::INVENTARIO_KARDEX => 'Kardex',
             self::COMPRAS => 'Compras',
-            self::COMPRAS_PEDIDOS => 'Pedidos de Compra',
+            self::COMPRAS_PEDIDOS => 'Órdenes de Compra',
             self::COMPRAS_STOCK_BAJO => 'Stock Bajo',
             self::DEVOLUCIONES => 'Devoluciones a Proveedor',
             self::CUENTAS_POR_COBRAR => 'Cuentas por Cobrar',

@@ -16,20 +16,20 @@
                             <p class="text-xs text-gray-500 dark:text-gray-400">
                                 Asigna un proveedor principal desde
                                 <a href="{{ \App\Filament\Resources\ProveedorResource::getUrl('index') }}" class="underline">Proveedores</a>
-                                para poder generar un pedido.
+                                para poder generar una orden de compra.
                             </p>
                         @endif
                     </div>
 
                     @if ($grupo['proveedor'])
                         <a
-                            href="{{ \App\Filament\Resources\PedidoCompraResource::getUrl('create', [
+                            href="{{ \App\Filament\Resources\OrdenCompraResource::getUrl('create', [
                                 'proveedor_id' => $grupo['proveedor']->id,
                                 'producto_ids' => $grupo['productos']->pluck('id')->implode(','),
                             ]) }}"
                             class="fi-btn fi-btn-color-primary inline-flex items-center gap-1 rounded-lg bg-primary-600 px-3 py-2 text-sm font-semibold text-white hover:bg-primary-500"
                         >
-                            Crear pedido
+                            Crear orden de compra
                         </a>
                     @endif
                 </div>

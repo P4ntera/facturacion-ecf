@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\AmbienteEcf;
+use App\Enums\FormaReembolso;
+use App\Enums\MetodoCosto;
+use App\Enums\RedondeoPrecio;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Spatie\Activitylog\LogOptions;
@@ -36,6 +39,13 @@ class EmpresaConfiguracion extends Model
         'certificado_path',
         'certificado_password',
         'certificado_vence',
+        'metodo_costo',
+        'redondeo_precio',
+        'permite_stock_negativo',
+        'acepta_devoluciones',
+        'devolucion_plazo_dias',
+        'devolucion_reembolsos',
+        'devolucion_monto_supervisor',
     ];
 
     protected $casts = [
@@ -46,6 +56,13 @@ class EmpresaConfiguracion extends Model
         'dgii_api_key' => 'encrypted',
         'certificado_password' => 'encrypted',
         'certificado_vence' => 'date',
+        'metodo_costo' => MetodoCosto::class,
+        'redondeo_precio' => RedondeoPrecio::class,
+        'permite_stock_negativo' => 'boolean',
+        'acepta_devoluciones' => 'boolean',
+        'devolucion_plazo_dias' => 'integer',
+        'devolucion_reembolsos' => 'array',
+        'devolucion_monto_supervisor' => 'decimal:2',
     ];
 
     // Reflejan los defaults de la columna en la migración: sin esto, un ::create()/firstOrCreate()
@@ -60,7 +77,29 @@ class EmpresaConfiguracion extends Model
         'moneda' => 'DOP',
         'dgii_ambiente' => 'TesteCF',
         'dgii_base_url' => 'https://sandbox.pac-ecf.example.do/api/v1',
+        'metodo_costo' => 'ultima_compra',
+        'redondeo_precio' => 'ninguno',
+        'permite_stock_negativo' => false,
+        'acepta_devoluciones' => true,
     ];
+
+    /**
+     * Formas de reembolso que la empresa acepta en una devolución. null en la columna = todas.
+     *
+     * @return array<int, FormaReembolso>
+     */
+    public function reembolsosPermitidos(): array
+    {
+        if (blank($this->devolucion_reembolsos)) {
+            return FormaReembolso::cases();
+        }
+
+        return collect($this->devolucion_reembolsos)
+            ->map(fn (string $valor) => FormaReembolso::tryFrom($valor))
+            ->filter()
+            ->values()
+            ->all();
+    }
 
     public function empresa(): BelongsTo
     {

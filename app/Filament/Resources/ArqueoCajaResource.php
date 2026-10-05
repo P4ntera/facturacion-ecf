@@ -78,6 +78,8 @@ class ArqueoCajaResource extends Resource
                     TextEntry::make('total_ventas_efectivo')->label('Ventas en efectivo')->money('DOP')->placeholder('—'),
                     TextEntry::make('total_ventas_tarjeta')->label('Ventas con tarjeta')->money('DOP')->placeholder('—'),
                     TextEntry::make('total_ventas_transferencia')->label('Ventas por transferencia')->money('DOP')->placeholder('—'),
+                    TextEntry::make('total_devoluciones_efectivo')->label('Devoluciones en efectivo')->money('DOP')
+                        ->visible(fn ($record) => (float) $record->total_devoluciones_efectivo > 0),
                     TextEntry::make('efectivo_esperado')->label('Efectivo esperado')->money('DOP')->placeholder('—'),
                     TextEntry::make('efectivo_contado')->label('Efectivo contado')->money('DOP')->placeholder('—'),
                     TextEntry::make('diferencia')->label('Diferencia')->money('DOP')->placeholder('—')

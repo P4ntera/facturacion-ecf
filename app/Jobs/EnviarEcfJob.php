@@ -7,16 +7,24 @@ use App\Exceptions\DgiiGatewayException;
 use App\Models\Venta;
 use App\Services\Dgii\EnvioEcfService;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 
 /**
- * Envía un e-CF ya registrado al PAC sin bloquear el cobro. Correr el worker con:
- *   ./vendor/bin/sail artisan queue:work --queue=ecf
+ * Envía un e-CF ya registrado al PAC sin bloquear el cobro. Va a la cola "ecf": el worker tiene
+ * que escucharla (servicio "queue" de compose.yaml, o en producción el programa de Supervisor de
+ * docs/produccion-colas.md):
+ *   php artisan queue:work --queue=ecf,default
+ *
+ * Si los 5 intentos se agotan (el PAC estuvo caído un rato), la venta queda PENDIENTE y el
+ * comando programado ecf:procesar-pendientes la vuelve a encolar. ShouldBeUnique: mientras haya
+ * un envío de esa venta en cola o reintentándose, no se encola otro (nunca dos envíos del mismo
+ * e-NCF a la vez).
  */
-class EnviarEcfJob implements ShouldQueue
+class EnviarEcfJob implements ShouldBeUnique, ShouldQueue
 {
     use Dispatchable;
     use InteractsWithQueue;
@@ -25,9 +33,20 @@ class EnviarEcfJob implements ShouldQueue
 
     public int $tries = 5;
 
+    /**
+     * Segundos que dura el candado de unicidad si el job nunca termina (worker muerto a mitad):
+     * más que la suma del backoff (7.5 min) para no soltarlo en medio de los reintentos.
+     */
+    public int $uniqueFor = 900;
+
     public function __construct(public readonly Venta $venta)
     {
         $this->onQueue('ecf');
+    }
+
+    public function uniqueId(): string
+    {
+        return (string) $this->venta->id;
     }
 
     /** Backoff exponencial: 30s, 1min, 2min, 4min entre reintentos. */

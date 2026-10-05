@@ -12,3 +12,14 @@ Artisan::command('inspire', function () {
 Schedule::call(fn () => app(CotizacionService::class)->vencerExpiradas())
     ->dailyAt('00:00')
     ->description('Vencer cotizaciones expiradas');
+
+Schedule::command('license:refresh')
+    ->everyFourHours()
+    ->description('Revalidar licencias de todas las empresas');
+
+// Red de seguridad del envío de e-CF: reencola los pendientes y consulta los "en proceso".
+// withoutOverlapping: si una corrida tarda (PAC lento), la siguiente no arranca encima.
+Schedule::command('ecf:procesar-pendientes')
+    ->everyFiveMinutes()
+    ->withoutOverlapping()
+    ->description('Reintentar e-CF pendientes y refrescar los que están en proceso');
