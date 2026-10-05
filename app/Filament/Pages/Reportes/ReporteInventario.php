@@ -7,6 +7,7 @@ namespace App\Filament\Pages\Reportes;
 use App\Filament\Exports\ProductoExporter;
 use App\Services\ReporteService;
 use BackedEnum;
+use Filament\Facades\Filament;
 use Filament\Schemas\Components\EmbeddedTable;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Text;
@@ -85,7 +86,7 @@ class ReporteInventario extends ReportePage
             ->filters([
                 SelectFilter::make('categoria_id')
                     ->label('Categoría')
-                    ->relationship('categoria', 'nombre')
+                    ->relationship('categoria', 'nombre', modifyQueryUsing: fn ($query) => $query->where('empresa_id', Filament::getTenant()->id))
                     ->searchable()
                     ->preload(),
 

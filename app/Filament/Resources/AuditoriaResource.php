@@ -134,6 +134,7 @@ class AuditoriaResource extends Resource
                         ->orderBy('name')
                         ->pluck('name', 'id')
                         ->all())
+                    ->searchable()
                     ->query(function (Builder $query, array $data): Builder {
                         return $query->when(
                             $data['value'] ?? null,

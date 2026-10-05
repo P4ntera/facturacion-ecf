@@ -432,7 +432,9 @@ class ProductoResource extends Resource
                     ->label('Categoría')
                     // Scope manual obligatorio — Filament NO aplica tenant scope dentro de
                     // ->relationship(), ni siquiera dentro de su propio Resource.
-                    ->relationship('categoria', 'nombre', modifyQueryUsing: fn (Builder $query) => $query->where('empresa_id', Filament::getTenant()->id)),
+                    ->relationship('categoria', 'nombre', modifyQueryUsing: fn (Builder $query) => $query->where('empresa_id', Filament::getTenant()->id))
+                    ->searchable()
+                    ->preload(),
                 TernaryFilter::make('activo')->label('Activo')->default(true),
             ])
             ->recordActions([

@@ -79,6 +79,7 @@ class UserResource extends Resource
                 ->pivotData(fn (): array => ['empresa_id' => Filament::getTenant()?->id])
                 ->multiple()
                 ->preload()
+                ->searchable()
                 ->visible(fn (): bool => auth()->user()?->can('usuarios.gestionar') ?? false),
 
             Select::make('impresora_facturacion_id')
@@ -91,6 +92,7 @@ class UserResource extends Resource
                     ->activas()
                     ->porModulo(ModuloImpresion::FACTURACION))
                 ->preload()
+                ->searchable()
                 ->native(false)
                 ->visible(fn (): bool => auth()->user()?->can('usuarios.gestionar') ?? false),
 

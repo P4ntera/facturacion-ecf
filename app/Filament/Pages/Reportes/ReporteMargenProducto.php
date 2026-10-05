@@ -10,6 +10,7 @@ use BackedEnum;
 use Filament\Forms\Components\DatePicker;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Facades\Filament;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
@@ -93,7 +94,7 @@ class ReporteMargenProducto extends ReportePage
 
                 SelectFilter::make('categoria_id')
                     ->label('Categoría')
-                    ->relationship('categoria', 'nombre')
+                    ->relationship('categoria', 'nombre', modifyQueryUsing: fn ($query) => $query->where('empresa_id', Filament::getTenant()->id))
                     ->searchable()
                     ->preload(),
             ])

@@ -177,6 +177,7 @@ class ArqueoCajaResource extends Resource
                     ->label('Caja')
                     // Mismo motivo que el filtro de cajero: ->relationship() no se scopea solo.
                     ->relationship('caja', 'nombre', modifyQueryUsing: fn (Builder $query) => $query->where('empresa_id', Filament::getTenant()->id))
+                    ->searchable()
                     ->preload(),
 
                 SelectFilter::make('estado')
