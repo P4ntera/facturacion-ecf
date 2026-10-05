@@ -15,6 +15,7 @@ class ArqueoCaja extends Model
         'empresa_id', 'caja_id', 'user_id', 'fondo_inicial', 'abierto_en', 'cerrado_en', 'estado',
         'total_ventas_efectivo', 'total_ventas_tarjeta', 'total_ventas_transferencia',
         'efectivo_esperado', 'efectivo_contado', 'diferencia', 'notas',
+        'total_devoluciones_efectivo',
     ];
 
     protected $casts = [
@@ -28,6 +29,7 @@ class ArqueoCaja extends Model
         'efectivo_esperado' => 'decimal:2',
         'efectivo_contado' => 'decimal:2',
         'diferencia' => 'decimal:2',
+        'total_devoluciones_efectivo' => 'decimal:2',
     ];
 
     public function empresa(): BelongsTo

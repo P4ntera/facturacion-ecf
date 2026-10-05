@@ -41,11 +41,24 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Mail;
 use RuntimeException;
 
+/**
+ * RETIRADO: los pedidos de compra se unificaron con las Órdenes de Compra (OrdenCompraResource),
+ * que son las que se usan desde ahora. Se mantiene solo como historial de solo lectura: fuera del
+ * menú y sin crear nuevos. Los pedidos que estaban pendientes se pasaron a órdenes (migración
+ * 2026_10_01_120000).
+ */
 class PedidoCompraResource extends Resource
 {
     use RestringidoPorModulo;
 
     protected static ?string $model = PedidoCompra::class;
+
+    protected static bool $shouldRegisterNavigation = false;
+
+    public static function canCreate(): bool
+    {
+        return false;
+    }
 
     public static function modulo(): Modulo
     {
@@ -340,16 +353,6 @@ class PedidoCompraResource extends Resource
             ])
             ->recordActions([
                 ViewAction::make(),
-
-                // Abre el formulario de compra prellenado con el proveedor y las líneas del
-                // pedido (ver CreateCompra::mount()). La compra queda ligada al pedido y lo marca
-                // RECIBIDO al guardarse.
-                Action::make('recibir')
-                    ->label('Recibir')
-                    ->icon('heroicon-o-inbox-arrow-down')
-                    ->color('success')
-                    ->visible(fn (PedidoCompra $record): bool => $record->estaPendiente() && (auth()->user()?->can('compras.crear') ?? false))
-                    ->url(fn (PedidoCompra $record) => CompraResource::getUrl('create', ['pedido' => $record->id])),
 
                 Action::make('descargarPdf')
                     ->label('Descargar PDF')

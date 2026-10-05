@@ -18,7 +18,13 @@ class InventarioService
      * Debe ejecutarse dentro de una transacción abierta por el llamador (la operación
      * de negocio completa —venta, compra, ajuste— debe ser atómica).
      *
-     * @throws StockInsuficienteException si el movimiento dejaría el stock en negativo.
+     * Stock negativo: un movimiento que BAJA el stock por debajo de cero se rechaza, salvo que el
+     * llamador pase $permitirNegativo (solo VentaService, y solo si la empresa activó "vender sin
+     * stock"). Ajustes, anular compras y devolver al proveedor nunca lo pasan. Las entradas nunca
+     * se rechazan: una compra que llega con el stock en -5 lo sube aunque siga negativo. La
+     * salida que deja el producto en negativo queda marcada en el Kardex (dejo_stock_negativo).
+     *
+     * @throws StockInsuficienteException si el movimiento dejaría el stock en negativo y no se permite.
      */
     public function registrarMovimiento(
         Producto $producto,
@@ -28,6 +34,7 @@ class InventarioService
         ?int $referenciaId = null,
         ?int $userId = null,
         ?string $observacion = null,
+        bool $permitirNegativo = false,
     ): ?MovimientoInventario {
         if (! $producto->controla_stock) {
             return null;
@@ -44,7 +51,9 @@ class InventarioService
             TipoMovimiento::AJUSTE => $stockAnterior + $cantidad, // $cantidad ya trae el signo
         };
 
-        if ($stockNuevo < 0) {
+        $quedaNegativo = $stockNuevo < 0 && $stockNuevo < $stockAnterior;
+
+        if ($quedaNegativo && ! $permitirNegativo) {
             throw new StockInsuficienteException(
                 "Stock insuficiente para «{$producto->nombre}»: disponible {$stockAnterior}, solicitado ".abs($cantidad).'.'
             );
@@ -63,6 +72,7 @@ class InventarioService
             'stock_nuevo' => $stockNuevo,
             'user_id' => $userId,
             'observacion' => $observacion,
+            'dejo_stock_negativo' => $quedaNegativo,
         ]);
     }
 }

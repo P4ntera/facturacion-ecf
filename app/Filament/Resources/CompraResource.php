@@ -14,6 +14,7 @@ use App\Filament\Concerns\RestringidoPorModulo;
 use App\Filament\Resources\CompraResource\Pages;
 use App\Models\Compra;
 use App\Models\DetalleCompra;
+use App\Models\OrdenCompra;
 use App\Models\Producto;
 use App\Models\Proveedor;
 use App\Services\CompraService;
@@ -78,10 +79,10 @@ class CompraResource extends Resource
                 ->columnSpanFull()
                 ->columns(3)
                 ->schema([
-                    // Lo llena CreateCompra::mount() al venir de "Recibir" en Pedidos de Compra.
-                    // CompraService revalida que el pedido sea de la empresa, del proveedor y
-                    // siga pendiente.
-                    Hidden::make('pedido_compra_id'),
+                    // Lo llena CreateCompra::mount() al venir de "Recibir mercancía" en Órdenes de
+                    // Compra. CompraService revalida que la orden sea de la empresa, del proveedor
+                    // y admita recepciones.
+                    Hidden::make('orden_compra_id'),
 
                     Select::make('proveedor_id')
                         ->label('Proveedor')
@@ -92,11 +93,13 @@ class CompraResource extends Resource
                         ->preload()
                         ->live()
                         ->required()
-                        // Al recibir un pedido el proveedor es el del pedido: dehydrated() porque
+                        // Al recibir una orden el proveedor es el de la orden: dehydrated() porque
                         // un campo disabled no viaja en el submit por defecto.
-                        ->disabled(fn (Get $get): bool => filled($get('pedido_compra_id')))
+                        ->disabled(fn (Get $get): bool => filled($get('orden_compra_id')))
                         ->dehydrated()
-                        ->helperText(fn (Get $get): ?string => filled($get('pedido_compra_id')) ? "Recibiendo el pedido de compra #{$get('pedido_compra_id')}." : null)
+                        ->helperText(fn (Get $get): ?string => filled($get('orden_compra_id'))
+                            ? 'Recibiendo la orden de compra '.(OrdenCompra::where('empresa_id', Filament::getTenant()->id)->find($get('orden_compra_id'))?->numero ?? '').'. Ajusta las cantidades si llegó distinto y pon el NCF de la factura.'
+                            : null)
                         ->createOptionForm([
                             TextInput::make('rnc')
                                 ->label('RNC / Cédula')
@@ -469,9 +472,12 @@ class CompraResource extends Resource
                             EstadoCompra::ANULADA => 'Anulada',
                         })
                         ->color(fn (EstadoCompra $state) => $state === EstadoCompra::ANULADA ? 'danger' : 'success'),
-                    TextEntry::make('pedido_compra_id')->label('Pedido de compra')
+                    TextEntry::make('ordenCompra.numero')->label('Orden de compra')
+                        ->url(fn (Compra $record) => $record->orden_compra_id ? OrdenCompraResource::getUrl('view', ['record' => $record->orden_compra_id]) : null)
+                        ->visible(fn (Compra $record) => $record->orden_compra_id !== null),
+                    // Historial: compras que recibieron un pedido antes de unificarlo con las órdenes.
+                    TextEntry::make('pedido_compra_id')->label('Pedido de compra (anterior)')
                         ->formatStateUsing(fn ($state) => "Pedido #{$state}")
-                        ->url(fn (Compra $record) => $record->pedido_compra_id ? PedidoCompraResource::getUrl('view', ['record' => $record->pedido_compra_id]) : null)
                         ->visible(fn (Compra $record) => $record->pedido_compra_id !== null),
                     TextEntry::make('subtotal')->label('Subtotal')->money('DOP'),
                     TextEntry::make('itbis')->label('ITBIS')->money('DOP'),

@@ -60,13 +60,7 @@ class MovimientoInventarioResource extends Resource
                 TipoMovimiento::SALIDA => 'Salida',
                 TipoMovimiento::AJUSTE => 'Ajuste',
             }),
-            TextEntry::make('origen')->label('Origen')->formatStateUsing(fn (OrigenMovimiento $state) => match ($state) {
-                OrigenMovimiento::VENTA => 'Venta',
-                OrigenMovimiento::COMPRA => 'Compra',
-                OrigenMovimiento::AJUSTE => 'Ajuste',
-                OrigenMovimiento::ANULACION => 'Anulación',
-                OrigenMovimiento::DEVOLUCION_COMPRA => 'Devolución a proveedor',
-            }),
+            TextEntry::make('origen')->label('Origen')->formatStateUsing(fn (OrigenMovimiento $state) => $state->etiqueta()),
             TextEntry::make('cantidad')->label('Cantidad')->numeric(decimalPlaces: 2),
             TextEntry::make('stock_anterior')->label('Stock anterior')->numeric(decimalPlaces: 2),
             TextEntry::make('stock_nuevo')->label('Stock nuevo')->numeric(decimalPlaces: 2),
@@ -104,14 +98,7 @@ class MovimientoInventarioResource extends Resource
                 TextColumn::make('origen')
                     ->label('Origen')
                     ->badge()
-                    ->formatStateUsing(fn ($state) => match ($state) {
-                        OrigenMovimiento::VENTA => 'Venta',
-                        OrigenMovimiento::COMPRA => 'Compra',
-                        OrigenMovimiento::AJUSTE => 'Ajuste',
-                        OrigenMovimiento::ANULACION => 'Anulación',
-                        OrigenMovimiento::DEVOLUCION_COMPRA => 'Devolución a proveedor',
-                        default => $state,
-                    }),
+                    ->formatStateUsing(fn ($state) => $state instanceof OrigenMovimiento ? $state->etiqueta() : $state),
 
                 TextColumn::make('cantidad')
                     ->label('Cantidad')
@@ -131,6 +118,14 @@ class MovimientoInventarioResource extends Resource
                     ->alignEnd()
                     ->toggleable(isToggledHiddenByDefault: true),
 
+                // Marca de "vender sin stock": esta salida dejó el producto en negativo.
+                TextColumn::make('dejo_stock_negativo')
+                    ->label('')
+                    ->badge()
+                    ->color('danger')
+                    ->formatStateUsing(fn (bool $state): ?string => $state ? 'Vendido sin stock' : null)
+                    ->state(fn (MovimientoInventario $record): ?bool => $record->dejo_stock_negativo ?: null),
+
                 TextColumn::make('user.name')
                     ->label('Usuario')
                     ->placeholder('Sistema')
@@ -149,6 +144,11 @@ class MovimientoInventarioResource extends Resource
                     ->relationship('producto', 'nombre', modifyQueryUsing: fn (Builder $query) => $query->where('empresa_id', Filament::getTenant()->id))
                     ->searchable()
                     ->preload(),
+
+                Filter::make('dejo_stock_negativo')
+                    ->label('Solo vendidos sin stock')
+                    ->toggle()
+                    ->query(fn (Builder $query): Builder => $query->where('dejo_stock_negativo', true)),
 
                 Filter::make('fecha')
                     ->schema([

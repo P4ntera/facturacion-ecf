@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Enums\EstadoFiscal;
 use App\Enums\EstadoVenta;
+use App\Enums\FormaReembolso;
 use App\Enums\TasaItbis;
 use App\Enums\TipoComprobante;
 use App\Enums\TipoDocumentoCliente;
@@ -36,7 +37,9 @@ use App\Models\User;
 use App\Models\Venta;
 use App\Services\ArqueoCajaService;
 use App\Services\CompraService;
+use App\Services\CostoPrecioService;
 use App\Services\DevolucionCompraService;
+use App\Services\OrdenCompraService;
 use App\Services\PedidoCompraService;
 use App\Services\RolesEmpresaService;
 use App\Services\SecuenciaNcfService;
@@ -968,11 +971,11 @@ class AislamientoEntreEmpresasTest extends TestCase
     }
 
     /**
-     * 27. Recibir un pedido de compra: una empresa no puede recibir el pedido de OTRA, ni
-     * manipulando el pedido_compra_id que llega al service, ni abriendo el formulario con
-     * ?pedido={id} de la otra empresa (no se prellena nada).
+     * 27. Recibir una orden de compra: una empresa no puede recibir la orden de OTRA, ni
+     * manipulando el orden_compra_id que llega al service, ni abriendo el formulario de compra
+     * con ?orden={id} de la otra empresa (no se prellena nada).
      */
-    public function test_27_no_se_puede_recibir_un_pedido_de_compra_de_otra_empresa(): void
+    public function test_27_no_se_puede_recibir_una_orden_de_compra_de_otra_empresa(): void
     {
         ['empresa' => $empresaA, 'admin' => $adminA, 'producto' => $productoA, 'proveedor' => $proveedorA] =
             $this->crearEmpresaConDatos('Empresa A', '131000001');
@@ -980,38 +983,99 @@ class AislamientoEntreEmpresasTest extends TestCase
             $this->crearEmpresaConDatos('Tobogán', '131000002');
 
         $this->comoEmpresa($empresaTobogan);
-        $pedidoTobogan = app(PedidoCompraService::class)->crear([
+        $this->actingAs($adminTobogan);
+        $ordenTobogan = app(OrdenCompraService::class)->crear([
             'proveedor_id' => $proveedorTobogan->id,
-            'fecha' => now(),
+            'fecha' => now()->toDateString(),
+            'fecha_esperada' => null,
             'notas' => null,
-            'lineas' => [['producto_id' => $productoTobogan->id, 'cantidad' => 3, 'costo_unitario' => 50]],
+            'lineas' => [['producto_id' => $productoTobogan->id, 'cantidad_solicitada' => 3, 'precio_unitario' => 50]],
         ], $adminTobogan->id, $empresaTobogan);
+        app(OrdenCompraService::class)->aprobar($ordenTobogan);
 
         $this->comoEmpresa($empresaA);
 
         try {
             app(CompraService::class)->crear([
                 'proveedor_id' => $proveedorA->id,
-                'pedido_compra_id' => $pedidoTobogan->id,
+                'orden_compra_id' => $ordenTobogan->id,
                 'tipo_comprobante' => TipoComprobante::FACTURA_CREDITO_FISCAL_FISICA,
                 'ncf' => 'B0100000001',
                 'fecha' => now(),
                 'itbis_incluido' => false,
                 'lineas' => [['producto_id' => $productoA->id, 'cantidad' => 1, 'costo_unitario' => 50]],
             ], $adminA->id, $empresaA);
-            $this->fail('Debió rechazar el pedido de otra empresa.');
+            $this->fail('Debió rechazar la orden de otra empresa.');
         } catch (RuntimeException $e) {
             $this->assertStringContainsString('no existe', $e->getMessage());
         }
 
         $this->assertDatabaseMissing('compras', ['empresa_id' => $empresaA->id]);
-        $this->assertTrue($pedidoTobogan->fresh()->estaPendiente());
+        $this->assertEquals(0, (float) $ordenTobogan->detalles()->first()->cantidad_recibida);
 
         Livewire::actingAs($adminA)
-            ->withQueryParams(['pedido' => $pedidoTobogan->id])
+            ->withQueryParams(['orden' => $ordenTobogan->id])
             ->test(CreateCompra::class)
-            ->assertSet('data.pedido_compra_id', null)
+            ->assertSet('data.orden_compra_id', null)
             ->assertSet('data.proveedor_id', null)
-            ->assertNotified('El pedido de compra no existe o ya no está pendiente.');
+            ->assertNotified('La orden de compra no existe o no admite recepciones.');
+    }
+
+    /**
+     * 28. Precios sugeridos: aplicar precios solo toca productos de la empresa activa, aunque se
+     * manipule el producto_id que llega desde el modal de "Revisar precios".
+     */
+    public function test_28_no_se_puede_cambiar_el_precio_de_un_producto_de_otra_empresa(): void
+    {
+        ['empresa' => $empresaA, 'producto' => $productoA] = $this->crearEmpresaConDatos('Empresa A', '131000001');
+        ['producto' => $productoTobogan] = $this->crearEmpresaConDatos('Tobogán', '131000002');
+        $this->comoEmpresa($empresaA);
+
+        try {
+            app(CostoPrecioService::class)->aplicarPrecios([$productoTobogan->id => '999.00'], $empresaA);
+            $this->fail('Debió rechazar el producto de otra empresa.');
+        } catch (RuntimeException $e) {
+            $this->assertStringContainsString('no existe', $e->getMessage());
+        }
+
+        $this->assertSame('100.00', (string) $productoTobogan->fresh()->precio);
+
+        // Con un producto propio sí funciona.
+        app(CostoPrecioService::class)->aplicarPrecios([$productoA->id => '120.00'], $empresaA);
+        $this->assertSame('120.00', (string) $productoA->fresh()->precio);
+    }
+
+    /**
+     * 29. Devoluciones: una empresa no puede registrar una devolución sobre la venta de OTRA
+     * (ni mover su stock ni emitir su nota de crédito), aunque mande el id de esa venta.
+     */
+    public function test_29_no_se_puede_devolver_una_venta_de_otra_empresa(): void
+    {
+        ['empresa' => $empresaA] = $this->crearEmpresaConDatos('Empresa A', '131000001');
+        ['empresa' => $empresaTobogan, 'producto' => $productoTobogan] = $this->crearEmpresaConDatos('Tobogán', '131000002');
+
+        $this->comoEmpresa($empresaTobogan);
+        $empresaTobogan->config()->update(['permite_ventas_sin_comprobante' => true]);
+        $productoTobogan->update(['controla_stock' => true, 'stock' => 10]);
+        $ventaTobogan = app(VentaService::class)->registrar([
+            'sin_comprobante' => true,
+            'lineas' => [['producto_id' => $productoTobogan->id, 'cantidad' => 2]],
+        ], $empresaTobogan);
+
+        $this->comoEmpresa($empresaA);
+
+        try {
+            app(VentaService::class)->registrarDevolucion(
+                $ventaTobogan->fresh(), $empresaA,
+                [['detalle_venta_id' => $ventaTobogan->detalles()->first()->id, 'cantidad' => 1]],
+                'Intento', FormaReembolso::MISMO_MEDIO,
+            );
+            $this->fail('Debió rechazar la venta de otra empresa.');
+        } catch (VentaInvalidaException $e) {
+            $this->assertStringContainsString('no pertenece a esta empresa', $e->getMessage());
+        }
+
+        $this->assertSame(0, Venta::where('venta_modificada_id', $ventaTobogan->id)->count());
+        $this->assertEquals(8, (float) $productoTobogan->fresh()->stock);
     }
 }

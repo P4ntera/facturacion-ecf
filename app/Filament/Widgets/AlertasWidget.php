@@ -9,6 +9,7 @@ use App\Enums\EstadoVenta;
 use App\Enums\TipoNotificacion;
 use App\Models\CuentaPorCobrar;
 use App\Models\CuentaPorPagar;
+use App\Models\Producto;
 use App\Models\SecuenciaNcf;
 use App\Models\Venta;
 use App\Services\LicenseService;
@@ -71,7 +72,7 @@ class AlertasWidget extends Widget
     public function getAlertas(): Collection
     {
         $alertas = collect([
-            TipoNotificacion::STOCK_BAJO->value => fn () => $this->alertasStockBajo(),
+            TipoNotificacion::STOCK_BAJO->value => fn () => [...$this->alertasStockNegativo(), ...$this->alertasStockBajo()],
             TipoNotificacion::NCF_AGOTANDOSE->value => fn () => $this->alertasSecuenciasPorAgotarse(),
             TipoNotificacion::ECF_RECHAZADO->value => fn () => [...$this->alertasEcfRechazado(), ...$this->alertasEcfPendiente()],
             TipoNotificacion::CXC_VENCIDAS->value => fn () => $this->alertasCxcVencidas(),
@@ -132,6 +133,38 @@ class AlertasWidget extends Widget
             'color' => 'azul',
             'titulo' => 'Cuentas por pagar vencidas',
             'detalle' => $cantidad.' factura(s) de proveedor — '.Number::currency((float) $vencidas->monto, 'DOP'),
+        ]];
+    }
+
+    /**
+     * Productos que se vendieron sin stock y siguen en negativo: se queda visible hasta que entre
+     * la compra o se ajuste el inventario tras contar.
+     *
+     * @return array<int, array{color: string, titulo: string, detalle: string}>
+     */
+    private function alertasStockNegativo(): array
+    {
+        $productos = Producto::query()
+            ->where('empresa_id', $this->empresaId())
+            ->where('controla_stock', true)
+            ->where('activo', true)
+            ->where('stock', '<', 0)
+            ->orderBy('stock')
+            ->get(['nombre', 'stock']);
+
+        if ($productos->isEmpty()) {
+            return [];
+        }
+
+        $detalle = $productos->take(3)
+            ->map(fn (Producto $p) => "{$p->nombre} (".rtrim(rtrim(number_format((float) $p->stock, 3, '.', ''), '0'), '.').')')
+            ->implode(', ');
+        $restantes = $productos->count() - 3;
+
+        return [[
+            'color' => 'rojo',
+            'titulo' => 'Productos en negativo',
+            'detalle' => $detalle.($restantes > 0 ? " y {$restantes} más" : '').'. Registra la compra que falta o ajusta tras contar.',
         ]];
     }
 

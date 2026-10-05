@@ -127,6 +127,12 @@
                 <td>Ventas por transferencia</td>
                 <td class="text-right">RD$ {{ number_format((float) $arqueo->total_ventas_transferencia, 2) }}</td>
             </tr>
+            @if ((float) $arqueo->total_devoluciones_efectivo > 0)
+                <tr>
+                    <td>Devoluciones en efectivo</td>
+                    <td class="text-right">− RD$ {{ number_format((float) $arqueo->total_devoluciones_efectivo, 2) }}</td>
+                </tr>
+            @endif
         </tbody>
     </table>
 

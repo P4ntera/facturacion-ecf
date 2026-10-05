@@ -6,6 +6,7 @@ use App\Enums\AmbienteEcf;
 use App\Enums\EstadoFiscal;
 use App\Enums\EstadoVenta;
 use App\Enums\FormaPago;
+use App\Enums\FormaReembolso;
 use App\Enums\TipoComprobante;
 use App\Enums\TipoPago;
 use App\Observers\VentaObserver;
@@ -37,6 +38,8 @@ class Venta extends Model
         'pac_id', 'codigo_seguridad', 'dgii_url', 'xml_url', 'ambiente',
         'ecf_enviado_en', 'ecf_respuesta',
         'motivo_anulacion', 'anulada_en', 'tipo_anulacion_608',
+        // Devolución (la nota de crédito): cómo y cuánto se reembolsó, y cuánto se rebajó de la CxC.
+        'forma_reembolso', 'monto_reembolso', 'monto_rebaja_cxc',
     ];
 
     protected $casts = [
@@ -62,6 +65,9 @@ class Venta extends Model
         'itbis_16' => 'decimal:2',
         'total_itbis' => 'decimal:2',
         'total' => 'decimal:2',
+        'forma_reembolso' => FormaReembolso::class,
+        'monto_reembolso' => 'decimal:2',
+        'monto_rebaja_cxc' => 'decimal:2',
     ];
 
     public function empresa(): BelongsTo

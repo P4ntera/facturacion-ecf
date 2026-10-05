@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\DestinoDevolucion;
 use App\Enums\TasaItbis;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -14,7 +15,7 @@ class DetalleVenta extends Model
     protected $fillable = [
         'venta_id', 'producto_id', 'presentacion_id', 'descripcion',
         'cantidad', 'factor', 'precio_unitario', 'descuento',
-        'tasa_itbis', 'itbis_monto', 'subtotal',
+        'tasa_itbis', 'itbis_monto', 'subtotal', 'costo_unitario', 'destino_devolucion',
     ];
 
     protected $casts = [
@@ -25,6 +26,8 @@ class DetalleVenta extends Model
         'descuento' => 'decimal:2',
         'itbis_monto' => 'decimal:2',
         'subtotal' => 'decimal:2',
+        'costo_unitario' => 'decimal:2',
+        'destino_devolucion' => DestinoDevolucion::class,
     ];
 
     public function venta(): BelongsTo

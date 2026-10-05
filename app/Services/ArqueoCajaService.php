@@ -7,6 +7,7 @@ namespace App\Services;
 use App\Enums\EstadoArqueoCaja;
 use App\Enums\EstadoVenta;
 use App\Enums\FormaPago;
+use App\Enums\FormaReembolso;
 use App\Enums\TipoPago;
 use App\Models\ArqueoCaja;
 use App\Models\Caja;
@@ -94,6 +95,8 @@ class ArqueoCajaService
                 // Ventas a crédito no representan efectivo/tarjeta recibido hoy: se cobran
                 // después vía CuentaPorCobrarService, no deben inflar el efectivo esperado.
                 ->where('tipo_pago', TipoPago::CONTADO)
+                // Las notas (devoluciones de hoy) no son ventas: se restan aparte, abajo.
+                ->whereNull('venta_modificada_id')
                 ->selectRaw('forma_pago, COALESCE(SUM(total), 0) as total')
                 ->groupBy('forma_pago')
                 ->pluck('total', 'forma_pago');
@@ -102,14 +105,22 @@ class ArqueoCajaService
             $totalTarjeta = $this->aMoneda($sumasPorFormaPago[FormaPago::TARJETA->value] ?? '0');
             $totalTransferencia = $this->aMoneda($sumasPorFormaPago[FormaPago::TRANSFERENCIA->value] ?? '0');
 
+            // Devoluciones reembolsadas en efectivo desde esta caja: ese dinero salió del cajón.
+            $devolucionesEfectivo = $this->aMoneda((string) $arqueo->ventas()
+                ->where('estado', '!=', EstadoVenta::ANULADA)
+                ->whereNotNull('venta_modificada_id')
+                ->where('forma_reembolso', FormaReembolso::EFECTIVO)
+                ->sum('monto_reembolso'));
+
             $efectivoContadoNormalizado = $this->aMoneda($efectivoContado);
-            $efectivoEsperado = bcadd((string) $arqueo->fondo_inicial, $totalEfectivo, 2);
+            $efectivoEsperado = bcsub(bcadd((string) $arqueo->fondo_inicial, $totalEfectivo, 2), $devolucionesEfectivo, 2);
             $diferencia = bcsub($efectivoContadoNormalizado, $efectivoEsperado, 2);
 
             $arqueo->update([
                 'total_ventas_efectivo' => $totalEfectivo,
                 'total_ventas_tarjeta' => $totalTarjeta,
                 'total_ventas_transferencia' => $totalTransferencia,
+                'total_devoluciones_efectivo' => $devolucionesEfectivo,
                 'efectivo_esperado' => $efectivoEsperado,
                 'efectivo_contado' => $efectivoContadoNormalizado,
                 'diferencia' => $diferencia,

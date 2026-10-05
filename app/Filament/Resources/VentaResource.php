@@ -4,12 +4,15 @@ namespace App\Filament\Resources;
 
 use App\Enums\AmbienteEcf;
 use App\Enums\AnchoPapel;
+use App\Enums\DestinoDevolucion;
 use App\Enums\EstadoFiscal;
 use App\Enums\EstadoVenta;
 use App\Enums\EventoEcf;
+use App\Enums\FormaReembolso;
 use App\Enums\Modulo;
 use App\Enums\ModuloImpresion;
 use App\Enums\TipoComprobante;
+use App\Enums\TipoPago;
 use App\Exceptions\ArqueoCajaCerradoException;
 use App\Exceptions\CuentaConPagosRegistradosException;
 use App\Exceptions\SecuenciaNcfAgotadaException;
@@ -19,6 +22,7 @@ use App\Filament\Concerns\RestringidoPorModulo;
 use App\Filament\Resources\VentaResource\Pages;
 use App\Jobs\EnviarEcfJob;
 use App\Models\Venta;
+use App\Services\ArqueoCajaService;
 use App\Services\Dgii\EnvioEcfService;
 use App\Services\Impresion\ImpresionService;
 use App\Services\VentaService;
@@ -431,19 +435,28 @@ class VentaResource extends Resource
                             ->success()
                             ->send();
                     })
+                    // E33 sobre e-CF aceptados, B03 sobre comprobantes físicos. Una venta sin
+                    // comprobante no tiene NCF que modificar.
                     ->visible(fn (Venta $record) => $record->estado !== EstadoVenta::ANULADA
                         && ! $record->esNotaCreditoDeAnulacion()
-                        && $record->esElectronica()
-                        && $record->estado_fiscal->esAceptado()
+                        && $record->tipo_comprobante !== null
+                        && (! $record->esElectronica() || $record->estado_fiscal->esAceptado())
                         && (auth()->user()?->can('ventas.nota_debito') ?? false)),
 
+                // Devolución de un cliente, siempre en la caja de hoy. Documento según la venta:
+                // E34 (e-CF aceptado), B04 (física) o interna (sin comprobante). Ver
+                // VentaService::registrarDevolucion().
                 Action::make('devolucionParcial')
-                    ->label('Devolución parcial')
+                    ->label('Devolución')
                     ->icon('heroicon-o-arrow-uturn-left')
                     ->color('warning')
-                    ->requiresConfirmation()
-                    ->modalHeading('Devolución parcial de productos')
-                    ->modalDescription(fn (Venta $record): string => "Nota de Crédito parcial sobre la venta {$record->ncf}.")
+                    ->modalHeading('Devolución de productos')
+                    ->modalDescription(fn (Venta $record): string => match (true) {
+                        $record->tipo_comprobante === null => 'Venta sin comprobante: se registra una devolución interna, sin NCF.',
+                        $record->esElectronica() => "Se emitirá una Nota de Crédito electrónica (E34) sobre {$record->ncf} y se enviará a la DGII.",
+                        default => "Se emitirá una Nota de Crédito física (B04) sobre {$record->ncf}.",
+                    })
+                    ->modalWidth('3xl')
                     ->schema([
                         Textarea::make('motivo')
                             ->label('Motivo de la devolución')
@@ -453,10 +466,10 @@ class VentaResource extends Resource
                         Repeater::make('detalles')
                             ->label('Productos a devolver')
                             ->schema([
-                                Select::make('producto_id')
+                                Select::make('detalle_venta_id')
                                     ->label('Producto')
                                     ->options(fn (Venta $record) => $record->detalles->mapWithKeys(fn ($d) => [
-                                        $d->producto_id => "{$d->descripcion} (vendido: {$d->cantidad})",
+                                        $d->id => "{$d->descripcion} (vendido: ".rtrim(rtrim((string) $d->cantidad, '0'), '.').')',
                                     ]))
                                     ->required(),
                                 TextInput::make('cantidad')
@@ -464,14 +477,35 @@ class VentaResource extends Resource
                                     ->numeric()
                                     ->minValue(0.001)
                                     ->required(),
+                                Select::make('destino')
+                                    ->label('¿Qué pasa con el producto?')
+                                    ->options(collect(DestinoDevolucion::cases())->mapWithKeys(fn (DestinoDevolucion $d) => [$d->value => $d->etiqueta()]))
+                                    ->default(DestinoDevolucion::INVENTARIO->value)
+                                    ->required(),
                             ])
+                            ->columns(3)
                             ->minItems(1)
                             ->required(),
+                        Select::make('reembolso')
+                            ->label('Cómo se le devuelve el dinero')
+                            ->options(fn () => collect(Filament::getTenant()->config()->reembolsosPermitidos())
+                                ->mapWithKeys(fn (FormaReembolso $f) => [$f->value => $f->etiqueta()]))
+                            ->default(fn () => Filament::getTenant()->config()->reembolsosPermitidos()[0]->value ?? null)
+                            ->helperText(fn (Venta $record): ?string => $record->tipo_pago === TipoPago::CREDITO
+                                ? 'Venta a crédito: primero se rebaja lo que el cliente todavía debe; solo el resto se le devuelve.'
+                                : null),
                     ])
                     ->action(function (Venta $record, array $data): void {
+                        $empresa = Filament::getTenant();
+
                         try {
-                            $nc = app(VentaService::class)->emitirNotaCreditoParcial(
-                                $record, Filament::getTenant(), $data['detalles'], $data['motivo'],
+                            $nc = app(VentaService::class)->registrarDevolucion(
+                                $record,
+                                $empresa,
+                                $data['detalles'],
+                                $data['motivo'],
+                                filled($data['reembolso'] ?? null) ? FormaReembolso::from($data['reembolso']) : null,
+                                app(ArqueoCajaService::class)->arqueoAbiertoDe(auth()->id(), $empresa),
                             );
                         } catch (VentaInvalidaException|SecuenciaNcfAgotadaException $e) {
                             Notification::make()->title($e->getMessage())->danger()->send();
@@ -479,16 +513,25 @@ class VentaResource extends Resource
                             return;
                         }
 
+                        $dinero = collect([
+                            $nc->monto_rebaja_cxc ? 'Se rebajaron RD$'.number_format((float) $nc->monto_rebaja_cxc, 2).' de la cuenta por cobrar.' : null,
+                            $nc->monto_reembolso ? 'Devuelve RD$'.number_format((float) $nc->monto_reembolso, 2).': '.mb_strtolower($nc->forma_reembolso->etiqueta()).'.' : null,
+                        ])->filter()->implode(' ');
+
                         Notification::make()
-                            ->title("Nota de Crédito {$nc->ncf} emitida")
-                            ->body('Productos devueltos al inventario. Se está enviando a la DGII.')
+                            ->title(match (true) {
+                                $nc->tipo_comprobante === null => 'Devolución registrada',
+                                $nc->tipo_comprobante->esElectronico() => "Nota de Crédito {$nc->ncf} emitida; se está enviando a la DGII",
+                                default => "Nota de Crédito {$nc->ncf} emitida",
+                            })
+                            ->body($dinero)
                             ->success()
                             ->send();
                     })
                     ->visible(fn (Venta $record) => $record->estado !== EstadoVenta::ANULADA
                         && ! $record->esNotaCreditoDeAnulacion()
-                        && $record->esElectronica()
-                        && $record->estado_fiscal->esAceptado()
+                        && (! $record->esElectronica() || $record->estado_fiscal->esAceptado())
+                        && Filament::getTenant()->config()->acepta_devoluciones
                         && (auth()->user()?->can('ventas.devolucion') ?? false)),
 
                 self::refrescarEstadoAction(),

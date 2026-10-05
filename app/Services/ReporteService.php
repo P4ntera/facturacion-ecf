@@ -665,6 +665,11 @@ class ReporteService
 
     public function margenPorProductoQuery(Carbon $desde, Carbon $hasta, ?int $empresaId = null): Builder
     {
+        // Costo de cada línea: el que quedó guardado al vender (detalle_ventas.costo_unitario, ya
+        // multiplicado por el factor de la presentación). Las ventas anteriores a ese campo no lo
+        // tienen: para ellas se usa el costo actual del producto × factor, como aproximación.
+        $costoLinea = 'detalle_ventas.cantidad * COALESCE(detalle_ventas.costo_unitario, productos.costo * detalle_ventas.factor)';
+
         return Producto::query()
             ->join('detalle_ventas', 'detalle_ventas.producto_id', '=', 'productos.id')
             ->join('ventas', 'ventas.id', '=', 'detalle_ventas.venta_id')
@@ -676,8 +681,8 @@ class ReporteService
             ->selectRaw('productos.id, productos.codigo, productos.nombre, productos.costo')
             ->selectRaw('COALESCE(SUM(detalle_ventas.cantidad), 0) as unidades_vendidas')
             ->selectRaw('COALESCE(SUM(detalle_ventas.subtotal), 0) as ingresos')
-            ->selectRaw('COALESCE(SUM(detalle_ventas.cantidad * productos.costo), 0) as costo_total')
-            ->selectRaw('COALESCE(SUM(detalle_ventas.subtotal) - SUM(detalle_ventas.cantidad * productos.costo), 0) as ganancia')
-            ->selectRaw("CASE WHEN SUM(detalle_ventas.subtotal) > 0 THEN ROUND(((SUM(detalle_ventas.subtotal) - SUM(detalle_ventas.cantidad * productos.costo)) / SUM(detalle_ventas.subtotal)) * 100, 2) ELSE 0 END as margen_porcentaje");
+            ->selectRaw("COALESCE(SUM({$costoLinea}), 0) as costo_total")
+            ->selectRaw("COALESCE(SUM(detalle_ventas.subtotal) - SUM({$costoLinea}), 0) as ganancia")
+            ->selectRaw("CASE WHEN SUM(detalle_ventas.subtotal) > 0 THEN ROUND(((SUM(detalle_ventas.subtotal) - SUM({$costoLinea})) / SUM(detalle_ventas.subtotal)) * 100, 2) ELSE 0 END as margen_porcentaje");
     }
 }
