@@ -3,11 +3,13 @@
 namespace App\Filament\Resources;
 
 use App\Enums\Modulo;
+use App\Enums\PerfilEmpresa;
 use App\Filament\Resources\EmpresaResource\Pages;
 use App\Models\Empresa;
 use App\Models\User;
 use App\Services\RolesEmpresaService;
 use Filament\Actions\Action;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Infolists\Components\TextEntry;
@@ -83,6 +85,17 @@ class EmpresaResource extends Resource
                             ->label('Activa')
                             ->helperText('Desactivarla bloquea el acceso al panel a todos sus usuarios.')
                             ->default(true),
+
+                        Select::make('perfil')
+                            ->label('Tipo de negocio')
+                            ->options(
+                                collect(PerfilEmpresa::cases())
+                                    ->mapWithKeys(fn (PerfilEmpresa $p) => [$p->value => $p->etiqueta()])
+                            )
+                            ->default(PerfilEmpresa::FACTURACION->value)
+                            ->required()
+                            ->helperText('Define qué módulos se activan por defecto. Puedes personalizarlos después.')
+                            ->native(false),
                     ]),
 
                 Section::make('Módulos')

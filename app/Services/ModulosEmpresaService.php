@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Enums\Modulo;
+use App\Enums\PerfilEmpresa;
 use App\Exceptions\DependenciaModuloException;
 use App\Models\Empresa;
 use App\Models\EmpresaModulo;
@@ -15,12 +16,15 @@ class ModulosEmpresaService
 {
     public function sembrarModulos(Empresa $empresa): void
     {
+        $perfil = $empresa->perfil ?? PerfilEmpresa::FACTURACION;
+        $activos = $perfil->modulosPorDefecto();
+
         foreach (Modulo::cases() as $modulo) {
             EmpresaModulo::firstOrCreate([
                 'empresa_id' => $empresa->id,
                 'modulo' => $modulo,
             ], [
-                'habilitado' => true,
+                'habilitado' => in_array($modulo, $activos, true),
             ]);
         }
     }

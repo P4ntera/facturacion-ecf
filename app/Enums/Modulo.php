@@ -40,6 +40,10 @@ enum Modulo: string
     case ECF_SECUENCIAS = 'ecf_secuencias';
     case ECF_RECIBIDOS = 'ecf_recibidos';
 
+    case RESTAURANTE_MESAS = 'restaurante_mesas';
+    case RESTAURANTE_COMANDAS = 'restaurante_comandas';
+    case RESTAURANTE_COCINA = 'restaurante_cocina';
+
     case IMPRESORAS = 'impresoras';
     case AUDITORIA = 'auditoria';
 
@@ -66,6 +70,9 @@ enum Modulo: string
             self::CUENTAS_POR_PAGAR => 'Cuentas por Pagar',
             self::ECF_SECUENCIAS => 'Secuencias NCF',
             self::ECF_RECIBIDOS => 'e-CF Recibidos',
+            self::RESTAURANTE_MESAS => 'Mesas',
+            self::RESTAURANTE_COMANDAS => 'Comandas',
+            self::RESTAURANTE_COCINA => 'Cocina (KDS)',
             self::IMPRESORAS => 'Impresoras',
             self::AUDITORIA => 'Auditoría',
         };
@@ -92,6 +99,9 @@ enum Modulo: string
             self::CUENTAS_POR_COBRAR, self::CUENTAS_POR_PAGAR => 'Cuentas',
 
             self::ECF_SECUENCIAS, self::ECF_RECIBIDOS => 'e-CF',
+
+            self::RESTAURANTE_MESAS, self::RESTAURANTE_COMANDAS,
+            self::RESTAURANTE_COCINA => 'Restaurante',
 
             self::IMPRESORAS, self::AUDITORIA => 'Configuración',
         };
@@ -122,6 +132,8 @@ enum Modulo: string
             self::DEVOLUCIONES => [self::COMPRAS],
             self::CUENTAS_POR_COBRAR => [self::VENTAS_LISTADO],
             self::CUENTAS_POR_PAGAR => [self::COMPRAS],
+            self::RESTAURANTE_COMANDAS => [self::RESTAURANTE_MESAS],
+            self::RESTAURANTE_COCINA => [self::RESTAURANTE_COMANDAS],
             default => [],
         };
     }

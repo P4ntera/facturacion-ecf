@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\Modulo;
+use App\Enums\PerfilEmpresa;
 use Filament\Models\Contracts\HasName;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -21,12 +22,13 @@ class Empresa extends Model implements HasName
     protected $fillable = [
         'slug', 'rnc', 'razon_social', 'nombre_comercial',
         'direccion', 'telefono', 'email', 'logo',
-        'usa_ecf', 'activa',
+        'usa_ecf', 'activa', 'perfil',
     ];
 
     protected $casts = [
         'usa_ecf' => 'boolean',
         'activa' => 'boolean',
+        'perfil' => PerfilEmpresa::class,
     ];
 
     /** @var Collection<string, EmpresaModulo>|null */

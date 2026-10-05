@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Enums\PerfilEmpresa;
 use App\Models\Empresa;
 use App\Models\Role;
 use App\Models\User;
@@ -97,6 +98,36 @@ class RolesEmpresaService
                 // (las de NCF, e-CF y cuentas son del Administrador).
                 'notificaciones.stock_bajo',
             ]);
+
+            if ($empresa->perfil === PerfilEmpresa::RESTAURANTE) {
+                $mesero = Role::firstOrCreate([
+                    'empresa_id' => $empresa->id,
+                    'name' => 'Mesero',
+                    'guard_name' => 'web',
+                ]);
+                $mesero->syncPermissions([
+                    'pos.acceder',
+                    'ventas.ver',
+                    'ventas.imprimir',
+                    'productos.ver',
+                    'clientes.ver',
+                    'comandas.ver',
+                    'comandas.crear',
+                    'comandas.editar',
+                    'comandas.cerrar',
+                    'mesas.ver',
+                ]);
+
+                $cocinero = Role::firstOrCreate([
+                    'empresa_id' => $empresa->id,
+                    'name' => 'Cocinero',
+                    'guard_name' => 'web',
+                ]);
+                $cocinero->syncPermissions([
+                    'cocina.ver',
+                    'cocina.preparar',
+                ]);
+            }
         });
 
         app(PermissionRegistrar::class)->forgetCachedPermissions();
