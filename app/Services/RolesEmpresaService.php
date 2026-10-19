@@ -9,6 +9,7 @@ use App\Models\Empresa;
 use App\Models\Role;
 use App\Models\User;
 use App\Support\Permisos;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Spatie\Permission\PermissionRegistrar;
 
 /**
@@ -23,7 +24,7 @@ class RolesEmpresaService
     public function sembrarRolesBase(Empresa $empresa): void
     {
         $this->dentroDelContextoDe($empresa, function () use ($empresa) {
-            $administrador = Role::firstOrCreate([
+            $administrador = $this->rolSeguro([
                 'empresa_id' => $empresa->id,
                 'name' => 'Administrador',
                 'guard_name' => 'web',
@@ -33,7 +34,7 @@ class RolesEmpresaService
             // no solo los del catálogo.
             $administrador->syncPermissions([...Permisos::todos(), 'gestionar_arqueo_caja']);
 
-            $vendedor = Role::firstOrCreate([
+            $vendedor = $this->rolSeguro([
                 'empresa_id' => $empresa->id,
                 'name' => 'Vendedor',
                 'guard_name' => 'web',
@@ -68,7 +69,7 @@ class RolesEmpresaService
                 'cotizaciones.exportar',
             ]);
 
-            $almacenista = Role::firstOrCreate([
+            $almacenista = $this->rolSeguro([
                 'empresa_id' => $empresa->id,
                 'name' => 'Almacenista',
                 'guard_name' => 'web',
@@ -101,7 +102,7 @@ class RolesEmpresaService
             ]);
 
             if ($empresa->perfil === PerfilEmpresa::RESTAURANTE) {
-                $mesero = Role::firstOrCreate([
+                $mesero = $this->rolSeguro([
                     'empresa_id' => $empresa->id,
                     'name' => 'Mesero',
                     'guard_name' => 'web',
@@ -119,7 +120,7 @@ class RolesEmpresaService
                     'mesas.ver',
                 ]);
 
-                $cocinero = Role::firstOrCreate([
+                $cocinero = $this->rolSeguro([
                     'empresa_id' => $empresa->id,
                     'name' => 'Cocinero',
                     'guard_name' => 'web',
@@ -141,6 +142,22 @@ class RolesEmpresaService
             $usuario->unsetRelation('roles')->unsetRelation('permissions');
             $usuario->assignRole('Administrador');
         });
+    }
+
+    /**
+     * firstOrCreate seguro: si el INSERT viola la unique constraint (race condition, doble
+     * request, o desajuste entre el scope de Spatie y la constraint de BD), recupera el
+     * registro existente en vez de lanzar.
+     */
+    private function rolSeguro(array $atributos): Role
+    {
+        try {
+            return Role::firstOrCreate($atributos);
+        } catch (UniqueConstraintViolationException) {
+            // El registro existe pero el SELECT de firstOrCreate no lo encontró (scope de
+            // Spatie vs constraint de BD). Lo buscamos sin scope global.
+            return Role::withoutGlobalScopes()->where($atributos)->firstOrFail();
+        }
     }
 
     /**
