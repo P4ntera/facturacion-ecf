@@ -40,21 +40,21 @@ class ReporteService
      * anulación (venta_modificada_id) — la venta que anulan ya queda fuera por ANULADA, así que
      * contar la nota restaría (o sumaría) dos veces.
      */
-    protected function ventasEmitidasEnRango(Carbon $desde, Carbon $hasta): Builder
+    protected function ventasEmitidasEnRango(Carbon $desde, Carbon $hasta, ?int $empresaId = null): Builder
     {
         return Venta::query()
             ->whereBetween('fecha', [$desde->copy()->startOfDay(), $hasta->copy()->endOfDay()])
             ->where('estado', '!=', EstadoVenta::ANULADA)
-            ->whereNull('venta_modificada_id');
+            ->whereNull('venta_modificada_id')
+            ->when($empresaId, fn (Builder $query, int $id) => $query->where('empresa_id', $id));
     }
 
     /**
      * Todas las ventas del rango (incluye ANULADAs) para el listado del reporte de ventas:
      * a diferencia de los agregados de ingresos, aquí interesa la trazabilidad completa.
      *
-     * $empresaId: solo lo necesitan los controllers de PDF (rutas fuera del panel de Filament,
-     * donde el scoping automático por tenant no aplica). Los widgets del dashboard, que corren
-     * dentro del panel, no lo pasan porque ya llegan scopeados por el global scope de Filament.
+     * $empresaId: todos los consumidores (widgets, controllers, PDF) deben pasarlo explícitamente
+     * para no depender del scoping automático de Filament (falla en colas, tests, comandos).
      */
     public function ventasEnRangoQuery(Carbon $desde, Carbon $hasta, ?int $empresaId = null): Builder
     {
@@ -433,9 +433,9 @@ class ReporteService
     /**
      * @return array{total_vendido: string, total_itbis: string, cantidad_ventas: int, ticket_promedio: string}
      */
-    public function ventasPorRango(Carbon $desde, Carbon $hasta): array
+    public function ventasPorRango(Carbon $desde, Carbon $hasta, ?int $empresaId = null): array
     {
-        $fila = $this->ventasEmitidasEnRango($desde, $hasta)
+        $fila = $this->ventasEmitidasEnRango($desde, $hasta, $empresaId)
             ->selectRaw('COALESCE(SUM(total), 0) as total_vendido')
             ->selectRaw('COALESCE(SUM(total_itbis), 0) as total_itbis')
             ->selectRaw('COUNT(*) as cantidad_ventas')
@@ -460,12 +460,12 @@ class ReporteService
      *
      * @return array{electronicos: int, fisicos: int}
      */
-    public function desgloseComprobantes(Carbon $desde, Carbon $hasta): array
+    public function desgloseComprobantes(Carbon $desde, Carbon $hasta, ?int $empresaId = null): array
     {
         $tiposElectronicos = collect(TipoComprobante::cases())->filter->esElectronico()->map->value->all();
         $tiposFisicos = collect(TipoComprobante::cases())->filter->esFisico()->map->value->all();
 
-        $base = $this->ventasEmitidasEnRango($desde, $hasta)->whereNotNull('ncf');
+        $base = $this->ventasEmitidasEnRango($desde, $hasta, $empresaId)->whereNotNull('ncf');
 
         return [
             'electronicos' => (clone $base)->whereIn('tipo_comprobante', $tiposElectronicos)->count(),
@@ -478,9 +478,9 @@ class ReporteService
      *
      * @return Collection<string, string>
      */
-    public function ventasPorDia(Carbon $desde, Carbon $hasta): Collection
+    public function ventasPorDia(Carbon $desde, Carbon $hasta, ?int $empresaId = null): Collection
     {
-        return $this->ventasEmitidasEnRango($desde, $hasta)
+        return $this->ventasEmitidasEnRango($desde, $hasta, $empresaId)
             ->selectRaw('DATE(fecha) as dia')
             ->selectRaw('COALESCE(SUM(total), 0) as total')
             ->groupBy('dia')
@@ -507,9 +507,9 @@ class ReporteService
     /**
      * @return array{por_cantidad: Collection, por_ingresos: Collection}
      */
-    public function topProductos(Carbon $desde, Carbon $hasta, int $limite = 10): array
+    public function topProductos(Carbon $desde, Carbon $hasta, int $limite = 10, ?int $empresaId = null): array
     {
-        $base = $this->productosVendidosQuery($desde, $hasta);
+        $base = $this->productosVendidosQuery($desde, $hasta, $empresaId);
 
         return [
             'por_cantidad' => (clone $base)->orderByDesc('cantidad_vendida')->limit($limite)->get(),
@@ -519,8 +519,7 @@ class ReporteService
 
     public function ventasPorClienteQuery(Carbon $desde, Carbon $hasta, ?int $empresaId = null): Builder
     {
-        return $this->ventasEmitidasEnRango($desde, $hasta)
-            ->when($empresaId, fn (Builder $query, int $id) => $query->where('ventas.empresa_id', $id))
+        return $this->ventasEmitidasEnRango($desde, $hasta, $empresaId)
             // leftJoin: las ventas al portador (cliente_id null) se agrupan en una sola fila.
             ->leftJoin('clientes', 'clientes.id', '=', 'ventas.cliente_id')
             ->groupBy('clientes.id', 'clientes.nombre')
@@ -533,15 +532,14 @@ class ReporteService
             ->selectRaw('COUNT(*) as cantidad_ventas');
     }
 
-    public function ventasPorCliente(Carbon $desde, Carbon $hasta): Collection
+    public function ventasPorCliente(Carbon $desde, Carbon $hasta, ?int $empresaId = null): Collection
     {
-        return $this->ventasPorClienteQuery($desde, $hasta)->orderByDesc('total_vendido')->get();
+        return $this->ventasPorClienteQuery($desde, $hasta, $empresaId)->orderByDesc('total_vendido')->get();
     }
 
     public function ventasPorUsuarioQuery(Carbon $desde, Carbon $hasta, ?int $empresaId = null): Builder
     {
-        return $this->ventasEmitidasEnRango($desde, $hasta)
-            ->when($empresaId, fn (Builder $query, int $id) => $query->where('ventas.empresa_id', $id))
+        return $this->ventasEmitidasEnRango($desde, $hasta, $empresaId)
             ->join('users', 'users.id', '=', 'ventas.user_id')
             ->groupBy('users.id', 'users.name')
             ->selectRaw('users.id as id, users.id as user_id, users.name as user_nombre')
@@ -549,19 +547,20 @@ class ReporteService
             ->selectRaw('COUNT(*) as cantidad_ventas');
     }
 
-    public function ventasPorUsuario(Carbon $desde, Carbon $hasta): Collection
+    public function ventasPorUsuario(Carbon $desde, Carbon $hasta, ?int $empresaId = null): Collection
     {
-        return $this->ventasPorUsuarioQuery($desde, $hasta)->orderByDesc('total_vendido')->get();
+        return $this->ventasPorUsuarioQuery($desde, $hasta, $empresaId)->orderByDesc('total_vendido')->get();
     }
 
     /**
      * Conteo por estado_fiscal, separado también por estado (emitida/anulada): incluye
      * anuladas porque el propósito aquí es monitoreo del ciclo fiscal DGII, no ingresos.
      */
-    public function ventasPorEstadoFiscal(Carbon $desde, Carbon $hasta): Collection
+    public function ventasPorEstadoFiscal(Carbon $desde, Carbon $hasta, ?int $empresaId = null): Collection
     {
         return Venta::query()
             ->whereBetween('fecha', [$desde->copy()->startOfDay(), $hasta->copy()->endOfDay()])
+            ->when($empresaId, fn (Builder $query, int $id) => $query->where('empresa_id', $id))
             ->groupBy('estado', 'estado_fiscal')
             ->selectRaw('estado, estado_fiscal, COUNT(*) as cantidad')
             ->orderBy('estado_fiscal')
@@ -593,9 +592,9 @@ class ReporteService
     /**
      * @return Collection<int, Producto>
      */
-    public function productosBajoMinimo(): Collection
+    public function productosBajoMinimo(?int $empresaId = null): Collection
     {
-        return $this->productosBajoMinimoQuery()->orderBy('nombre')->get();
+        return $this->productosBajoMinimoQuery($empresaId)->orderBy('nombre')->get();
     }
 
     // ──────────────────────────────────────────────────────────────────────

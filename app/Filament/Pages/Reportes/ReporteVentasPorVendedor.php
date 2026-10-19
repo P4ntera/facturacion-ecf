@@ -32,7 +32,7 @@ class ReporteVentasPorVendedor extends ReportePage
     public function table(Table $table): Table
     {
         return $table
-            ->query(fn () => app(ReporteService::class)->ventasPorUsuarioQuery($this->rangoDesde(), $this->rangoHasta()))
+            ->query(fn () => app(ReporteService::class)->ventasPorUsuarioQuery($this->rangoDesde(), $this->rangoHasta(), Filament::getTenant()->id))
             ->columns([
                 TextColumn::make('user_nombre')
                     ->label('Vendedor')

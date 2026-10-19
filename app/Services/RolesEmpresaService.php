@@ -45,6 +45,7 @@ class RolesEmpresaService
                 'pos.acceder',
                 'facturacion.acceder',
                 'ventas.ver',
+                'ventas.aplicar_descuento',
                 'ventas.imprimir',
                 'gestionar_arqueo_caja',
                 // "Maestros" del Vendedor se limita a consultar lo que necesita para vender

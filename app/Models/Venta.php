@@ -26,10 +26,10 @@ class Venta extends Model
     use LogsActivity;
 
     protected $fillable = [
-        'cliente_id', 'user_id', 'tipo_comprobante', 'ncf', 'ncf_modifica', 'venta_modificada_id',
-        'tipo_pago', 'fecha_limite_pago', 'forma_pago', 'arqueo_caja_id', 'caja_id',
         'empresa_id', 'cliente_id', 'user_id', 'tipo_comprobante', 'ncf', 'ncf_modifica',
-        'tipo_pago', 'fecha_limite_pago',
+        'venta_modificada_id', 'tipo_pago', 'fecha_limite_pago',
+        'forma_pago', 'monto_efectivo', 'monto_tarjeta', 'monto_transferencia', 'vuelto',
+        'arqueo_caja_id', 'caja_id',
         'fecha', 'moneda', 'tasa_cambio',
         'subtotal', 'descuento',
         'monto_gravado_18', 'monto_gravado_16', 'monto_gravado_0', 'monto_exento',
@@ -48,6 +48,10 @@ class Venta extends Model
         'estado_fiscal' => EstadoFiscal::class,
         'tipo_pago' => TipoPago::class,
         'forma_pago' => FormaPago::class,
+        'monto_efectivo' => 'decimal:2',
+        'monto_tarjeta' => 'decimal:2',
+        'monto_transferencia' => 'decimal:2',
+        'vuelto' => 'decimal:2',
         'ambiente' => AmbienteEcf::class,
         'fecha_limite_pago' => 'date',
         'fecha' => 'datetime',

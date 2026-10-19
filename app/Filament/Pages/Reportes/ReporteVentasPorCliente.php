@@ -32,7 +32,7 @@ class ReporteVentasPorCliente extends ReportePage
     public function table(Table $table): Table
     {
         return $table
-            ->query(fn () => app(ReporteService::class)->ventasPorClienteQuery($this->rangoDesde(), $this->rangoHasta()))
+            ->query(fn () => app(ReporteService::class)->ventasPorClienteQuery($this->rangoDesde(), $this->rangoHasta(), Filament::getTenant()->id))
             ->columns([
                 TextColumn::make('cliente_nombre')
                     ->label('Cliente')

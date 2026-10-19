@@ -90,20 +90,44 @@ class ArqueoCajaService
         }
 
         return DB::transaction(function () use ($arqueo, $efectivoContado, $notas) {
-            $sumasPorFormaPago = $arqueo->ventas()
+            // Calcula los totales REALES por método de pago, usando las columnas de desglose
+            // (monto_efectivo, monto_tarjeta, monto_transferencia) cuando existen (pago MIXTO),
+            // y cayendo al total de la venta cuando forma_pago es pura (EFECTIVO/TARJETA/TRANSFERENCIA).
+            // Esto reemplaza el GROUP BY forma_pago anterior, que no podía descomponer pagos MIXTOS.
+            $baseVentas = $arqueo->ventas()
                 ->where('estado', '!=', EstadoVenta::ANULADA)
                 // Ventas a crédito no representan efectivo/tarjeta recibido hoy: se cobran
                 // después vía CuentaPorCobrarService, no deben inflar el efectivo esperado.
                 ->where('tipo_pago', TipoPago::CONTADO)
                 // Las notas (devoluciones de hoy) no son ventas: se restan aparte, abajo.
-                ->whereNull('venta_modificada_id')
-                ->selectRaw('forma_pago, COALESCE(SUM(total), 0) as total')
-                ->groupBy('forma_pago')
-                ->pluck('total', 'forma_pago');
+                ->whereNull('venta_modificada_id');
 
-            $totalEfectivo = $this->aMoneda($sumasPorFormaPago[FormaPago::EFECTIVO->value] ?? '0');
-            $totalTarjeta = $this->aMoneda($sumasPorFormaPago[FormaPago::TARJETA->value] ?? '0');
-            $totalTransferencia = $this->aMoneda($sumasPorFormaPago[FormaPago::TRANSFERENCIA->value] ?? '0');
+            $sumas = $baseVentas->selectRaw(<<<'SQL'
+                COALESCE(SUM(
+                    CASE
+                        WHEN forma_pago = 'mixto' THEN COALESCE(monto_efectivo, 0)
+                        WHEN forma_pago = 'efectivo' THEN COALESCE(monto_efectivo, total)
+                        ELSE 0
+                    END
+                ), 0) as sum_efectivo,
+                COALESCE(SUM(
+                    CASE
+                        WHEN forma_pago = 'mixto' THEN COALESCE(monto_tarjeta, 0)
+                        WHEN forma_pago = 'tarjeta' THEN COALESCE(monto_tarjeta, total)
+                        ELSE 0
+                    END
+                ), 0) as sum_tarjeta,
+                COALESCE(SUM(
+                    CASE
+                        WHEN forma_pago = 'transferencia' THEN COALESCE(monto_transferencia, total)
+                        ELSE COALESCE(monto_transferencia, 0)
+                    END
+                ), 0) as sum_transferencia
+            SQL)->first();
+
+            $totalEfectivo = $this->aMoneda((string) ($sumas->sum_efectivo ?? '0'));
+            $totalTarjeta = $this->aMoneda((string) ($sumas->sum_tarjeta ?? '0'));
+            $totalTransferencia = $this->aMoneda((string) ($sumas->sum_transferencia ?? '0'));
 
             // Devoluciones reembolsadas en efectivo desde esta caja: ese dinero salió del cajón.
             $devolucionesEfectivo = $this->aMoneda((string) $arqueo->ventas()
@@ -112,8 +136,24 @@ class ArqueoCajaService
                 ->where('forma_reembolso', FormaReembolso::EFECTIVO)
                 ->sum('monto_reembolso'));
 
+            // Vuelto entregado a clientes: sale del cajón de efectivo.
+            $totalVuelto = $this->aMoneda((string) $arqueo->ventas()
+                ->where('estado', '!=', EstadoVenta::ANULADA)
+                ->whereNull('venta_modificada_id')
+                ->where('tipo_pago', TipoPago::CONTADO)
+                ->sum('vuelto'));
+
             $efectivoContadoNormalizado = $this->aMoneda($efectivoContado);
-            $efectivoEsperado = bcsub(bcadd((string) $arqueo->fondo_inicial, $totalEfectivo, 2), $devolucionesEfectivo, 2);
+            // Efectivo en caja = fondo + cobrado en efectivo − vuelto entregado − devoluciones.
+            $efectivoEsperado = bcsub(
+                bcsub(
+                    bcadd((string) $arqueo->fondo_inicial, $totalEfectivo, 2),
+                    $totalVuelto,
+                    2,
+                ),
+                $devolucionesEfectivo,
+                2,
+            );
             $diferencia = bcsub($efectivoContadoNormalizado, $efectivoEsperado, 2);
 
             $arqueo->update([

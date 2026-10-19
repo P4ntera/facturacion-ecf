@@ -41,7 +41,7 @@ class ReporteInventario extends ReportePage
             Section::make('Resumen')
                 ->schema([
                     Text::make(fn () => 'Valor total del inventario: '.Number::currency(
-                        (float) app(ReporteService::class)->valorInventario(),
+                        (float) app(ReporteService::class)->valorInventario(Filament::getTenant()->id),
                         'DOP',
                     ))
                         ->size(TextSize::Large)
@@ -58,7 +58,7 @@ class ReporteInventario extends ReportePage
     public function table(Table $table): Table
     {
         return $table
-            ->query(fn () => app(ReporteService::class)->productosBajoMinimoQuery())
+            ->query(fn () => app(ReporteService::class)->productosBajoMinimoQuery(Filament::getTenant()->id))
             ->columns([
                 TextColumn::make('codigo')
                     ->label('Código'),
@@ -81,7 +81,8 @@ class ReporteInventario extends ReportePage
 
                 TextColumn::make('costo')
                     ->label('Costo')
-                    ->money('DOP'),
+                    ->money('DOP')
+                    ->visible(fn (): bool => auth()->user()?->can('productos.ver_costo') ?? false),
             ])
             ->filters([
                 SelectFilter::make('categoria_id')

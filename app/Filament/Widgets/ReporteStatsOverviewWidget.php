@@ -29,10 +29,10 @@ class ReporteStatsOverviewWidget extends StatsOverviewWidget
 
         $servicio = app(ReporteService::class);
 
-        $hoy = Cache::remember("{$cacheKey}_hoy", $ttl, fn () => $servicio->ventasPorRango(Carbon::today(), Carbon::today()));
-        $mes = Cache::remember("{$cacheKey}_mes", $ttl, fn () => $servicio->ventasPorRango(Carbon::today()->startOfMonth(), Carbon::today()->endOfMonth()));
-        $productosBajoMinimo = Cache::remember("{$cacheKey}_bajo_min", $ttl, fn () => $servicio->productosBajoMinimo()->count());
-        $desglose = Cache::remember("{$cacheKey}_desglose", $ttl, fn () => $servicio->desgloseComprobantes(Carbon::today()->startOfMonth(), Carbon::today()->endOfMonth()));
+        $hoy = Cache::remember("{$cacheKey}_hoy", $ttl, fn () => $servicio->ventasPorRango(Carbon::today(), Carbon::today(), $empresaId));
+        $mes = Cache::remember("{$cacheKey}_mes", $ttl, fn () => $servicio->ventasPorRango(Carbon::today()->startOfMonth(), Carbon::today()->endOfMonth(), $empresaId));
+        $productosBajoMinimo = Cache::remember("{$cacheKey}_bajo_min", $ttl, fn () => $servicio->productosBajoMinimo($empresaId)->count());
+        $desglose = Cache::remember("{$cacheKey}_desglose", $ttl, fn () => $servicio->desgloseComprobantes(Carbon::today()->startOfMonth(), Carbon::today()->endOfMonth(), $empresaId));
 
         return [
             Stat::make('Ventas de hoy', Number::currency((float) $hoy['total_vendido'], 'DOP'))
@@ -51,7 +51,7 @@ class ReporteStatsOverviewWidget extends StatsOverviewWidget
                 ->icon('heroicon-o-receipt-percent')
                 ->color('info'),
 
-            Stat::make('Valor del inventario', Number::currency((float) Cache::remember("{$cacheKey}_inv", $ttl, fn () => $servicio->valorInventario()), 'DOP'))
+            Stat::make('Valor del inventario', Number::currency((float) Cache::remember("{$cacheKey}_inv", $ttl, fn () => $servicio->valorInventario($empresaId)), 'DOP'))
                 ->icon('heroicon-o-archive-box')
                 ->color('gray'),
 

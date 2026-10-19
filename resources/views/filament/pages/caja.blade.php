@@ -278,6 +278,37 @@
             </select>
           </div>
 
+          @if ($formaPago === \App\Enums\FormaPago::EFECTIVO->value)
+            <div class="mt-2">
+              <label class="form-label">Monto recibido (efectivo)</label>
+              <input type="number" step="0.01" min="0" class="form-input" wire:model.blur="montoEfectivo"
+                placeholder="{{ $totales['total'] ?? '0.00' }}" />
+            </div>
+            @if (bccomp($this->vueltoCalculado(), '0.00', 2) > 0)
+              <div class="mt-1" style="font-weight:600;color:var(--success-500);font-size:1.1rem;">
+                Vuelto: ${{ number_format((float) $this->vueltoCalculado(), 2) }}
+              </div>
+            @endif
+          @endif
+
+          @if ($formaPago === \App\Enums\FormaPago::MIXTO->value)
+            <div class="mt-2" style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;">
+              <div>
+                <label class="form-label">Efectivo</label>
+                <input type="number" step="0.01" min="0" class="form-input" wire:model.blur="montoEfectivo" />
+              </div>
+              <div>
+                <label class="form-label">Tarjeta</label>
+                <input type="number" step="0.01" min="0" class="form-input" wire:model.blur="montoTarjeta" />
+              </div>
+            </div>
+            @if (bccomp($this->vueltoCalculado(), '0.00', 2) > 0)
+              <div class="mt-1" style="font-weight:600;color:var(--success-500);font-size:1.1rem;">
+                Vuelto: ${{ number_format((float) $this->vueltoCalculado(), 2) }}
+              </div>
+            @endif
+          @endif
+
           <div class="mt-2">
             <label class="form-label">
               <input type="checkbox" wire:model.live="ventaACredito" />

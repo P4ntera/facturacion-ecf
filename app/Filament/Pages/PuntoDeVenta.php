@@ -82,6 +82,16 @@ class PuntoDeVenta extends Page
 
     public string $formaPago = 'efectivo';
 
+    /**
+     * Monto recibido en efectivo (usado cuando formaPago es EFECTIVO o MIXTO).
+     * Cuando es EFECTIVO puro, si montoEfectivo > total se calcula vuelto.
+     * Cuando es MIXTO, montoEfectivo + montoTarjeta debe cubrir el total.
+     */
+    public string $montoEfectivo = '';
+
+    /** Monto cobrado por tarjeta (solo cuando formaPago = MIXTO). */
+    public string $montoTarjeta = '';
+
     public bool $ventaACredito = false;
 
     public string $fechaLimitePago = '';
@@ -738,6 +748,10 @@ class PuntoDeVenta extends Page
     /** @return Collection<int, Descuento> */
     public function descuentosDisponibles(): Collection
     {
+        if (! auth()->user()?->can('ventas.aplicar_descuento')) {
+            return collect();
+        }
+
         return Descuento::query()
             ->where('empresa_id', $this->empresaId())
             ->where('activo', true)
@@ -815,6 +829,7 @@ class PuntoDeVenta extends Page
                 'sin_comprobante' => $this->esSinComprobante(),
                 'descuento_global' => $this->descuentoGlobal,
                 'forma_pago' => $this->formaPago,
+                ...$this->datosDesglosePago(),
                 'arqueo_caja_id' => $this->arqueoAbierto()?->id,
                 'tipo_pago' => $this->ventaACredito ? TipoPago::CREDITO->value : TipoPago::CONTADO->value,
                 'fecha_limite_pago' => $this->ventaACredito && filled($this->fechaLimitePago) ? $this->fechaLimitePago : null,
@@ -833,6 +848,8 @@ class PuntoDeVenta extends Page
         $this->busquedaProducto = '';
         $this->ventaACredito = false;
         $this->fechaLimitePago = '';
+        $this->montoEfectivo = '';
+        $this->montoTarjeta = '';
         $this->recalcularTotales();
 
         $this->notificarVentaRegistradaEImprimirTicket($venta);
@@ -908,6 +925,82 @@ class PuntoDeVenta extends Page
                 $accionComprobante,
             ])
             ->send();
+    }
+
+    /**
+     * Calcula el vuelto a entregar al cliente.
+     *
+     * - EFECTIVO puro: vuelto = montoEfectivo − total (si montoEfectivo > total).
+     * - MIXTO: vuelto = (montoEfectivo + montoTarjeta) − total (normalmente 0 o positivo solo
+     *   si el cajero recibe de más en efectivo; la tarjeta cobra exacto).
+     *
+     * Se devuelve '0.00' si no aplica o si los montos no están llenos.
+     */
+    public function vueltoCalculado(): string
+    {
+        $formaPago = FormaPago::tryFrom($this->formaPago);
+
+        if ($formaPago === null || ! $formaPago->incluyeEfectivo()) {
+            return '0.00';
+        }
+
+        $total = $this->totales['total'] ?? '0.00';
+        $efectivo = filled($this->montoEfectivo) ? $this->montoEfectivo : '0.00';
+
+        if ($formaPago === FormaPago::MIXTO) {
+            $tarjeta = filled($this->montoTarjeta) ? $this->montoTarjeta : '0.00';
+            $totalRecibido = bcadd($efectivo, $tarjeta, 2);
+        } else {
+            $totalRecibido = $efectivo;
+        }
+
+        $vuelto = bcsub($totalRecibido, $total, 2);
+
+        return bccomp($vuelto, '0.00', 2) > 0 ? $vuelto : '0.00';
+    }
+
+    /**
+     * Arma los datos de desglose de pago (montos por método y vuelto) que cobrar() mezcla en el
+     * array que va a VentaService::registrar(). Los campos se llenan solo cuando tienen sentido
+     * (para no guardar nulls/ceros innecesarios en pagos sencillos).
+     *
+     * @return array<string, string|null>
+     */
+    protected function datosDesglosePago(): array
+    {
+        $formaPago = FormaPago::tryFrom($this->formaPago);
+        $total = $this->totales['total'] ?? '0.00';
+
+        if ($formaPago === FormaPago::MIXTO) {
+            $efectivo = filled($this->montoEfectivo) ? $this->montoEfectivo : '0.00';
+            $tarjeta = filled($this->montoTarjeta) ? $this->montoTarjeta : '0.00';
+            $vuelto = $this->vueltoCalculado();
+
+            return [
+                'monto_efectivo' => $efectivo,
+                'monto_tarjeta' => $tarjeta,
+                'vuelto' => bccomp($vuelto, '0.00', 2) > 0 ? $vuelto : null,
+            ];
+        }
+
+        if ($formaPago === FormaPago::EFECTIVO && filled($this->montoEfectivo)) {
+            $vuelto = $this->vueltoCalculado();
+
+            return [
+                'monto_efectivo' => $this->montoEfectivo,
+                'vuelto' => bccomp($vuelto, '0.00', 2) > 0 ? $vuelto : null,
+            ];
+        }
+
+        if ($formaPago === FormaPago::TARJETA) {
+            return ['monto_tarjeta' => $total];
+        }
+
+        if ($formaPago === FormaPago::TRANSFERENCIA) {
+            return ['monto_transferencia' => $total];
+        }
+
+        return [];
     }
 
     protected function recalcularTotales(): void

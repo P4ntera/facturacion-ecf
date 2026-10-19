@@ -464,19 +464,38 @@
         @endif
 
         @if ($formaPago === \App\Enums\FormaPago::EFECTIVO->value)
-          <div class="pt-seccion" x-data="{ total: {{ (float) $totales['total'] }} }">
+          <div class="pt-seccion" x-data="{ total: {{ (float) ($totales['total'] ?? 0) }} }">
             <label>Efectivo recibido</label>
-            <input type="number" inputmode="decimal" min="0" step="0.01" x-model="recibido" placeholder="0.00" />
+            <input type="number" inputmode="decimal" min="0" step="0.01"
+              wire:model.blur="montoEfectivo" x-ref="efectivo" placeholder="0.00" />
             <div class="pt-billetes">
               @foreach ([100, 200, 500, 1000, 2000] as $billete)
-                <button type="button" x-on:click="recibido = String((parseFloat(recibido || '0') + {{ $billete }}).toFixed(2))">+{{ number_format($billete) }}</button>
+                <button type="button" x-on:click="$refs.efectivo.value = String((parseFloat($refs.efectivo.value || '0') + {{ $billete }}).toFixed(2)); $wire.set('montoEfectivo', $refs.efectivo.value)">+{{ number_format($billete) }}</button>
               @endforeach
-              <button type="button" x-on:click="recibido = total.toFixed(2)">Exacto</button>
-              <button type="button" x-on:click="recibido = ''" style="grid-column: span 2">Limpiar</button>
+              <button type="button" x-on:click="$refs.efectivo.value = total.toFixed(2); $wire.set('montoEfectivo', $refs.efectivo.value)">Exacto</button>
+              <button type="button" x-on:click="$refs.efectivo.value = ''; $wire.set('montoEfectivo', '')" style="grid-column: span 2">Limpiar</button>
             </div>
-            <p style="margin-top:.6rem;font-size:1.3rem;font-weight:700">
-              Cambio: <span class="pt-num" x-text="'RD$ ' + cambio(total).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })"></span>
-            </p>
+            @if (bccomp($this->vueltoCalculado(), '0.00', 2) > 0)
+              <p style="margin-top:.6rem;font-size:1.3rem;font-weight:700;color:var(--success-500)">
+                Vuelto: RD$ {{ number_format((float) $this->vueltoCalculado(), 2, '.', ',') }}
+              </p>
+            @endif
+          </div>
+        @endif
+
+        @if ($formaPago === \App\Enums\FormaPago::MIXTO->value)
+          <div class="pt-seccion">
+            <label>Efectivo</label>
+            <input type="number" inputmode="decimal" min="0" step="0.01"
+              wire:model.blur="montoEfectivo" placeholder="0.00" />
+            <label style="margin-top:.5rem">Tarjeta</label>
+            <input type="number" inputmode="decimal" min="0" step="0.01"
+              wire:model.blur="montoTarjeta" placeholder="0.00" />
+            @if (bccomp($this->vueltoCalculado(), '0.00', 2) > 0)
+              <p style="margin-top:.6rem;font-size:1.3rem;font-weight:700;color:var(--success-500)">
+                Vuelto: RD$ {{ number_format((float) $this->vueltoCalculado(), 2, '.', ',') }}
+              </p>
+            @endif
           </div>
         @endif
 

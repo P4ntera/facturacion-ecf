@@ -6,6 +6,7 @@ namespace App\Filament\Widgets;
 
 use App\Models\CuentaPorCobrar;
 use App\Services\ReporteService;
+use Filament\Facades\Filament;
 use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 use Illuminate\Support\Carbon;
@@ -39,8 +40,9 @@ class DashboardStatsWidget extends StatsOverviewWidget
 
     private function statVentasHoy(ReporteService $servicio): Stat
     {
-        $hoy = $servicio->ventasPorRango(Carbon::today(), Carbon::today());
-        $ayer = $servicio->ventasPorRango(Carbon::yesterday(), Carbon::yesterday());
+        $empresaId = Filament::getTenant()->id;
+        $hoy = $servicio->ventasPorRango(Carbon::today(), Carbon::today(), $empresaId);
+        $ayer = $servicio->ventasPorRango(Carbon::yesterday(), Carbon::yesterday(), $empresaId);
 
         $totalHoy = (float) $hoy['total_vendido'];
         $totalAyer = (float) $ayer['total_vendido'];
@@ -58,7 +60,7 @@ class DashboardStatsWidget extends StatsOverviewWidget
 
     private function statFacturasEmitidas(ReporteService $servicio): Stat
     {
-        $desglose = $servicio->desgloseComprobantes(Carbon::today(), Carbon::today());
+        $desglose = $servicio->desgloseComprobantes(Carbon::today(), Carbon::today(), Filament::getTenant()->id);
         $total = $desglose['electronicos'] + $desglose['fisicos'];
 
         return Stat::make('Facturas Emitidas', (string) $total)
@@ -70,6 +72,7 @@ class DashboardStatsWidget extends StatsOverviewWidget
     private function statCxcPendiente(): Stat
     {
         $pendientes = CuentaPorCobrar::query()
+            ->where('empresa_id', Filament::getTenant()->id)
             ->whereColumn('monto_pagado', '<', 'monto_total')
             ->selectRaw('COALESCE(SUM(monto_total - monto_pagado), 0) as monto_pendiente')
             ->selectRaw('COUNT(*) as cantidad')
@@ -85,7 +88,7 @@ class DashboardStatsWidget extends StatsOverviewWidget
 
     private function statStockBajo(ReporteService $servicio): Stat
     {
-        $cantidad = $servicio->productosBajoMinimoQuery()->count();
+        $cantidad = $servicio->productosBajoMinimoQuery(Filament::getTenant()->id)->count();
 
         return Stat::make('Stock Bajo Mínimo', (string) $cantidad)
             ->description($cantidad > 0 ? 'Requieren reposición' : 'Todo en orden')

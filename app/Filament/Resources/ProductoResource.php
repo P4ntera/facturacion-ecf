@@ -174,7 +174,8 @@ class ProductoResource extends Resource
                                 MetodoCosto::MANUAL => 'Sin ITBIS. Método manual: las compras no cambian este costo.',
                                 MetodoCosto::ULTIMA_COMPRA => 'Sin ITBIS. Se actualiza con cada compra (costo de la última compra).',
                                 MetodoCosto::PROMEDIO_PONDERADO => 'Sin ITBIS. Se recalcula con cada compra (promedio ponderado).',
-                            }),
+                            })
+                            ->visible(fn (): bool => auth()->user()?->can('productos.ver_costo') ?? false),
 
                         TextInput::make('margen_ganancia')
                             ->label('% de ganancia')
@@ -188,10 +189,12 @@ class ProductoResource extends Resource
 
                                 return $margenCategoria !== null ? "{$margenCategoria} % (de la categoría)" : 'Sin porcentaje';
                             })
-                            ->helperText('Sobre el costo. Vacío = usa el de la categoría.'),
+                            ->helperText('Sobre el costo. Vacío = usa el de la categoría.')
+                            ->visible(fn (): bool => auth()->user()?->can('productos.ver_costo') ?? false),
 
                         TextEntry::make('precio_sugerido_preview')
                             ->label('Precio sugerido')
+                            ->visible(fn (): bool => auth()->user()?->can('productos.ver_costo') ?? false)
                             ->state(function (Get $get): string {
                                 $tipoVenta = TipoVenta::tryFrom((string) $get('tipo_venta'));
                                 $tasa = TasaItbis::tryFrom((string) $get('tasa_itbis'));
