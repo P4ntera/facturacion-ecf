@@ -373,7 +373,7 @@ class VentaService
 
             $cuentaPorCobrar = $venta->cuentaPorCobrar;
 
-            if ($cuentaPorCobrar !== null && (float) $cuentaPorCobrar->monto_pagado > 0) {
+            if ($cuentaPorCobrar !== null && bccomp((string) $cuentaPorCobrar->monto_pagado, '0', 2) > 0) {
                 throw new CuentaConPagosRegistradosException(
                     "No se puede anular la venta #{$venta->id}: su cuenta por cobrar ya tiene pagos registrados."
                 );
@@ -395,7 +395,7 @@ class VentaService
                         $producto,
                         TipoMovimiento::ENTRADA,
                         OrigenMovimiento::ANULACION,
-                        (float) $detalle->cantidad * (float) $detalle->factor,
+                        bcmul((string) $detalle->cantidad, (string) $detalle->factor, 3),
                         $venta->id,
                         $userId,
                         $motivo,
@@ -509,7 +509,7 @@ class VentaService
                 }
 
                 $producto = Producto::where('empresa_id', $empresa->id)->findOrFail($detalle['producto_id']);
-                $cantidad = (float) ($detalle['cantidad'] ?? 1);
+                $cantidad = (string) ($detalle['cantidad'] ?? '1');
                 $tasaEfectiva = $config->aplica_itbis ? $producto->tasa_itbis : TasaItbis::CERO;
                 $base = bcmul($monto, number_format($cantidad, 4, '.', ''), 2);
                 $itbis = bcdiv(bcmul($base, (string) $tasaEfectiva->porcentaje(), 4), '100', 2);
@@ -660,9 +660,9 @@ class VentaService
             $stockMovimientos = [];
 
             foreach ($detalles as $detalle) {
-                $cantidad = (float) $detalle['cantidad'];
+                $cantidad = (string) ($detalle['cantidad'] ?? '0');
 
-                if ($cantidad <= 0) {
+                if (bccomp($cantidad, '0', 3) <= 0) {
                     throw new VentaInvalidaException('La cantidad a devolver debe ser mayor que cero.');
                 }
 
@@ -752,7 +752,7 @@ class VentaService
 
                 $stockMovimientos[] = [
                     'producto' => $detalleOriginal->producto,
-                    'cantidad' => $cantidad * (float) $detalleOriginal->factor,
+                    'cantidad' => bcmul($cantidad, (string) $detalleOriginal->factor, 3),
                     'destino' => $destino,
                 ];
             }
@@ -1068,6 +1068,28 @@ class VentaService
      */
     private function procesarLineas(array $lineas, EmpresaConfiguracion $config, ImpuestoStrategy $estrategia, Empresa $empresa, bool $permitePrecioCero = false, string $proporcionDescuentoGlobal = '0'): array
     {
+        // Consolidar líneas duplicadas del mismo producto+presentación: el POS puede mandar
+        // varias líneas del mismo ítem; sumar cantidades y descuentos evita detalles repetidos.
+        $consolidadas = [];
+        foreach ($lineas as $linea) {
+            $key = ($linea['producto_id'] ?? '') . '_' . ($linea['presentacion_id'] ?? '');
+            if (isset($consolidadas[$key])) {
+                $consolidadas[$key]['cantidad'] = bcadd(
+                    (string) ($consolidadas[$key]['cantidad'] ?? '0'),
+                    (string) ($linea['cantidad'] ?? '0'),
+                    3
+                );
+                $consolidadas[$key]['descuento'] = bcadd(
+                    (string) ($consolidadas[$key]['descuento'] ?? '0'),
+                    (string) ($linea['descuento'] ?? '0'),
+                    2
+                );
+            } else {
+                $consolidadas[$key] = $linea;
+            }
+        }
+        $lineas = array_values($consolidadas);
+
         $detalles = [];
         $productosLineas = [];
         $acumulado = [
@@ -1081,9 +1103,9 @@ class VentaService
         ];
 
         foreach ($lineas as $linea) {
-            $cantidad = (float) ($linea['cantidad'] ?? 0);
+            $cantidad = (string) ($linea['cantidad'] ?? '0');
 
-            if ($cantidad <= 0) {
+            if (bccomp($cantidad, '0', 3) <= 0) {
                 throw new VentaInvalidaException('La cantidad de cada línea debe ser mayor que cero.');
             }
 
@@ -1101,7 +1123,7 @@ class VentaService
             // facturar) como si fuera 1 unidad. La restricción producto_id = $producto->id de
             // paso impide referenciar la presentación de otro producto.
             $presentacion = null;
-            $factor = 1.0;
+            $factor = '1.000';
             $descripcion = $producto->nombre;
 
             if (filled($linea['presentacion_id'] ?? null)) {
@@ -1111,7 +1133,7 @@ class VentaService
                     throw new VentaInvalidaException("La presentación indicada no existe o no pertenece a «{$producto->nombre}».");
                 }
 
-                $factor = (float) $presentacion->factor;
+                $factor = (string) $presentacion->factor;
                 $descripcion = $presentacion->es_base ? $producto->nombre : "{$producto->nombre} - {$presentacion->nombre}";
             }
 
@@ -1189,7 +1211,7 @@ class VentaService
 
             // El inventario SIEMPRE se mueve en unidad base: cantidad × factor (una caja de 24
             // consume 24 unidades base aunque la línea diga cantidad 1).
-            $productosLineas[] = ['producto' => $producto, 'cantidad' => $cantidad * $factor];
+            $productosLineas[] = ['producto' => $producto, 'cantidad' => bcmul($cantidad, $factor, 3)];
         }
 
         return [$detalles, $productosLineas, $acumulado];

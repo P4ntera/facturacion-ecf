@@ -468,7 +468,7 @@ class ProductoResource extends Resource
                                 $record,
                                 TipoMovimiento::from($data['tipo']),
                                 OrigenMovimiento::AJUSTE,
-                                (float) $data['cantidad'],
+                                (string) $data['cantidad'],
                                 null,
                                 auth()->id(),
                                 $data['observacion'] ?? null,

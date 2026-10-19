@@ -30,7 +30,7 @@ class InventarioService
         Producto $producto,
         TipoMovimiento $tipo,
         OrigenMovimiento $origen,
-        float $cantidad,
+        string $cantidad,
         ?int $referenciaId = null,
         ?int $userId = null,
         ?string $observacion = null,
@@ -43,19 +43,20 @@ class InventarioService
         // Re-lee con lock para evitar condiciones de carrera con movimientos concurrentes.
         $producto = Producto::lockForUpdate()->findOrFail($producto->id);
 
-        $stockAnterior = (float) $producto->stock;
+        $stockAnterior = (string) $producto->stock;
 
         $stockNuevo = match ($tipo) {
-            TipoMovimiento::ENTRADA => $stockAnterior + $cantidad,
-            TipoMovimiento::SALIDA => $stockAnterior - $cantidad,
-            TipoMovimiento::AJUSTE => $stockAnterior + $cantidad, // $cantidad ya trae el signo
+            TipoMovimiento::ENTRADA => bcadd($stockAnterior, $cantidad, 3),
+            TipoMovimiento::SALIDA  => bcsub($stockAnterior, $cantidad, 3),
+            TipoMovimiento::AJUSTE  => bcadd($stockAnterior, $cantidad, 3), // $cantidad ya trae el signo
         };
 
-        $quedaNegativo = $stockNuevo < 0 && $stockNuevo < $stockAnterior;
+        $quedaNegativo = bccomp($stockNuevo, '0', 3) < 0 && bccomp($stockNuevo, $stockAnterior, 3) < 0;
 
         if ($quedaNegativo && ! $permitirNegativo) {
+            $solicitado = bccomp($cantidad, '0', 3) < 0 ? bcsub('0', $cantidad, 3) : $cantidad;
             throw new StockInsuficienteException(
-                "Stock insuficiente para «{$producto->nombre}»: disponible {$stockAnterior}, solicitado ".abs($cantidad).'.'
+                "Stock insuficiente para «{$producto->nombre}»: disponible {$stockAnterior}, solicitado {$solicitado}."
             );
         }
 
