@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\EstablecerEmpresaPermisos;
 use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -52,5 +53,15 @@ return Application::configure(basePath: dirname(__DIR__))
         );
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        //
+        $exceptions->renderable(function (UniqueConstraintViolationException $e) {
+            if (request()->expectsJson() || request()->header('X-Livewire')) {
+                \Filament\Notifications\Notification::make()
+                    ->title('Registro duplicado')
+                    ->body('Ya existe un registro con estos datos. Verifica los campos únicos e intenta de nuevo.')
+                    ->danger()
+                    ->send();
+
+                return back();
+            }
+        });
     })->create();

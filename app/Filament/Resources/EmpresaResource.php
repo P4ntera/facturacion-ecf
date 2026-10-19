@@ -68,6 +68,7 @@ class EmpresaResource extends Resource
                             ->required()
                             ->regex('/^\d{9}(\d{2})?$/')
                             ->validationMessages(['regex' => 'El RNC debe tener 9 u 11 dígitos.'])
+                            ->unique(ignoreRecord: true)
                             ->maxLength(11),
 
                         TextInput::make('slug')
