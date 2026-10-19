@@ -10,6 +10,7 @@ use App\Filament\Exports\ReporteKardexExporter;
 use App\Services\ReporteService;
 use BackedEnum;
 use Filament\Forms\Components\DatePicker;
+use Filament\Facades\Filament;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
@@ -104,7 +105,7 @@ class ReporteKardex extends ReportePage
 
                 SelectFilter::make('producto_id')
                     ->label('Producto')
-                    ->relationship('producto', 'nombre')
+                    ->relationship('producto', 'nombre', modifyQueryUsing: fn ($query) => $query->where('empresa_id', Filament::getTenant()->id))
                     ->searchable()
                     ->preload(),
 

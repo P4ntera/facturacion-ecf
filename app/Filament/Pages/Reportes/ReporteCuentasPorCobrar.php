@@ -8,6 +8,7 @@ use App\Filament\Exports\ReporteCuentasPorCobrarExporter;
 use App\Models\CuentaPorCobrar;
 use App\Services\ReporteService;
 use BackedEnum;
+use Filament\Facades\Filament;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\Summarizers\Summarizer;
 use Filament\Tables\Columns\TextColumn;
@@ -100,7 +101,7 @@ class ReporteCuentasPorCobrar extends ReportePage
             ->filters([
                 SelectFilter::make('cliente_id')
                     ->label('Cliente')
-                    ->relationship('cliente', 'nombre')
+                    ->relationship('cliente', 'nombre', modifyQueryUsing: fn ($query) => $query->where('empresa_id', Filament::getTenant()->id))
                     ->searchable()
                     ->preload(),
 
