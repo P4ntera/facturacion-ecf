@@ -58,9 +58,11 @@ class SecuenciaNcfResource extends Resource
             ->components([
                 Select::make('tipo_comprobante')
                     ->label('Tipo de comprobante')
-                    ->options(collect(TipoComprobante::cases())->mapWithKeys(
-                        fn (TipoComprobante $tipo) => [$tipo->value => "{$tipo->value} — {$tipo->etiqueta()}"]
-                    ))
+                    ->options(
+                        collect(TipoComprobante::cases())
+                            ->when(! Filament::getTenant()?->usaEcf(), fn ($c) => $c->filter(fn (TipoComprobante $t) => $t->esFisico()))
+                            ->mapWithKeys(fn (TipoComprobante $tipo) => [$tipo->value => "{$tipo->value} — {$tipo->etiqueta()}"])
+                    )
                     ->required()
                     ->live()
                     ->afterStateUpdated(function (?string $state, Set $set, Get $get, string $operation): void {
@@ -286,9 +288,11 @@ class SecuenciaNcfResource extends Resource
             ->filters([
                 SelectFilter::make('tipo_comprobante')
                     ->label('Comprobante')
-                    ->options(collect(TipoComprobante::cases())->mapWithKeys(
-                        fn (TipoComprobante $tipo) => [$tipo->value => $tipo->etiqueta()]
-                    )),
+                    ->options(
+                        collect(TipoComprobante::cases())
+                            ->when(! Filament::getTenant()?->usaEcf(), fn ($c) => $c->filter(fn (TipoComprobante $t) => $t->esFisico()))
+                            ->mapWithKeys(fn (TipoComprobante $tipo) => [$tipo->value => $tipo->etiqueta()])
+                    ),
 
                 TernaryFilter::make('activa')->label('Activa'),
 
