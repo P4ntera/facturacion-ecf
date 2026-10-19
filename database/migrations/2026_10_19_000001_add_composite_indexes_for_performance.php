@@ -58,7 +58,7 @@ return new class extends Migration
         });
 
         // --- Inventario (Kardex) ---
-        Schema::table('movimiento_inventarios', function (Blueprint $table) {
+        Schema::table('movimientos_inventario', function (Blueprint $table) {
             $table->index(['empresa_id', 'producto_id', 'created_at'], 'kardex_empresa_producto_fecha_idx');
         });
 
@@ -108,7 +108,7 @@ return new class extends Migration
             $table->dropIndex('pagos_realizados_empresa_fecha_idx');
         });
 
-        Schema::table('movimiento_inventarios', function (Blueprint $table) {
+        Schema::table('movimientos_inventario', function (Blueprint $table) {
             $table->dropIndex('kardex_empresa_producto_fecha_idx');
         });
 
