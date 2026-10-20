@@ -243,7 +243,12 @@
             <div wire:key="linea-{{ $indice }}-{{ $linea['producto_id'] }}-{{ $linea['presentacion_id'] ?? 'x' }}">
               <button type="button" class="pt-item {{ $lineaSeleccionada === $indice ? 'pt-activo' : '' }}" wire:click="seleccionarLinea({{ $indice }})">
                 <span style="min-width:0">
-                  <span class="pt-nombre" style="display:block">{{ $linea['nombre'] }}</span>
+                  <span class="pt-nombre" style="display:block">
+                    {{ $linea['nombre'] }}
+                    @if (in_array($linea['producto_id'], $this->productosEnPromocion()))
+                      <span style="background:#16a34a;color:#fff;font-size:.7rem;padding:1px 5px;border-radius:4px;margin-left:4px">Promo</span>
+                    @endif
+                  </span>
                   <span class="pt-det pt-muted">
                     RD$ {{ number_format((float) $linea['precio_unitario'], 2) }}
                     @if ((float) $linea['descuento'] > 0)

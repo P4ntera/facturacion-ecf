@@ -213,6 +213,9 @@
                   <tr wire:key="linea-{{ $indice }}">
                     <td>
                       {{ $linea['codigo'] }} — {{ $linea['nombre'] }}
+                      @if (in_array($linea['producto_id'], $this->productosEnPromocion()))
+                        <span class="badge badge-success" title="Promoción aplicada automáticamente">🏷️ Promo</span>
+                      @endif
                       @if ($this->lineaConStockInsuficiente($linea))
                         <div class="mt-1">
                           <span class="badge badge-danger">
@@ -265,6 +268,21 @@
 
       {{-- Totales --}}
       <div class="pos-side">
+        @if ($this->promocionesVigentes()->isNotEmpty())
+          <div class="card mb-2" style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 0.75rem;">
+            <h4 style="font-size: 0.85rem; font-weight: 600; color: #166534; margin-bottom: 0.5rem;">🏷️ Promociones activas</h4>
+            <ul style="list-style: none; padding: 0; margin: 0; font-size: 0.8rem;">
+              @foreach ($this->promocionesVigentes() as $promo)
+                <li style="padding: 0.2rem 0; color: #15803d;">
+                  <strong>{{ $promo->nombre }}</strong>
+                  <span style="color: #6b7280;">({{ $promo->tipo->etiqueta() }}{{ $promo->valor ? ' — ' . ($promo->tipo->value === 'porcentaje' ? $promo->valor . '%' : 'RD$ ' . number_format((float) $promo->valor, 2)) : '' }})</span>
+                  <span style="color: #9ca3af; font-size: 0.75rem;">hasta {{ $promo->fecha_fin->format('d/m/Y') }}</span>
+                </li>
+              @endforeach
+            </ul>
+          </div>
+        @endif
+
         <div class="card pos-totales">
           <h3 class="card-title">Totales</h3>
 

@@ -18,6 +18,7 @@ enum Modulo: string
     case MAESTROS_PRODUCTOS = 'maestros_productos';
     case MAESTROS_CATEGORIAS = 'maestros_categorias';
     case MAESTROS_DESCUENTOS = 'maestros_descuentos';
+    case MAESTROS_PROMOCIONES = 'maestros_promociones';
     case MAESTROS_LISTAS_PRECIO = 'maestros_listas_precio';
 
     case COTIZACIONES = 'cotizaciones';
@@ -55,6 +56,7 @@ enum Modulo: string
             self::MAESTROS_PRODUCTOS => 'Productos',
             self::MAESTROS_CATEGORIAS => 'Categorías',
             self::MAESTROS_DESCUENTOS => 'Descuentos',
+            self::MAESTROS_PROMOCIONES => 'Promociones',
             self::MAESTROS_LISTAS_PRECIO => 'Listas de Precio',
             self::COTIZACIONES => 'Cotizaciones',
             self::VENTAS_POS => 'Punto de Venta',
@@ -84,7 +86,8 @@ enum Modulo: string
         return match ($this) {
             self::MAESTROS_CLIENTES, self::MAESTROS_PROVEEDORES,
             self::MAESTROS_PRODUCTOS, self::MAESTROS_CATEGORIAS,
-            self::MAESTROS_DESCUENTOS, self::MAESTROS_LISTAS_PRECIO => 'Maestros',
+            self::MAESTROS_DESCUENTOS, self::MAESTROS_PROMOCIONES,
+            self::MAESTROS_LISTAS_PRECIO => 'Maestros',
 
             self::COTIZACIONES => 'Comercial',
 

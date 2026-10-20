@@ -53,6 +53,7 @@ class RolesEmpresaService
                 // (precios de productos, datos de clientes); crear/editar/desactivar maestros
                 // queda fuera de su pantalla de trabajo.
                 'productos.ver',
+                'promociones.ver',
                 'clientes.ver',
                 // Exportar va junto con ver: un vendedor que puede consultar un reporte también
                 // necesita poder sacarlo en PDF/Excel para el día a día (cierre de caja, etc.).

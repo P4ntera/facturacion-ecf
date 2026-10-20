@@ -46,6 +46,7 @@ enum PerfilEmpresa: string
             self::FACTURACION => [
                 ...$base,
                 Modulo::MAESTROS_DESCUENTOS,
+                Modulo::MAESTROS_PROMOCIONES,
                 Modulo::MAESTROS_LISTAS_PRECIO,
                 Modulo::COTIZACIONES,
                 Modulo::VENTAS_ARQUEO_CAJA,

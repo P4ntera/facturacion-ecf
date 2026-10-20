@@ -41,6 +41,7 @@ class VentaService
         private readonly SecuenciaNcfService $ncfService,
         private readonly InventarioService $inventarioService,
         private readonly CuentaPorCobrarService $cuentaPorCobrarService,
+        private readonly PromocionService $promocionService,
     ) {}
 
     /**
@@ -1039,7 +1040,22 @@ class VentaService
             }, $lineas);
         }
 
+        // Aplicar promociones vigentes antes de procesar líneas: el descuento por promoción
+        // se inyecta en el campo `descuento` de cada línea (mismo campo que DetalleVenta usa).
+        [$lineas, $promocionesAplicadas] = $this->promocionService->aplicar($lineas, $empresa);
+
         [$detalles, $productosLineas, $acumulado] = $this->procesarLineas($lineas, $config, $estrategia, $empresa, $permitePrecioCero);
+
+        // Propagar metadata de promociones a los detalles para trazabilidad en el POS.
+        foreach ($detalles as $i => &$detalle) {
+            $lineaOriginal = $lineas[$i] ?? [];
+            if (isset($lineaOriginal['_promocion_id'])) {
+                $detalle['_promocion_id'] = $lineaOriginal['_promocion_id'];
+                $detalle['_promocion_nombre'] = $lineaOriginal['_promocion_nombre'];
+                $detalle['_promocion_tipo'] = $lineaOriginal['_promocion_tipo'];
+            }
+        }
+        unset($detalle);
 
         $subtotalBruto = $acumulado['subtotal'];
         $descuentoGlobal = $this->resolverDescuentoGlobal($datos, $subtotalBruto, $empresa);

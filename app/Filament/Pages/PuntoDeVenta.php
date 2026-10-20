@@ -24,6 +24,7 @@ use App\Models\Venta;
 use App\Services\ArqueoCajaService;
 use App\Services\Dgii\ConsultaContribuyenteService;
 use App\Services\Impresion\ImpresionService;
+use App\Services\PromocionService;
 use App\Services\SecuenciaNcfService;
 use App\Services\VentaService;
 use BackedEnum;
@@ -774,6 +775,31 @@ class PuntoDeVenta extends Page
             ->where('empresa_id', $this->empresaId())
             ->where('activo', true)
             ->find((int) $this->descuentoId);
+    }
+
+    /**
+     * Promociones vigentes de la empresa actual, para mostrar en la UI del POS.
+     * Los descuentos por promoción se aplican automáticamente en VentaService::calcularLineas().
+     *
+     * @return Collection<int, \App\Models\Promocion>
+     */
+    public function promocionesVigentes(): Collection
+    {
+        return app(PromocionService::class)->vigentes($this->empresa());
+    }
+
+    /**
+     * IDs de productos que tienen una promoción vigente, para marcar visualmente en el carrito.
+     *
+     * @return array<int, int>
+     */
+    public function productosEnPromocion(): array
+    {
+        return $this->promocionesVigentes()
+            ->flatMap(fn ($promo) => $promo->productos->pluck('id'))
+            ->unique()
+            ->values()
+            ->all();
     }
 
     /** Turno de caja abierto del usuario actual, si tiene uno. Lookup fresco, sin cachear. */
