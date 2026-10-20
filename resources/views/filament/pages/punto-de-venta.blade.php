@@ -46,7 +46,6 @@
       },
 
       handleKeydown(ev) {
-        console.log('POS keydown:', ev.key, ev.code, 'ctrl:', ev.ctrlKey, 'alt:', ev.altKey, 'shift:', ev.shiftKey);
         if (document.querySelector('[role=dialog]')) return;
 
         let tag = ev.target.tagName;
@@ -60,10 +59,12 @@
           atajo = ev.key;
         } else if (ev.ctrlKey && ev.altKey && ev.shiftKey) {
           atajo = ahkMapa[ev.code] || null;
+          console.log('AHK combo detectada, code:', ev.code, 'mapa:', ahkMapa[ev.code], 'atajo:', atajo);
         }
 
+        console.log('POS:', ev.key, ev.code, 'mods:', ev.ctrlKey, ev.altKey, ev.shiftKey, 'atajo:', atajo);
+
         if (atajo) {
-          console.log('POS ATAJO DETECTADO:', atajo);
           ev.preventDefault();
           ev.stopPropagation();
           this.ejecutarAtajo(atajo);
