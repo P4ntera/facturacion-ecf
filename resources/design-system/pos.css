@@ -142,6 +142,37 @@
     font-size:var(--fs-body);
 }
 
+.pos-screen .btn-cobrar-caja{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    width:100%;
+    padding:var(--space-md) var(--space-md);
+    border-radius:var(--radius-lg);
+    border:none;
+    font-family:var(--font-family);
+    font-size:var(--fs-section);
+    font-weight:700;
+    line-height:1.2;
+    cursor:pointer;
+    background-color:var(--success-dark, #16a34a);
+    color:var(--white);
+    transition:background-color 150ms ease-in-out;
+    position:sticky;
+    bottom:var(--space-sm);
+    z-index:10;
+    box-shadow:0 -2px 8px rgba(0,0,0,0.15);
+}
+
+.pos-screen .btn-cobrar-caja:hover:not(:disabled){
+    background-color:var(--success, #15803d);
+}
+
+.pos-screen .btn-cobrar-caja:disabled{
+    opacity:0.45;
+    cursor:not-allowed;
+}
+
 /*======== TABLAS ========*/
 
 .pos-screen .table{
@@ -374,5 +405,126 @@
 .pos-screen .pos-resultados li.pos-highlight button{
     background-color:var(--primary-50, #eff6ff);
 }
+
+/*======== CARRITO VACÍO (Caja) ========*/
+
+.pos-screen .pos-carrito-vacio{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:var(--space-sm);
+    padding:var(--space-xl, 3rem) var(--space-md);
+    color:var(--gray-400);
+}
+
+.pos-screen .pos-carrito-vacio p{
+    font-size:var(--fs-body);
+    text-align:center;
+    max-width:20rem;
+}
+
+/*======== MODAL DE COBRO (Caja) ========*/
+
+.pos-screen .pos-modal-overlay{
+    position:fixed;
+    inset:0;
+    z-index:50;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background-color:rgba(0,0,0,0.5);
+    padding:var(--space-md);
+}
+
+.pos-screen .pos-modal{
+    background-color:var(--fondo-tarjeta);
+    border:1px solid var(--borde-tarjeta);
+    border-radius:var(--radius-lg);
+    box-shadow:0 20px 60px rgba(0,0,0,0.3);
+    width:100%;
+    max-width:28rem;
+    max-height:90vh;
+    overflow-y:auto;
+    display:flex;
+    flex-direction:column;
+}
+
+.pos-screen .pos-modal-header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:var(--space-md);
+    border-bottom:1px solid var(--borde-tarjeta);
+}
+
+.pos-screen .pos-modal-header h3{
+    font-size:var(--fs-body);
+    font-weight:700;
+    margin:0;
+}
+
+.pos-screen .pos-modal-close{
+    background:none;
+    border:none;
+    font-size:1.5rem;
+    line-height:1;
+    cursor:pointer;
+    color:var(--gray-500);
+    padding:0 var(--space-xs);
+}
+
+.pos-screen .pos-modal-close:hover{
+    color:var(--gray-900);
+}
+
+.pos-screen .pos-modal-body{
+    padding:var(--space-md);
+}
+
+.pos-screen .pos-modal-total{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:var(--space-sm) var(--space-md);
+    background-color:var(--gray-100);
+    border-radius:var(--radius);
+    font-weight:600;
+}
+
+.pos-screen .pos-modal-vuelto{
+    margin-top:var(--space-xs);
+    padding:var(--space-sm) var(--space-md);
+    background-color:var(--success-50, #f0fdf4);
+    border-radius:var(--radius);
+    font-weight:700;
+    font-size:var(--fs-body);
+    color:var(--success-dark, #16a34a);
+    text-align:center;
+}
+
+.pos-screen .pos-modal-footer{
+    display:flex;
+    align-items:center;
+    justify-content:flex-end;
+    gap:var(--space-sm);
+    padding:var(--space-md);
+    border-top:1px solid var(--borde-tarjeta);
+}
+
+.pos-screen .pos-modal-footer .btn-cobrar-caja{
+    position:static;
+    box-shadow:none;
+    width:auto;
+    flex:1;
+}
+
+/* Transiciones del modal */
+.pos-modal-enter{ transition:opacity 200ms ease-out; }
+.pos-modal-enter-start{ opacity:0; }
+.pos-modal-enter-end{ opacity:1; }
+.pos-modal-leave{ transition:opacity 150ms ease-in; }
+.pos-modal-leave-start{ opacity:1; }
+.pos-modal-leave-end{ opacity:0; }
 
 [x-cloak]{ display:none !important; }

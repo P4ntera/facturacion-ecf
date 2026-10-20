@@ -49,7 +49,11 @@ class Caja extends PuntoDeVenta
     {
         parent::mount();
 
-        $this->aplicarTipoComprobanteSegunToggle();
+        // creditoFiscal arranca en false: sincronizar con el tipo que parent::mount() asignó.
+        $this->creditoFiscal = in_array($this->tipoComprobante, [
+            TipoComprobante::FACTURA_CREDITO_FISCAL->value,
+            TipoComprobante::FACTURA_CREDITO_FISCAL_FISICA->value,
+        ], true);
     }
 
     public function updated(string $name): void
@@ -69,9 +73,16 @@ class Caja extends PuntoDeVenta
 
     private function aplicarTipoComprobanteSegunToggle(): void
     {
-        $this->tipoComprobante = $this->creditoFiscal
-            ? TipoComprobante::FACTURA_CREDITO_FISCAL->value
-            : TipoComprobante::FACTURA_CONSUMO->value;
+        if ($this->creditoFiscal) {
+            $this->tipoComprobante = $this->usaEcf()
+                ? TipoComprobante::FACTURA_CREDITO_FISCAL->value
+                : TipoComprobante::FACTURA_CREDITO_FISCAL_FISICA->value;
+        } else {
+            // Volver al tipo de consumo que corresponde a la empresa.
+            $this->tipoComprobante = $this->usaEcf()
+                ? TipoComprobante::FACTURA_CONSUMO->value
+                : TipoComprobante::FACTURA_CONSUMO_FISICA->value;
+        }
     }
 
     /**
