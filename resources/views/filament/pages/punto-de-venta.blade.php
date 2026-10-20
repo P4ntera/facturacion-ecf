@@ -75,11 +75,11 @@
       let enInput = (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT');
 
       // Detectar atajo: tecla F directa O la combinación Ctrl+Alt+Shift+N de AutoHotkey
+      let fDirectas = {'F1':1,'F2':1,'F3':1,'F4':1,'F5':1,'F6':1,'F7':1,'F8':1,'F9':1};
       let atajo = null;
-      if ($event.key.match(/^F(\d+)$/)) {
-        atajo = $event.key; // 'F1', 'F2', etc.
+      if (fDirectas[$event.key]) {
+        atajo = $event.key;
       } else if ($event.ctrlKey && $event.altKey && $event.shiftKey) {
-        // AutoHotkey remapea F1→Ctrl+Alt+Shift+1, F2→Ctrl+Alt+Shift+2, etc.
         let mapa = { Digit1:'F1', Digit2:'F2', Digit3:'F3', Digit4:'F4',
                      Digit5:'F5', Digit6:'F6', Digit7:'F7', Digit8:'F8', Digit9:'F9' };
         atajo = mapa[$event.code] || null;
