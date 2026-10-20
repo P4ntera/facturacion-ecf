@@ -2,137 +2,9 @@
 <x-filament-panels::page>
   <div
     class="pos-screen"
-    x-data="{
-      highlightProducto: -1,
-      highlightCliente: -1,
-      mostrarAyuda: false,
-      _sidebarAbiertoAntes: false,
-
-      init() {
-        this._sidebarAbiertoAntes = this.$store.sidebar.isOpen;
-        this.$store.sidebar.close();
-        document.addEventListener('livewire:navigate', () => {
-          if (this._sidebarAbiertoAntes) this.$store.sidebar.open();
-        }, { once: true });
-      },
-
-      resetHighlights() {
-        this.highlightProducto = -1;
-        this.highlightCliente = -1;
-      },
-
-      navegar(lista, direccion) {
-        let items = this.$el.querySelectorAll(lista + ' li');
-        if (!items.length) return -1;
-        let campo = lista.includes('producto') ? 'highlightProducto' : 'highlightCliente';
-        let idx = this[campo] + direccion;
-        if (idx < 0) idx = items.length - 1;
-        if (idx >= items.length) idx = 0;
-        this[campo] = idx;
-        items[idx]?.scrollIntoView({ block: 'nearest' });
-        return idx;
-      },
-
-      seleccionarHighlight(lista) {
-        let campo = lista.includes('producto') ? 'highlightProducto' : 'highlightCliente';
-        let idx = this[campo];
-        if (idx < 0) return false;
-        let items = this.$el.querySelectorAll(lista + ' li');
-        let item = items[idx];
-        if (!item) return false;
-        let btn = item.querySelector('button');
-        if (btn) { btn.click(); return true; }
-        return false;
-      },
-
-      handleKeydown(ev) {
-        if (document.querySelector('[role=dialog]')) return;
-
-        let tag = ev.target.tagName;
-        let enInput = (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT');
-
-        // Detectar atajo: tecla F directa O Ctrl+Alt+Shift+N (AutoHotkey)
-        let fDirectas = {F1:1,F2:1,F3:1,F4:1,F5:1,F6:1,F7:1,F8:1,F9:1};
-        let ahkMapa = {Digit1:'F1',Digit2:'F2',Digit3:'F3',Digit4:'F4',Digit5:'F5',Digit6:'F6',Digit7:'F7',Digit8:'F8',Digit9:'F9'};
-        let atajo = null;
-        if (fDirectas[ev.key]) {
-          atajo = ev.key;
-        } else if (ev.ctrlKey && ev.altKey && ev.shiftKey) {
-          atajo = ahkMapa[ev.code] || null;
-          console.log('AHK combo detectada, code:', ev.code, 'mapa:', ahkMapa[ev.code], 'atajo:', atajo);
-        }
-
-        console.log('POS:', ev.key, ev.code, 'mods:', ev.ctrlKey, ev.altKey, ev.shiftKey, 'atajo:', atajo);
-
-        if (atajo) {
-          ev.preventDefault();
-          ev.stopPropagation();
-          this.ejecutarAtajo(atajo);
-          return;
-        }
-
-        switch (ev.key) {
-          case 'Escape':
-            if (this.mostrarAyuda) { this.mostrarAyuda = false; ev.preventDefault(); break; }
-            if (enInput) {
-              ev.target.value = '';
-              ev.target.dispatchEvent(new Event('input', { bubbles: true }));
-              this.resetHighlights();
-              ev.preventDefault();
-            }
-            break;
-          case 'ArrowDown':
-            if (this.$refs.buscadorProducto === document.activeElement) { ev.preventDefault(); this.navegar('.pos-resultados-producto', 1); }
-            else if (this.$refs.buscadorCliente === document.activeElement) { ev.preventDefault(); this.navegar('.pos-resultados-cliente', 1); }
-            break;
-          case 'ArrowUp':
-            if (this.$refs.buscadorProducto === document.activeElement) { ev.preventDefault(); this.navegar('.pos-resultados-producto', -1); }
-            else if (this.$refs.buscadorCliente === document.activeElement) { ev.preventDefault(); this.navegar('.pos-resultados-cliente', -1); }
-            break;
-          case 'Enter':
-            if (this.$refs.buscadorCliente === document.activeElement && this.highlightCliente >= 0) {
-              ev.preventDefault(); this.seleccionarHighlight('.pos-resultados-cliente');
-            }
-            if (this.$refs.buscadorProducto === document.activeElement && this.highlightProducto >= 0) {
-              ev.preventDefault(); this.seleccionarHighlight('.pos-resultados-producto');
-              this.$refs.buscadorProducto.value = '';
-              this.$refs.buscadorProducto.dispatchEvent(new Event('input', { bubbles: true }));
-              this.resetHighlights();
-            }
-            break;
-          case 'Delete':
-            if (!enInput) { ev.preventDefault(); this.$wire.call('quitarUltimaLinea'); }
-            break;
-        }
-      },
-
-      ejecutarAtajo(atajo) {
-        console.log('POS ejecutarAtajo:', atajo, 'refs:', Object.keys(this.$refs));
-        switch (atajo) {
-          case 'F1': this.mostrarAyuda = !this.mostrarAyuda; break;
-          case 'F2': this.mostrarAyuda = false; this.$refs.buscadorProducto?.focus(); break;
-          case 'F3': this.mostrarAyuda = false; this.$refs.buscadorCliente?.focus(); break;
-          case 'F4':
-            var sp = this.$refs.selectFormaPago;
-            if (sp) {
-              sp.selectedIndex = (sp.selectedIndex + 1) % sp.options.length;
-              sp.dispatchEvent(new Event('change', { bubbles: true }));
-              sp.dispatchEvent(new Event('input', { bubbles: true }));
-            }
-            break;
-          case 'F5': this.$refs.selectDescuento?.focus(); break;
-          case 'F6': this.$refs.inputEfectivo?.focus(); break;
-          case 'F7': this.$refs.checkCredito?.click(); break;
-          case 'F8': this.$refs.btnCobrar?.click(); break;
-          case 'F9':
-            if (confirm('¿Limpiar todo el carrito?')) { this.$wire.call('limpiarCarrito'); }
-            break;
-        }
-      }
-    }"
+    x-data="{ highlightProducto: -1, highlightCliente: -1, mostrarAyuda: false }"
     x-on:abrir-ticket.window="window.open($event.detail.url, '_blank')"
-    x-on:producto-escaneado.window="$nextTick(() => { resetHighlights(); $refs.buscadorProducto?.focus(); })"
-    x-on:keydown.window="handleKeydown($event)"
+    x-on:producto-escaneado.window="$nextTick(() => { highlightProducto = -1; highlightCliente = -1; $refs.buscadorProducto?.focus(); })"
   >
     @if ($this->arqueoAbierto() === null)
       {{-- Sin caja abierta: se bloquea la pantalla de venta hasta abrirla --}}
@@ -559,4 +431,141 @@
       </div>
     @endif
   </div>
+
+  @pushOnce('scripts')
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      // Colapsar sidebar al entrar al POS
+      var sidebarAntes = Alpine.store('sidebar')?.isOpen || false;
+      if (Alpine.store('sidebar')) Alpine.store('sidebar').close();
+      document.addEventListener('livewire:navigate', function() {
+        if (sidebarAntes && Alpine.store('sidebar')) Alpine.store('sidebar').open();
+      }, { once: true });
+    });
+
+    // Atajos de teclado POS — listener global
+    document.addEventListener('keydown', function(ev) {
+      // Solo activo si estamos en la pantalla POS
+      var posScreen = document.querySelector('.pos-screen');
+      if (!posScreen) return;
+
+      // No interferir si hay modal abierto
+      if (document.querySelector('[role=dialog]')) return;
+
+      var tag = ev.target.tagName;
+      var enInput = (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT');
+
+      // Detectar atajo: F directa o Ctrl+Alt+Shift+N (AutoHotkey)
+      var fDirectas = {F1:1,F2:1,F3:1,F4:1,F5:1,F6:1,F7:1,F8:1,F9:1};
+      var ahkMapa = {Digit1:'F1',Digit2:'F2',Digit3:'F3',Digit4:'F4',Digit5:'F5',Digit6:'F6',Digit7:'F7',Digit8:'F8',Digit9:'F9'};
+      var atajo = null;
+
+      if (fDirectas[ev.key]) {
+        atajo = ev.key;
+      } else if (ev.ctrlKey && ev.altKey && ev.shiftKey) {
+        atajo = ahkMapa[ev.code] || null;
+      }
+
+      // Obtener el componente Alpine del POS
+      var alpineData = Alpine.$data(posScreen);
+
+      if (atajo) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        switch (atajo) {
+          case 'F1': alpineData.mostrarAyuda = !alpineData.mostrarAyuda; break;
+          case 'F2': alpineData.mostrarAyuda = false; posScreen.querySelector('[x-ref=buscadorProducto]')?.focus(); break;
+          case 'F3': alpineData.mostrarAyuda = false; posScreen.querySelector('[x-ref=buscadorCliente]')?.focus(); break;
+          case 'F4':
+            var sp = posScreen.querySelector('[x-ref=selectFormaPago]');
+            if (sp) {
+              sp.selectedIndex = (sp.selectedIndex + 1) % sp.options.length;
+              sp.dispatchEvent(new Event('change', { bubbles: true }));
+              sp.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+            break;
+          case 'F5': posScreen.querySelector('[x-ref=selectDescuento]')?.focus(); break;
+          case 'F6': posScreen.querySelector('[x-ref=inputEfectivo]')?.focus(); break;
+          case 'F7': posScreen.querySelector('[x-ref=checkCredito]')?.click(); break;
+          case 'F8': posScreen.querySelector('[x-ref=btnCobrar]')?.click(); break;
+          case 'F9':
+            if (confirm('¿Limpiar todo el carrito?')) {
+              Livewire.find(posScreen.closest('[wire\\:id]').getAttribute('wire:id')).call('limpiarCarrito');
+            }
+            break;
+        }
+        return;
+      }
+
+      // Navegación con flechas / Escape / Delete
+      var buscadorProducto = posScreen.querySelector('[x-ref=buscadorProducto]');
+      var buscadorCliente = posScreen.querySelector('[x-ref=buscadorCliente]');
+
+      switch (ev.key) {
+        case 'Escape':
+          if (alpineData.mostrarAyuda) { alpineData.mostrarAyuda = false; ev.preventDefault(); break; }
+          if (enInput) {
+            ev.target.value = '';
+            ev.target.dispatchEvent(new Event('input', { bubbles: true }));
+            alpineData.highlightProducto = -1;
+            alpineData.highlightCliente = -1;
+            ev.preventDefault();
+          }
+          break;
+
+        case 'ArrowDown':
+        case 'ArrowUp':
+          var dir = ev.key === 'ArrowDown' ? 1 : -1;
+          if (buscadorProducto === document.activeElement) {
+            ev.preventDefault();
+            posNavegar(posScreen, '.pos-resultados-producto', 'highlightProducto', dir, alpineData);
+          } else if (buscadorCliente === document.activeElement) {
+            ev.preventDefault();
+            posNavegar(posScreen, '.pos-resultados-cliente', 'highlightCliente', dir, alpineData);
+          }
+          break;
+
+        case 'Enter':
+          if (buscadorCliente === document.activeElement && alpineData.highlightCliente >= 0) {
+            ev.preventDefault();
+            posSeleccionar(posScreen, '.pos-resultados-cliente', alpineData.highlightCliente);
+          }
+          if (buscadorProducto === document.activeElement && alpineData.highlightProducto >= 0) {
+            ev.preventDefault();
+            posSeleccionar(posScreen, '.pos-resultados-producto', alpineData.highlightProducto);
+            buscadorProducto.value = '';
+            buscadorProducto.dispatchEvent(new Event('input', { bubbles: true }));
+            alpineData.highlightProducto = -1;
+            alpineData.highlightCliente = -1;
+          }
+          break;
+
+        case 'Delete':
+          if (!enInput) {
+            ev.preventDefault();
+            Livewire.find(posScreen.closest('[wire\\:id]').getAttribute('wire:id')).call('quitarUltimaLinea');
+          }
+          break;
+      }
+    });
+
+    function posNavegar(posScreen, selector, campo, dir, data) {
+      var items = posScreen.querySelectorAll(selector + ' li');
+      if (!items.length) return;
+      var idx = data[campo] + dir;
+      if (idx < 0) idx = items.length - 1;
+      if (idx >= items.length) idx = 0;
+      data[campo] = idx;
+      items[idx]?.scrollIntoView({ block: 'nearest' });
+    }
+
+    function posSeleccionar(posScreen, selector, idx) {
+      var items = posScreen.querySelectorAll(selector + ' li');
+      var item = items[idx];
+      if (!item) return;
+      var btn = item.querySelector('button');
+      if (btn) btn.click();
+    }
+  </script>
+  @endPushOnce
 </x-filament-panels::page>
