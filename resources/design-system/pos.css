@@ -364,3 +364,122 @@
     color:var(--danger);
     font-weight:600;
 }
+
+/*======== HIGHLIGHT DE NAVEGACIÓN POR TECLADO ========*/
+
+.pos-screen .pos-resultados li.pos-highlight{
+    background-color:var(--primary-50, #eff6ff);
+}
+
+.pos-screen .pos-resultados li.pos-highlight button{
+    background-color:var(--primary-50, #eff6ff);
+}
+
+/*======== BARRA DE ATAJOS DE TECLADO ========*/
+
+.pos-shortcuts-bar{
+    display:flex;
+    flex-wrap:wrap;
+    gap:var(--space-sm);
+    padding:var(--space-xs) var(--space-sm);
+    margin-top:var(--space-sm);
+    background-color:var(--gray-100);
+    border-radius:var(--radius);
+    font-size:var(--fs-caption);
+    color:var(--gray-600);
+}
+
+.pos-shortcut{
+    display:inline-flex;
+    align-items:center;
+    gap:3px;
+    white-space:nowrap;
+}
+
+.pos-screen kbd{
+    display:inline-block;
+    padding:1px 5px;
+    font-family:var(--font-family);
+    font-size:0.7rem;
+    font-weight:600;
+    line-height:1.4;
+    color:var(--gray-700);
+    background-color:var(--white);
+    border:1px solid var(--gray-300);
+    border-radius:3px;
+    box-shadow:0 1px 0 var(--gray-200);
+}
+
+/*======== OVERLAY DE AYUDA (F1) ========*/
+
+.pos-help-overlay{
+    position:fixed;
+    inset:0;
+    z-index:9999;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background-color:rgba(0,0,0,0.5);
+}
+
+.pos-help-card{
+    background:var(--white);
+    border-radius:var(--radius-lg);
+    padding:var(--space-lg);
+    max-width:560px;
+    width:90vw;
+    box-shadow:0 20px 60px rgba(0,0,0,0.3);
+}
+
+.pos-help-card h3{
+    font-size:var(--fs-section);
+    font-weight:700;
+    margin-bottom:var(--space-md);
+    color:var(--gray-900);
+}
+
+.pos-help-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:var(--space-md);
+}
+
+@media (max-width:480px){
+    .pos-help-grid{ grid-template-columns:1fr; }
+}
+
+.pos-help-section h4{
+    font-size:var(--fs-small);
+    font-weight:600;
+    color:var(--gray-500);
+    text-transform:uppercase;
+    letter-spacing:0.05em;
+    margin-bottom:var(--space-xs);
+}
+
+.pos-help-section dl > div{
+    display:flex;
+    align-items:center;
+    gap:var(--space-sm);
+    padding:3px 0;
+}
+
+.pos-help-section dt{
+    flex-shrink:0;
+    min-width:4.5rem;
+    text-align:right;
+}
+
+.pos-help-section dd{
+    font-size:var(--fs-small);
+    color:var(--gray-700);
+}
+
+.pos-help-footer{
+    margin-top:var(--space-md);
+    text-align:center;
+    font-size:var(--fs-caption);
+    color:var(--gray-400);
+}
+
+[x-cloak]{ display:none !important; }

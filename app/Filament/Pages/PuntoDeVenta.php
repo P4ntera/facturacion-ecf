@@ -575,6 +575,27 @@ class PuntoDeVenta extends Page
         $this->recalcularTotales();
     }
 
+    /** Quita la última línea del carrito (atajo Supr). */
+    public function quitarUltimaLinea(): void
+    {
+        if (empty($this->carrito)) {
+            return;
+        }
+
+        array_pop($this->carrito);
+        $this->recalcularTotales();
+    }
+
+    /** Vacía el carrito completo (atajo F9). */
+    public function limpiarCarrito(): void
+    {
+        $this->carrito = [];
+        $this->descuentoId = '';
+        $this->descuentoGlobal = '0.00';
+        $this->busquedaProducto = '';
+        $this->recalcularTotales();
+    }
+
     public function stockDeLinea(array $linea): ?float
     {
         if (! $linea['controla_stock']) {

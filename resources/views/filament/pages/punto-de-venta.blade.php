@@ -2,7 +2,43 @@
 <x-filament-panels::page>
   <div
     class="pos-screen"
-    x-data
+    x-data="{
+      // Índice resaltado en resultados de producto (-1 = ninguno)
+      highlightProducto: -1,
+      // Índice resaltado en resultados de cliente (-1 = ninguno)
+      highlightCliente: -1,
+      // Mostrar leyenda de atajos
+      mostrarAyuda: false,
+
+      resetHighlights() {
+        this.highlightProducto = -1;
+        this.highlightCliente = -1;
+      },
+
+      navegar(lista, direccion) {
+        let items = this.$el.querySelectorAll(lista + ' li');
+        if (!items.length) return -1;
+        let campo = lista.includes('producto') ? 'highlightProducto' : 'highlightCliente';
+        let idx = this[campo] + direccion;
+        if (idx < 0) idx = items.length - 1;
+        if (idx >= items.length) idx = 0;
+        this[campo] = idx;
+        items[idx]?.scrollIntoView({ block: 'nearest' });
+        return idx;
+      },
+
+      seleccionarHighlight(lista) {
+        let campo = lista.includes('producto') ? 'highlightProducto' : 'highlightCliente';
+        let idx = this[campo];
+        if (idx < 0) return false;
+        let items = this.$el.querySelectorAll(lista + ' li');
+        let item = items[idx];
+        if (!item) return false;
+        let btn = item.querySelector('button');
+        if (btn) { btn.click(); return true; }
+        return false;
+      }
+    }"
     x-init="
       /*
        * Paso 1: el POS es una pantalla de trabajo, así que entra con el sidebar colapsado
@@ -25,7 +61,129 @@
       document.addEventListener('livewire:navigate', posRestaurarSidebar);
     "
     x-on:abrir-ticket.window="window.open($event.detail.url, '_blank')"
-    x-on:producto-escaneado.window="$nextTick(() => $refs.buscadorProducto?.focus())"
+    x-on:producto-escaneado.window="$nextTick(() => { resetHighlights(); $refs.buscadorProducto?.focus(); })"
+    {{-- === ATAJOS DE TECLADO GLOBALES === --}}
+    x-on:keydown.window="
+      // No interferir si hay un modal/dialog abierto (Filament notifications, etc.)
+      if (document.querySelector('[role=dialog]')) return;
+
+      let tag = $event.target.tagName;
+      let enInput = (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT');
+
+      switch ($event.key) {
+        case 'F1':
+          $event.preventDefault();
+          mostrarAyuda = !mostrarAyuda;
+          break;
+
+        case 'F2':
+          $event.preventDefault();
+          mostrarAyuda = false;
+          $refs.buscadorProducto?.focus();
+          break;
+
+        case 'F3':
+          $event.preventDefault();
+          mostrarAyuda = false;
+          $refs.buscadorCliente?.focus();
+          break;
+
+        case 'F4':
+          $event.preventDefault();
+          // Ciclar forma de pago
+          let selectPago = $refs.selectFormaPago;
+          if (selectPago) {
+            let opts = [...selectPago.options];
+            let idx = selectPago.selectedIndex;
+            selectPago.selectedIndex = (idx + 1) % opts.length;
+            selectPago.dispatchEvent(new Event('change', { bubbles: true }));
+            // Livewire necesita el input event para wire:model.live
+            selectPago.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+          break;
+
+        case 'F5':
+          $event.preventDefault();
+          $refs.selectDescuento?.focus();
+          break;
+
+        case 'F6':
+          $event.preventDefault();
+          $refs.inputEfectivo?.focus();
+          break;
+
+        case 'F7':
+          $event.preventDefault();
+          $refs.checkCredito?.click();
+          break;
+
+        case 'F8':
+          $event.preventDefault();
+          $refs.btnCobrar?.click();
+          break;
+
+        case 'F9':
+          $event.preventDefault();
+          if (confirm('¿Limpiar todo el carrito?')) {
+            $wire.call('limpiarCarrito');
+          }
+          break;
+
+        case 'Escape':
+          if (mostrarAyuda) { mostrarAyuda = false; $event.preventDefault(); break; }
+          if (enInput) {
+            $event.target.value = '';
+            $event.target.dispatchEvent(new Event('input', { bubbles: true }));
+            resetHighlights();
+            $event.preventDefault();
+          }
+          break;
+
+        case 'ArrowDown':
+          if ($refs.buscadorProducto === document.activeElement) {
+            $event.preventDefault();
+            navegar('.pos-resultados-producto', 1);
+          } else if ($refs.buscadorCliente === document.activeElement) {
+            $event.preventDefault();
+            navegar('.pos-resultados-cliente', 1);
+          }
+          break;
+
+        case 'ArrowUp':
+          if ($refs.buscadorProducto === document.activeElement) {
+            $event.preventDefault();
+            navegar('.pos-resultados-producto', -1);
+          } else if ($refs.buscadorCliente === document.activeElement) {
+            $event.preventDefault();
+            navegar('.pos-resultados-cliente', -1);
+          }
+          break;
+
+        case 'Enter':
+          if ($refs.buscadorCliente === document.activeElement && highlightCliente >= 0) {
+            $event.preventDefault();
+            seleccionarHighlight('.pos-resultados-cliente');
+          }
+          // Producto: Enter ya lo maneja wire:keydown.enter (escanearOBuscar),
+          // pero si hay un highlight, selecciona ese en lugar de escanear
+          if ($refs.buscadorProducto === document.activeElement && highlightProducto >= 0) {
+            $event.preventDefault();
+            seleccionarHighlight('.pos-resultados-producto');
+            $refs.buscadorProducto.value = '';
+            $refs.buscadorProducto.dispatchEvent(new Event('input', { bubbles: true }));
+            resetHighlights();
+          }
+          break;
+
+        case 'Delete':
+          // Supr: quitar última línea del carrito (solo si no estamos en un input)
+          if (!enInput) {
+            $event.preventDefault();
+            $wire.call('quitarUltimaLinea');
+          }
+          break;
+      }
+    "
   >
     @if ($this->arqueoAbierto() === null)
       {{-- Sin caja abierta: se bloquea la pantalla de venta hasta abrirla --}}
@@ -79,14 +237,16 @@
               <input
                 type="text"
                 class="form-input"
-                placeholder="Buscar cliente por nombre o documento (opcional)..."
+                x-ref="buscadorCliente"
+                placeholder="Buscar cliente por nombre o documento... (F3)"
                 wire:model.live.debounce.300ms="busquedaCliente"
+                x-on:input="highlightCliente = -1"
               />
 
               @if ($busquedaCliente !== '')
-                <ul class="pos-resultados">
+                <ul class="pos-resultados pos-resultados-cliente">
                   @forelse ($this->clientesSugeridos() as $cliente)
-                    <li>
+                    <li :class="{ 'pos-highlight': highlightCliente === {{ $loop->index }} }">
                       <button type="button" wire:click="seleccionarCliente({{ $cliente->id }})">
                         <span>{{ $cliente->nombre }}</span>
                         @if ($cliente->documento)
@@ -144,15 +304,16 @@
             type="text"
             class="form-input"
             x-ref="buscadorProducto"
-            placeholder="Buscar por código, nombre o escanear código de barras..."
+            placeholder="Buscar producto o escanear código... (F2)"
             wire:model.live.debounce.300ms="busquedaProducto"
             wire:keydown.enter="escanearOBuscar($event.target.value)"
+            x-on:input="highlightProducto = -1"
           />
 
           @if ($busquedaProducto !== '')
-            <ul class="pos-resultados">
+            <ul class="pos-resultados pos-resultados-producto">
               @forelse ($this->resultadosBusqueda() as $fila)
-                <li>
+                <li :class="{ 'pos-highlight': highlightProducto === {{ $loop->index }} }">
                   @if ($fila['tipo'] === 'pesado')
                     <div class="flex items-center justify-between gap-2 pos-resultado-pesado" x-data="{ peso: '1.000' }">
                       <span class="flex items-center gap-2">
@@ -297,7 +458,7 @@
 
           <div class="mb-2">
             <label class="form-label">Descuento global</label>
-            <select class="form-select" wire:model.live="descuentoId">
+            <select class="form-select" wire:model.live="descuentoId" x-ref="selectDescuento">
               <option value="">Sin descuento</option>
               @foreach ($this->descuentosDisponibles() as $descuento)
                 <option value="{{ $descuento->id }}">{{ $descuento->nombre }} ({{ number_format((float) $descuento->porcentaje, 2) }}%)</option>
@@ -337,7 +498,7 @@
 
           <div class="mt-2">
             <label class="form-label">Forma de pago</label>
-            <select class="form-select" wire:model.live="formaPago">
+            <select class="form-select" wire:model.live="formaPago" x-ref="selectFormaPago">
               @foreach ($this->formasPago() as $valor => $etiqueta)
                 <option value="{{ $valor }}">{{ $etiqueta }}</option>
               @endforeach
@@ -348,7 +509,7 @@
             <div class="mt-2">
               <label class="form-label">Monto recibido (efectivo)</label>
               <input type="number" step="0.01" min="0" class="form-input" wire:model.blur="montoEfectivo"
-                placeholder="{{ $totales['total'] ?? '0.00' }}" />
+                x-ref="inputEfectivo" placeholder="{{ $totales['total'] ?? '0.00' }}" />
             </div>
             @if (bccomp($this->vueltoCalculado(), '0.00', 2) > 0)
               <div class="mt-1" style="font-weight:600;color:var(--success-500);font-size:1.1rem;">
@@ -377,7 +538,7 @@
 
           <div class="mt-2">
             <label class="form-label">
-              <input type="checkbox" wire:model.live="ventaACredito" />
+              <input type="checkbox" wire:model.live="ventaACredito" x-ref="checkCredito" />
               Vender a crédito (fiar al cliente)
             </label>
           </div>
@@ -394,12 +555,58 @@
             type="button"
             class="btn btn-primary btn-cobrar mt-2"
             wire:click="cobrar"
+            x-ref="btnCobrar"
             @disabled(! $this->puedeCobrar())
           >
-            Cobrar
+            Cobrar (F8)
           </button>
         </div>
       </div>
+      </div>
+      {{-- Barra de atajos de teclado al pie --}}
+      <div class="pos-shortcuts-bar">
+        <span class="pos-shortcut"><kbd>F1</kbd> Ayuda</span>
+        <span class="pos-shortcut"><kbd>F2</kbd> Producto</span>
+        <span class="pos-shortcut"><kbd>F3</kbd> Cliente</span>
+        <span class="pos-shortcut"><kbd>F4</kbd> Pago</span>
+        <span class="pos-shortcut"><kbd>F5</kbd> Descuento</span>
+        <span class="pos-shortcut"><kbd>F6</kbd> Efectivo</span>
+        <span class="pos-shortcut"><kbd>F7</kbd> Crédito</span>
+        <span class="pos-shortcut"><kbd>F8</kbd> Cobrar</span>
+        <span class="pos-shortcut"><kbd>F9</kbd> Limpiar</span>
+        <span class="pos-shortcut"><kbd>Esc</kbd> Cerrar</span>
+      </div>
+
+      {{-- Overlay de ayuda (F1) --}}
+      <div class="pos-help-overlay" x-show="mostrarAyuda" x-transition.opacity x-cloak>
+        <div class="pos-help-card" x-on:click.outside="mostrarAyuda = false">
+          <h3>Atajos de teclado</h3>
+          <div class="pos-help-grid">
+            <div class="pos-help-section">
+              <h4>Acciones rápidas</h4>
+              <dl>
+                <div><dt><kbd>F2</kbd></dt><dd>Buscar producto</dd></div>
+                <div><dt><kbd>F3</kbd></dt><dd>Buscar cliente</dd></div>
+                <div><dt><kbd>F4</kbd></dt><dd>Cambiar forma de pago</dd></div>
+                <div><dt><kbd>F5</kbd></dt><dd>Descuento global</dd></div>
+                <div><dt><kbd>F6</kbd></dt><dd>Monto efectivo</dd></div>
+                <div><dt><kbd>F7</kbd></dt><dd>Venta a crédito</dd></div>
+                <div><dt><kbd>F8</kbd></dt><dd>Cobrar</dd></div>
+                <div><dt><kbd>F9</kbd></dt><dd>Limpiar carrito</dd></div>
+              </dl>
+            </div>
+            <div class="pos-help-section">
+              <h4>Navegación</h4>
+              <dl>
+                <div><dt><kbd>↑</kbd> <kbd>↓</kbd></dt><dd>Navegar resultados</dd></div>
+                <div><dt><kbd>Enter</kbd></dt><dd>Seleccionar / escanear</dd></div>
+                <div><dt><kbd>Esc</kbd></dt><dd>Cerrar búsqueda</dd></div>
+                <div><dt><kbd>Supr</kbd></dt><dd>Quitar última línea</dd></div>
+              </dl>
+            </div>
+          </div>
+          <p class="pos-help-footer">Presiona <kbd>F1</kbd> o <kbd>Esc</kbd> para cerrar</p>
+        </div>
       </div>
     @endif
   </div>
