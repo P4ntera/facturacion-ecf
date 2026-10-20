@@ -6,6 +6,7 @@ namespace App\Filament\Pages;
 
 use App\Enums\FormaPago;
 use App\Enums\Modulo;
+use App\Enums\ModoImpresionPos;
 use App\Enums\ModuloImpresion;
 use App\Enums\TipoComprobante;
 use App\Enums\TipoPago;
@@ -926,14 +927,21 @@ class PuntoDeVenta extends Page
      * La venta ya quedó registrada (atómica, vía VentaService) antes de llegar aquí: un fallo de
      * impresión de aquí en adelante NUNCA la revierte ni la afecta, solo se notifica.
      *
-     * RED -> el servidor manda los bytes ESC/POS directo al socket, sin diálogo. NAVEGADOR (o sin
-     * impresora configurada) -> el navegador decide la impresora física, así que solo podemos
-     * abrir la vista del ticket y dejar que window.print() (en la propia vista) dispare el diálogo.
+     * Cascada del modo de impresión: CajaRegistradora (si tiene override) → Empresa → default
+     * (directa). En modo PREVISUALIZAR se ignora la impresora de red y se abre el ticket en el
+     * navegador; en modo DIRECTA se intenta la red primero y cae al navegador si no hay impresora.
      */
     protected function notificarVentaRegistradaEImprimirTicket(Venta $venta): void
     {
-        $impresora = app(ImpresionService::class)->resolverImpresora(ModuloImpresion::FACTURACION, auth()->user());
-        $resultado = app(ImpresionService::class)->imprimirTicket($venta, $impresora);
+        $modo = $this->resolverModoImpresion();
+        $impresionService = app(ImpresionService::class);
+
+        // En modo previsualizar: saltar la impresora de red, ir directo al navegador.
+        $impresora = $modo === ModoImpresionPos::PREVISUALIZAR
+            ? null
+            : $impresionService->resolverImpresora(ModuloImpresion::FACTURACION, auth()->user());
+
+        $resultado = $impresionService->imprimirTicket($venta, $impresora);
 
         $accionComprobante = Action::make('comprobante')
             ->label('Comprobante PDF')
@@ -981,6 +989,21 @@ class PuntoDeVenta extends Page
                 $accionComprobante,
             ])
             ->send();
+    }
+
+    /**
+     * Modo de impresión efectivo: CajaRegistradora (si el arqueo está asociado a una) -> Empresa.
+     * Subclases como PuntoDeVentaTouch pueden sobreescribir para leer la caja del cajaId actual.
+     */
+    protected function resolverModoImpresion(): ModoImpresionPos
+    {
+        $caja = $this->arqueoAbierto()?->caja;
+
+        if ($caja !== null && $caja->modo_impresion_pos !== null) {
+            return $caja->modo_impresion_pos;
+        }
+
+        return $this->empresa()->config()->modo_impresion_pos;
     }
 
     /**

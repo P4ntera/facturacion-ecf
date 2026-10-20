@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\ModoImpresionPos;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -19,12 +20,13 @@ class Caja extends Model
 {
     use LogsActivity;
 
-    protected $fillable = ['empresa_id', 'nombre', 'codigo', 'mensaje_display', 'activo'];
+    protected $fillable = ['empresa_id', 'nombre', 'codigo', 'mensaje_display', 'modo_impresion_pos', 'activo'];
 
     // El token nunca viaja en toArray()/JSON de rutina: es la credencial del display público.
     protected $hidden = ['display_token'];
 
     protected $casts = [
+        'modo_impresion_pos' => ModoImpresionPos::class,
         'activo' => 'boolean',
     ];
 
@@ -83,10 +85,16 @@ class Caja extends Model
         return $this->hasMany(ArqueoCaja::class);
     }
 
+    /** Modo de impresión efectivo: el de esta caja si está configurado, si no el de la empresa. */
+    public function modoImpresionEfectivo(): ModoImpresionPos
+    {
+        return $this->modo_impresion_pos ?? $this->empresa->config()->modo_impresion_pos;
+    }
+
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
-            ->logOnly(['nombre', 'codigo', 'mensaje_display', 'activo'])
+            ->logOnly(['nombre', 'codigo', 'mensaje_display', 'modo_impresion_pos', 'activo'])
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs()
             ->useLogName('Cajas');
