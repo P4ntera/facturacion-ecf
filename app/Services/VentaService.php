@@ -724,8 +724,8 @@ class VentaService
                 $tasaEfectiva = $detalleOriginal->tasa_itbis;
                 $cantidadOriginal = (string) $detalleOriginal->cantidad;
                 $proporcion = bcdiv(number_format($cantidad, 4, '.', ''), $cantidadOriginal, 12);
-                $base = bcadd(bcmul((string) $detalleOriginal->subtotal, $proporcion, 6), '0.005', 2);
-                $itbis = bcadd(bcmul((string) $detalleOriginal->itbis_monto, $proporcion, 6), '0.005', 2);
+                $base = $this->bcround(bcmul((string) $detalleOriginal->subtotal, $proporcion, 6));
+                $itbis = $this->bcround(bcmul((string) $detalleOriginal->itbis_monto, $proporcion, 6));
 
                 $acumulado['subtotal'] = bcadd($acumulado['subtotal'], $base, 2);
                 $acumulado['total_itbis'] = bcadd($acumulado['total_itbis'], $itbis, 2);
@@ -1163,7 +1163,7 @@ class VentaService
 
             $descuentoLinea = $this->aMoneda($linea['descuento'] ?? '0');
             // Mismo redondeo que las estrategias de ITBIS (cantidad a 4 decimales, half-up).
-            $brutoLinea = bcadd(bcmul($precioUnitario, number_format($cantidad, 4, '.', ''), 6), '0.005', 2);
+            $brutoLinea = $this->bcround(bcmul($precioUnitario, number_format($cantidad, 4, '.', ''), 6));
 
             // El descuento de línea viene del carrito del POS (client-controllable): negativo
             // subiría el precio; mayor que la línea la dejaría en negativo.
@@ -1176,7 +1176,7 @@ class VentaService
             }
 
             if (bccomp($proporcionDescuentoGlobal, '0', 12) > 0) {
-                $parteGlobal = bcadd(bcmul(bcsub($brutoLinea, $descuentoLinea, 2), $proporcionDescuentoGlobal, 6), '0.005', 2);
+                $parteGlobal = $this->bcround(bcmul(bcsub($brutoLinea, $descuentoLinea, 2), $proporcionDescuentoGlobal, 6));
                 $descuentoLinea = bccomp(bcadd($descuentoLinea, $parteGlobal, 2), $brutoLinea, 2) > 0
                     ? $brutoLinea
                     : bcadd($descuentoLinea, $parteGlobal, 2);
@@ -1214,7 +1214,7 @@ class VentaService
                 // Costo del momento (sin ITBIS) por unidad VENDIDA: una caja de 24 cuesta 24
                 // veces el costo base. Queda fijo en la línea para que los reportes de ganancia
                 // no cambien cuando luego cambie el costo del producto.
-                'costo_unitario' => bcadd(bcmul((string) $producto->costo, number_format($factor, 3, '.', ''), 6), '0.005', 2),
+                'costo_unitario' => $this->bcround(bcmul((string) $producto->costo, number_format($factor, 3, '.', ''), 6)),
             ];
 
             // El inventario SIEMPRE se mueve en unidad base: cantidad × factor (una caja de 24
@@ -1229,6 +1229,21 @@ class VentaService
     private function aMoneda(string|int|float $valor): string
     {
         return bcadd((string) $valor, '0', 2);
+    }
+
+    /**
+     * Redondeo HALF_UP puro vía bcmath (sin conversión a float).
+     *
+     * Reemplaza el truco anterior `bcadd($x, '0.005', 2)` que solo funcionaba
+     * para 2 decimales y no manejaba negativos.
+     */
+    private function bcround(string $valor, int $decimales = 2): string
+    {
+        $offset = '0.' . str_repeat('0', $decimales) . '5';
+
+        return bccomp($valor, '0', 10) >= 0
+            ? bcadd($valor, $offset, $decimales)
+            : bcsub($valor, $offset, $decimales);
     }
 
     /**
