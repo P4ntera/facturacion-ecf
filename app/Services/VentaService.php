@@ -519,7 +519,7 @@ class VentaService
                 $producto = Producto::where('empresa_id', $empresa->id)->findOrFail($detalle['producto_id']);
                 $cantidad = (string) ($detalle['cantidad'] ?? '1');
                 $tasaEfectiva = $config->aplica_itbis ? $producto->tasa_itbis : TasaItbis::CERO;
-                $base = bcmul($monto, number_format($cantidad, 4, '.', ''), 2);
+                $base = bcmul($monto, $this->bcround((string) $cantidad, 4), 2);
                 $itbis = bcdiv(bcmul($base, (string) $tasaEfectiva->porcentaje(), 4), '100', 2);
 
                 $acumulado['subtotal'] = bcadd($acumulado['subtotal'], $base, 2);
@@ -711,7 +711,7 @@ class VentaService
 
                 $disponible = bcsub((string) $detalleOriginal->cantidad, (string) $yaDevuelto, 3);
 
-                if (bccomp(number_format($cantidad, 3, '.', ''), $disponible, 3) > 0) {
+                if (bccomp($this->bcround((string) $cantidad, 3), $disponible, 3) > 0) {
                     $nombre = $detalleOriginal->descripcion;
 
                     throw new VentaInvalidaException(
@@ -723,7 +723,7 @@ class VentaService
                 $descuentoLinea = (string) $detalleOriginal->descuento;
                 $tasaEfectiva = $detalleOriginal->tasa_itbis;
                 $cantidadOriginal = (string) $detalleOriginal->cantidad;
-                $proporcion = bcdiv(number_format($cantidad, 4, '.', ''), $cantidadOriginal, 12);
+                $proporcion = bcdiv($this->bcround((string) $cantidad, 4), $cantidadOriginal, 12);
                 $base = $this->bcround(bcmul((string) $detalleOriginal->subtotal, $proporcion, 6));
                 $itbis = $this->bcround(bcmul((string) $detalleOriginal->itbis_monto, $proporcion, 6));
 
@@ -1163,7 +1163,7 @@ class VentaService
 
             $descuentoLinea = $this->aMoneda($linea['descuento'] ?? '0');
             // Mismo redondeo que las estrategias de ITBIS (cantidad a 4 decimales, half-up).
-            $brutoLinea = $this->bcround(bcmul($precioUnitario, number_format($cantidad, 4, '.', ''), 6));
+            $brutoLinea = $this->bcround(bcmul($precioUnitario, $this->bcround($cantidad, 4), 6));
 
             // El descuento de línea viene del carrito del POS (client-controllable): negativo
             // subiría el precio; mayor que la línea la dejaría en negativo.
@@ -1214,7 +1214,7 @@ class VentaService
                 // Costo del momento (sin ITBIS) por unidad VENDIDA: una caja de 24 cuesta 24
                 // veces el costo base. Queda fijo en la línea para que los reportes de ganancia
                 // no cambien cuando luego cambie el costo del producto.
-                'costo_unitario' => $this->bcround(bcmul((string) $producto->costo, number_format($factor, 3, '.', ''), 6)),
+                'costo_unitario' => $this->bcround(bcmul((string) $producto->costo, $this->bcround((string) $factor, 3), 6)),
             ];
 
             // El inventario SIEMPRE se mueve en unidad base: cantidad × factor (una caja de 24

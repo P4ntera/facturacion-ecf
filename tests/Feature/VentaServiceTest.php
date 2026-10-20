@@ -413,4 +413,90 @@ class VentaServiceTest extends TestCase
 
         $this->assertTrue($anulada->estaAnulada());
     }
+
+    /**
+     * Cuando el POS envía varias líneas del mismo producto (ej: el usuario escanea el código
+     * de barras dos veces), VentaService::procesarLineas() debe consolidarlas en un solo
+     * detalle con la suma de cantidades, en vez de crear registros separados que provocan
+     * entradas duplicadas en Kardex y problemas en devoluciones parciales.
+     */
+    public function test_lineas_duplicadas_del_mismo_producto_se_consolidan(): void
+    {
+        $this->secuencia(TipoComprobante::FACTURA_CONSUMO, 'E32');
+
+        $producto = $this->producto('VS-CONSOLIDA', 200);
+
+        $venta = app(VentaService::class)->registrar([
+            'lineas' => [
+                ['producto_id' => $producto->id, 'cantidad' => 3],
+                ['producto_id' => $producto->id, 'cantidad' => 2],
+            ],
+        ], $this->empresaDefault);
+
+        // Solo debe haber 1 detalle, con cantidad = 5 (3 + 2).
+        $this->assertCount(1, $venta->detalles);
+        $this->assertEquals('5.000', $venta->detalles->first()->cantidad);
+    }
+
+    /**
+     * Líneas duplicadas del mismo producto pero con presentación diferente NO deben
+     * consolidarse: son ítems distintos (ej: "Coca-Cola Unidad" vs "Coca-Cola Caja").
+     */
+    public function test_lineas_con_distinta_presentacion_no_se_consolidan(): void
+    {
+        $this->secuencia(TipoComprobante::FACTURA_CONSUMO, 'E32');
+
+        $producto = $this->producto('VS-NO-CONSOLIDA', 200);
+
+        // Crear dos presentaciones distintas para el mismo producto.
+        $unidad = $producto->presentaciones()->create([
+            'empresa_id' => $this->empresaDefault->id,
+            'nombre' => 'Unidad',
+            'factor' => 1,
+            'precio' => 200,
+            'activo' => true,
+        ]);
+        $caja = $producto->presentaciones()->create([
+            'empresa_id' => $this->empresaDefault->id,
+            'nombre' => 'Caja',
+            'factor' => 12,
+            'precio' => 2200,
+            'activo' => true,
+        ]);
+
+        $venta = app(VentaService::class)->registrar([
+            'lineas' => [
+                ['producto_id' => $producto->id, 'presentacion_id' => $unidad->id, 'cantidad' => 3],
+                ['producto_id' => $producto->id, 'presentacion_id' => $caja->id, 'cantidad' => 1],
+            ],
+        ], $this->empresaDefault);
+
+        // Deben ser 2 detalles distintos: uno por presentación.
+        $this->assertCount(2, $venta->detalles);
+    }
+
+    /**
+     * La consolidación debe sumar también los descuentos por línea cuando se fusionan dos
+     * líneas del mismo producto.
+     */
+    public function test_consolidacion_suma_descuentos_por_linea(): void
+    {
+        $this->secuencia(TipoComprobante::FACTURA_CONSUMO, 'E32');
+
+        $producto = $this->producto('VS-DESC-CONSOL', 200);
+
+        $venta = app(VentaService::class)->registrar([
+            'lineas' => [
+                ['producto_id' => $producto->id, 'cantidad' => 2, 'descuento' => '10.00'],
+                ['producto_id' => $producto->id, 'cantidad' => 1, 'descuento' => '5.00'],
+            ],
+        ], $this->empresaDefault);
+
+        $detalle = $venta->detalles->first();
+
+        // Cantidad consolidada: 2 + 1 = 3
+        $this->assertEquals('3.000', $detalle->cantidad);
+        // Descuento consolidado: 10 + 5 = 15
+        $this->assertEquals('15.00', $detalle->descuento);
+    }
 }
