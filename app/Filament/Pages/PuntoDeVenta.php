@@ -189,11 +189,17 @@ class PuntoDeVenta extends Page
         $this->busquedaCliente = '';
     }
 
-    /** Vuelve a "Al portador" (sin cliente). */
+    /** Vuelve a "Al portador" / Consumidor Final (sin cliente). */
     public function quitarCliente(): void
     {
         $this->clienteId = null;
         $this->busquedaCliente = '';
+    }
+
+    /** Alias para el botón "Consumidor Final" de la vista de Caja. */
+    public function seleccionarConsumidorFinal(): void
+    {
+        $this->quitarCliente();
     }
 
     public function esSinComprobante(): bool
