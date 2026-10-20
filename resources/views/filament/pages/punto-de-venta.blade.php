@@ -63,6 +63,7 @@
         }
 
         if (atajo) {
+          console.log('POS ATAJO DETECTADO:', atajo);
           ev.preventDefault();
           ev.stopPropagation();
           this.ejecutarAtajo(atajo);
@@ -105,6 +106,7 @@
       },
 
       ejecutarAtajo(atajo) {
+        console.log('POS ejecutarAtajo:', atajo, 'refs:', Object.keys(this.$refs));
         switch (atajo) {
           case 'F1': this.mostrarAyuda = !this.mostrarAyuda; break;
           case 'F2': this.mostrarAyuda = false; this.$refs.buscadorProducto?.focus(); break;
