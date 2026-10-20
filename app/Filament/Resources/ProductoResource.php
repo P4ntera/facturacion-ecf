@@ -18,6 +18,7 @@ use App\Services\CostoPrecioService;
 use App\Services\InventarioService;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -29,6 +30,7 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
+use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\ToggleColumn;
 use Filament\Tables\Filters\SelectFilter;
@@ -138,6 +140,19 @@ class ProductoResource extends Resource
                         Textarea::make('descripcion')
                             ->label('Descripción')
                             ->rows(2)
+                            ->columnSpanFull(),
+
+                        FileUpload::make('imagen')
+                            ->label('Foto del producto')
+                            ->image()
+                            ->imageEditor()
+                            ->directory('productos')
+                            ->disk('public')
+                            ->maxSize(2048) // 2 MB
+                            ->imageResizeMode('cover')
+                            ->imageCropAspectRatio('1:1')
+                            ->imageResizeTargetWidth('400')
+                            ->imageResizeTargetHeight('400')
                             ->columnSpanFull(),
                     ]),
 
@@ -369,6 +384,13 @@ class ProductoResource extends Resource
                     })
                     ->toggleable(isToggledHiddenByDefault: true)
                     ->placeholder('—'),
+
+                ImageColumn::make('imagen')
+                    ->label('Foto')
+                    ->disk('public')
+                    ->circular()
+                    ->defaultImageUrl(fn () => null)
+                    ->toggleable(),
 
                 TextColumn::make('nombre')
                     ->label('Nombre')

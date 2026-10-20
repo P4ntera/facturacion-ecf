@@ -1,3 +1,4 @@
+@use('Illuminate\Support\Facades\Storage')
 <x-filament-panels::page>
   <div
     class="pos-screen"
@@ -154,7 +155,10 @@
                 <li>
                   @if ($fila['tipo'] === 'pesado')
                     <div class="flex items-center justify-between gap-2 pos-resultado-pesado" x-data="{ peso: '1.000' }">
-                      <span>
+                      <span class="flex items-center gap-2">
+                        @if ($fila['imagen'])
+                          <img src="{{ Storage::disk('public')->url($fila['imagen']) }}" alt="" class="pos-thumb" />
+                        @endif
                         {{ $fila['etiqueta'] }}
                         <span class="pos-muted">({{ $fila['precio_texto'] }})</span>
                       </span>
@@ -174,7 +178,12 @@
                       type="button"
                       wire:click="{{ $fila['presentacion_id'] ? 'agregarPresentacion('.$fila['presentacion_id'].')' : 'agregarProducto('.$fila['producto_id'].')' }}"
                     >
-                      <span>{{ $fila['etiqueta'] }}</span>
+                      <span class="flex items-center gap-2">
+                        @if ($fila['imagen'])
+                          <img src="{{ Storage::disk('public')->url($fila['imagen']) }}" alt="" class="pos-thumb" />
+                        @endif
+                        {{ $fila['etiqueta'] }}
+                      </span>
                       <span class="flex items-center gap-2 pos-muted">
                         {{ $fila['precio_texto'] }}
                         @if ($fila['controla_stock'])

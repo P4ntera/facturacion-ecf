@@ -1,3 +1,4 @@
+@use('Illuminate\Support\Facades\Storage')
 @php
   $caja = $this->cajaSeleccionada();
   $empresa = $this->empresa();
@@ -131,6 +132,7 @@
     .pt-productos button { display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start; text-align: left;
       padding: .6rem; background: var(--pt-card); font-weight: 600; font-size: .95rem; line-height: 1.2; }
     .pt-productos .pt-precio { color: var(--pt-exito); font-variant-numeric: tabular-nums; font-size: 1rem; }
+    .pt-productos .pt-prod-img { width: 48px; height: 48px; border-radius: 6px; object-fit: cover; align-self: center; }
     .pt-teclado-ctn { flex-shrink: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: .5rem; }
     .pt-display-buffer { min-height: 48px; display: flex; align-items: center; justify-content: flex-end; padding: 0 .9rem;
       background: var(--pt-bg); border: 1px solid var(--pt-borde); border-radius: 10px; font-size: 1.5rem; font-variant-numeric: tabular-nums; }
@@ -362,6 +364,9 @@
         <div class="pt-productos">
           @foreach ($this->productosGrid() as $producto)
             <button type="button" wire:key="prod-{{ $producto['id'] }}" x-on:click="tocar({{ $producto['id'] }})" @disabled($producto['agotado'])>
+              @if ($producto['imagen'])
+                <img src="{{ Storage::disk('public')->url($producto['imagen']) }}" alt="" class="pt-prod-img" />
+              @endif
               <span>{{ $producto['nombre'] }}</span>
               <span class="pt-precio">
                 {{ $producto['precio_texto'] }}

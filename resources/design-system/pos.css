@@ -312,6 +312,14 @@
     color:var(--text-muted);
 }
 
+.pos-screen .pos-thumb{
+    width:32px;
+    height:32px;
+    border-radius:4px;
+    object-fit:cover;
+    flex-shrink:0;
+}
+
 /*======== TOTALES ========*/
 
 .pos-screen .pos-totales dl > div{
