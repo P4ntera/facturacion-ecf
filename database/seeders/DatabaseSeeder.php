@@ -15,6 +15,7 @@ class DatabaseSeeder extends Seeder
             FilamentAdminSeeder::class,
             RolePermissionSeeder::class,
             EmpresaSeeder::class,
+            SupermercadoDemoSeeder::class,
         ]);
     }
 }
