@@ -3,12 +3,18 @@
   <div
     class="pos-screen"
     x-data="{
-      // Índice resaltado en resultados de producto (-1 = ninguno)
       highlightProducto: -1,
-      // Índice resaltado en resultados de cliente (-1 = ninguno)
       highlightCliente: -1,
-      // Mostrar leyenda de atajos
       mostrarAyuda: false,
+      _sidebarAbiertoAntes: false,
+
+      init() {
+        this._sidebarAbiertoAntes = this.$store.sidebar.isOpen;
+        this.$store.sidebar.close();
+        document.addEventListener('livewire:navigate', () => {
+          if (this._sidebarAbiertoAntes) this.$store.sidebar.open();
+        }, { once: true });
+      },
 
       resetHighlights() {
         this.highlightProducto = -1;
@@ -37,151 +43,92 @@
         let btn = item.querySelector('button');
         if (btn) { btn.click(); return true; }
         return false;
+      },
+
+      handleKeydown(ev) {
+        if (document.querySelector('[role=dialog]')) return;
+
+        let tag = ev.target.tagName;
+        let enInput = (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT');
+
+        // Detectar atajo: tecla F directa O Ctrl+Alt+Shift+N (AutoHotkey)
+        let fDirectas = {F1:1,F2:1,F3:1,F4:1,F5:1,F6:1,F7:1,F8:1,F9:1};
+        let ahkMapa = {Digit1:'F1',Digit2:'F2',Digit3:'F3',Digit4:'F4',Digit5:'F5',Digit6:'F6',Digit7:'F7',Digit8:'F8',Digit9:'F9'};
+        let atajo = null;
+        if (fDirectas[ev.key]) {
+          atajo = ev.key;
+        } else if (ev.ctrlKey && ev.altKey && ev.shiftKey) {
+          atajo = ahkMapa[ev.code] || null;
+        }
+
+        if (atajo) {
+          ev.preventDefault();
+          ev.stopPropagation();
+          this.ejecutarAtajo(atajo);
+          return;
+        }
+
+        switch (ev.key) {
+          case 'Escape':
+            if (this.mostrarAyuda) { this.mostrarAyuda = false; ev.preventDefault(); break; }
+            if (enInput) {
+              ev.target.value = '';
+              ev.target.dispatchEvent(new Event('input', { bubbles: true }));
+              this.resetHighlights();
+              ev.preventDefault();
+            }
+            break;
+          case 'ArrowDown':
+            if (this.$refs.buscadorProducto === document.activeElement) { ev.preventDefault(); this.navegar('.pos-resultados-producto', 1); }
+            else if (this.$refs.buscadorCliente === document.activeElement) { ev.preventDefault(); this.navegar('.pos-resultados-cliente', 1); }
+            break;
+          case 'ArrowUp':
+            if (this.$refs.buscadorProducto === document.activeElement) { ev.preventDefault(); this.navegar('.pos-resultados-producto', -1); }
+            else if (this.$refs.buscadorCliente === document.activeElement) { ev.preventDefault(); this.navegar('.pos-resultados-cliente', -1); }
+            break;
+          case 'Enter':
+            if (this.$refs.buscadorCliente === document.activeElement && this.highlightCliente >= 0) {
+              ev.preventDefault(); this.seleccionarHighlight('.pos-resultados-cliente');
+            }
+            if (this.$refs.buscadorProducto === document.activeElement && this.highlightProducto >= 0) {
+              ev.preventDefault(); this.seleccionarHighlight('.pos-resultados-producto');
+              this.$refs.buscadorProducto.value = '';
+              this.$refs.buscadorProducto.dispatchEvent(new Event('input', { bubbles: true }));
+              this.resetHighlights();
+            }
+            break;
+          case 'Delete':
+            if (!enInput) { ev.preventDefault(); this.$wire.call('quitarUltimaLinea'); }
+            break;
+        }
+      },
+
+      ejecutarAtajo(atajo) {
+        switch (atajo) {
+          case 'F1': this.mostrarAyuda = !this.mostrarAyuda; break;
+          case 'F2': this.mostrarAyuda = false; this.$refs.buscadorProducto?.focus(); break;
+          case 'F3': this.mostrarAyuda = false; this.$refs.buscadorCliente?.focus(); break;
+          case 'F4':
+            var sp = this.$refs.selectFormaPago;
+            if (sp) {
+              sp.selectedIndex = (sp.selectedIndex + 1) % sp.options.length;
+              sp.dispatchEvent(new Event('change', { bubbles: true }));
+              sp.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+            break;
+          case 'F5': this.$refs.selectDescuento?.focus(); break;
+          case 'F6': this.$refs.inputEfectivo?.focus(); break;
+          case 'F7': this.$refs.checkCredito?.click(); break;
+          case 'F8': this.$refs.btnCobrar?.click(); break;
+          case 'F9':
+            if (confirm('¿Limpiar todo el carrito?')) { this.$wire.call('limpiarCarrito'); }
+            break;
+        }
       }
     }"
-    x-init="
-      /*
-       * Paso 1: el POS es una pantalla de trabajo, así que entra con el sidebar colapsado
-       * para aprovechar el ancho. Usamos el store global de Alpine que trae Filament
-       * ($store.sidebar, ver vendor/filament/filament/resources/js/stores/sidebar.js) para
-       * cerrarlo al montar esta página y restaurar el estado que tenía al salir de ella
-       * (evento `livewire:navigate`, que Livewire dispara justo antes de navegar a otra
-       * página). El botón de hamburguesa del topbar de Filament no se toca: sigue
-       * funcionando en todo momento para reabrir el sidebar manualmente.
-       */
-      let posSidebarAbiertoAntes = $store.sidebar.isOpen;
-      $store.sidebar.close();
-
-      let posRestaurarSidebar = () => {
-        if (posSidebarAbiertoAntes) {
-          $store.sidebar.open();
-        }
-        document.removeEventListener('livewire:navigate', posRestaurarSidebar);
-      };
-      document.addEventListener('livewire:navigate', posRestaurarSidebar);
-    "
     x-on:abrir-ticket.window="window.open($event.detail.url, '_blank')"
     x-on:producto-escaneado.window="$nextTick(() => { resetHighlights(); $refs.buscadorProducto?.focus(); })"
-    {{-- === ATAJOS DE TECLADO GLOBALES ===
-         Escucha TANTO las teclas F directas (funcionan en kiosk/Linux) COMO las
-         combinaciones Ctrl+Alt+Shift+N que AutoHotkey envía en Windows cuando
-         remapea F1–F9. Así el mismo código sirve en cualquier entorno.
-    --}}
-    x-on:keydown.window="
-      // No interferir si hay un modal/dialog abierto (Filament notifications, etc.)
-      if (document.querySelector('[role=dialog]')) return;
-
-      let tag = $event.target.tagName;
-      let enInput = (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT');
-
-      // Detectar atajo: tecla F directa O la combinación Ctrl+Alt+Shift+N de AutoHotkey
-      let fDirectas = {'F1':1,'F2':1,'F3':1,'F4':1,'F5':1,'F6':1,'F7':1,'F8':1,'F9':1};
-      let atajo = null;
-      if (fDirectas[$event.key]) {
-        atajo = $event.key;
-      } else if ($event.ctrlKey && $event.altKey && $event.shiftKey) {
-        let mapa = { Digit1:'F1', Digit2:'F2', Digit3:'F3', Digit4:'F4',
-                     Digit5:'F5', Digit6:'F6', Digit7:'F7', Digit8:'F8', Digit9:'F9' };
-        atajo = mapa[$event.code] || null;
-      }
-
-      if (atajo) {
-        $event.preventDefault();
-        $event.stopPropagation();
-        switch (atajo) {
-          case 'F1':
-            mostrarAyuda = !mostrarAyuda;
-            break;
-          case 'F2':
-            mostrarAyuda = false;
-            $refs.buscadorProducto?.focus();
-            break;
-          case 'F3':
-            mostrarAyuda = false;
-            $refs.buscadorCliente?.focus();
-            break;
-          case 'F4':
-            let selectPago = $refs.selectFormaPago;
-            if (selectPago) {
-              selectPago.selectedIndex = (selectPago.selectedIndex + 1) % selectPago.options.length;
-              selectPago.dispatchEvent(new Event('change', { bubbles: true }));
-              selectPago.dispatchEvent(new Event('input', { bubbles: true }));
-            }
-            break;
-          case 'F5':
-            $refs.selectDescuento?.focus();
-            break;
-          case 'F6':
-            $refs.inputEfectivo?.focus();
-            break;
-          case 'F7':
-            $refs.checkCredito?.click();
-            break;
-          case 'F8':
-            $refs.btnCobrar?.click();
-            break;
-          case 'F9':
-            if (confirm('¿Limpiar todo el carrito?')) {
-              $wire.call('limpiarCarrito');
-            }
-            break;
-        }
-        return;
-      }
-
-      switch ($event.key) {
-        case 'Escape':
-          if (mostrarAyuda) { mostrarAyuda = false; $event.preventDefault(); break; }
-          if (enInput) {
-            $event.target.value = '';
-            $event.target.dispatchEvent(new Event('input', { bubbles: true }));
-            resetHighlights();
-            $event.preventDefault();
-          }
-          break;
-
-        case 'ArrowDown':
-          if ($refs.buscadorProducto === document.activeElement) {
-            $event.preventDefault();
-            navegar('.pos-resultados-producto', 1);
-          } else if ($refs.buscadorCliente === document.activeElement) {
-            $event.preventDefault();
-            navegar('.pos-resultados-cliente', 1);
-          }
-          break;
-
-        case 'ArrowUp':
-          if ($refs.buscadorProducto === document.activeElement) {
-            $event.preventDefault();
-            navegar('.pos-resultados-producto', -1);
-          } else if ($refs.buscadorCliente === document.activeElement) {
-            $event.preventDefault();
-            navegar('.pos-resultados-cliente', -1);
-          }
-          break;
-
-        case 'Enter':
-          if ($refs.buscadorCliente === document.activeElement && highlightCliente >= 0) {
-            $event.preventDefault();
-            seleccionarHighlight('.pos-resultados-cliente');
-          }
-          if ($refs.buscadorProducto === document.activeElement && highlightProducto >= 0) {
-            $event.preventDefault();
-            seleccionarHighlight('.pos-resultados-producto');
-            $refs.buscadorProducto.value = '';
-            $refs.buscadorProducto.dispatchEvent(new Event('input', { bubbles: true }));
-            resetHighlights();
-          }
-          break;
-
-        case 'Delete':
-          if (!enInput) {
-            $event.preventDefault();
-            $wire.call('quitarUltimaLinea');
-          }
-          break;
-      }
-    "
+    x-on:keydown.window="handleKeydown($event)"
   >
     @if ($this->arqueoAbierto() === null)
       {{-- Sin caja abierta: se bloquea la pantalla de venta hasta abrirla --}}
