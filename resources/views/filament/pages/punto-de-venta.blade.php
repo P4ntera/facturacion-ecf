@@ -62,7 +62,11 @@
     "
     x-on:abrir-ticket.window="window.open($event.detail.url, '_blank')"
     x-on:producto-escaneado.window="$nextTick(() => { resetHighlights(); $refs.buscadorProducto?.focus(); })"
-    {{-- === ATAJOS DE TECLADO GLOBALES === --}}
+    {{-- === ATAJOS DE TECLADO GLOBALES ===
+         Escucha TANTO las teclas F directas (funcionan en kiosk/Linux) COMO las
+         combinaciones Ctrl+Alt+Shift+N que AutoHotkey envía en Windows cuando
+         remapea F1–F9. Así el mismo código sirve en cualquier entorno.
+    --}}
     x-on:keydown.window="
       // No interferir si hay un modal/dialog abierto (Filament notifications, etc.)
       if (document.querySelector('[role=dialog]')) return;
@@ -70,65 +74,62 @@
       let tag = $event.target.tagName;
       let enInput = (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT');
 
+      // Detectar atajo: tecla F directa O la combinación Ctrl+Alt+Shift+N de AutoHotkey
+      let atajo = null;
+      if ($event.key.match(/^F(\d+)$/)) {
+        atajo = $event.key; // 'F1', 'F2', etc.
+      } else if ($event.ctrlKey && $event.altKey && $event.shiftKey) {
+        // AutoHotkey remapea F1→Ctrl+Alt+Shift+1, F2→Ctrl+Alt+Shift+2, etc.
+        let mapa = { Digit1:'F1', Digit2:'F2', Digit3:'F3', Digit4:'F4',
+                     Digit5:'F5', Digit6:'F6', Digit7:'F7', Digit8:'F8', Digit9:'F9' };
+        atajo = mapa[$event.code] || null;
+      }
+
+      if (atajo) {
+        $event.preventDefault();
+        $event.stopPropagation();
+        switch (atajo) {
+          case 'F1':
+            mostrarAyuda = !mostrarAyuda;
+            break;
+          case 'F2':
+            mostrarAyuda = false;
+            $refs.buscadorProducto?.focus();
+            break;
+          case 'F3':
+            mostrarAyuda = false;
+            $refs.buscadorCliente?.focus();
+            break;
+          case 'F4':
+            let selectPago = $refs.selectFormaPago;
+            if (selectPago) {
+              selectPago.selectedIndex = (selectPago.selectedIndex + 1) % selectPago.options.length;
+              selectPago.dispatchEvent(new Event('change', { bubbles: true }));
+              selectPago.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+            break;
+          case 'F5':
+            $refs.selectDescuento?.focus();
+            break;
+          case 'F6':
+            $refs.inputEfectivo?.focus();
+            break;
+          case 'F7':
+            $refs.checkCredito?.click();
+            break;
+          case 'F8':
+            $refs.btnCobrar?.click();
+            break;
+          case 'F9':
+            if (confirm('¿Limpiar todo el carrito?')) {
+              $wire.call('limpiarCarrito');
+            }
+            break;
+        }
+        return;
+      }
+
       switch ($event.key) {
-        case 'F1':
-          $event.preventDefault();
-          mostrarAyuda = !mostrarAyuda;
-          break;
-
-        case 'F2':
-          $event.preventDefault();
-          mostrarAyuda = false;
-          $refs.buscadorProducto?.focus();
-          break;
-
-        case 'F3':
-          $event.preventDefault();
-          mostrarAyuda = false;
-          $refs.buscadorCliente?.focus();
-          break;
-
-        case 'F4':
-          $event.preventDefault();
-          // Ciclar forma de pago
-          let selectPago = $refs.selectFormaPago;
-          if (selectPago) {
-            let opts = [...selectPago.options];
-            let idx = selectPago.selectedIndex;
-            selectPago.selectedIndex = (idx + 1) % opts.length;
-            selectPago.dispatchEvent(new Event('change', { bubbles: true }));
-            // Livewire necesita el input event para wire:model.live
-            selectPago.dispatchEvent(new Event('input', { bubbles: true }));
-          }
-          break;
-
-        case 'F5':
-          $event.preventDefault();
-          $refs.selectDescuento?.focus();
-          break;
-
-        case 'F6':
-          $event.preventDefault();
-          $refs.inputEfectivo?.focus();
-          break;
-
-        case 'F7':
-          $event.preventDefault();
-          $refs.checkCredito?.click();
-          break;
-
-        case 'F8':
-          $event.preventDefault();
-          $refs.btnCobrar?.click();
-          break;
-
-        case 'F9':
-          $event.preventDefault();
-          if (confirm('¿Limpiar todo el carrito?')) {
-            $wire.call('limpiarCarrito');
-          }
-          break;
-
         case 'Escape':
           if (mostrarAyuda) { mostrarAyuda = false; $event.preventDefault(); break; }
           if (enInput) {
@@ -164,8 +165,6 @@
             $event.preventDefault();
             seleccionarHighlight('.pos-resultados-cliente');
           }
-          // Producto: Enter ya lo maneja wire:keydown.enter (escanearOBuscar),
-          // pero si hay un highlight, selecciona ese en lugar de escanear
           if ($refs.buscadorProducto === document.activeElement && highlightProducto >= 0) {
             $event.preventDefault();
             seleccionarHighlight('.pos-resultados-producto');
@@ -176,7 +175,6 @@
           break;
 
         case 'Delete':
-          // Supr: quitar última línea del carrito (solo si no estamos en un input)
           if (!enInput) {
             $event.preventDefault();
             $wire.call('quitarUltimaLinea');
