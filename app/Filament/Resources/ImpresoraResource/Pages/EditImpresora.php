@@ -31,4 +31,9 @@ class EditImpresora extends EditRecord
             throw new Halt;
         }
     }
+
+    protected function getRedirectUrl(): string
+    {
+        return $this->getResource()::getUrl('index');
+    }
 }

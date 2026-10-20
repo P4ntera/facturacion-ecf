@@ -113,4 +113,9 @@ class EditRole extends EditRecord
 
         return ! $tieneOtraFuente;
     }
+
+    protected function getRedirectUrl(): string
+    {
+        return $this->getResource()::getUrl('index');
+    }
 }
