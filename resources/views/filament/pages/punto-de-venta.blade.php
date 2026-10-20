@@ -46,6 +46,7 @@
       },
 
       handleKeydown(ev) {
+        console.log('POS keydown:', ev.key, ev.code, 'ctrl:', ev.ctrlKey, 'alt:', ev.altKey, 'shift:', ev.shiftKey);
         if (document.querySelector('[role=dialog]')) return;
 
         let tag = ev.target.tagName;
