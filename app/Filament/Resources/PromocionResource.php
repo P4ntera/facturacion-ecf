@@ -97,14 +97,17 @@ class PromocionResource extends Resource
             Select::make('productos')
                 ->label('Productos incluidos')
                 ->helperText('Seleccione los productos a los que aplica esta promoción.')
-                ->relationship('productos', 'nombre')
+                ->relationship(
+                    'productos',
+                    'nombre',
+                    modifyQueryUsing: fn ($query) => $query->where('empresa_id', Filament::getTenant()->id)->where('activo', true),
+                )
                 ->multiple()
                 ->searchable()
                 ->preload()
                 ->required()
                 ->columnSpanFull()
-                ->getOptionLabelFromRecordUsing(fn (Producto $p) => "{$p->codigo} — {$p->nombre}")
-                ->modifyQueryUsing(fn ($query) => $query->where('empresa_id', Filament::getTenant()->id)->where('activo', true)),
+                ->getOptionLabelFromRecordUsing(fn (Producto $p) => "{$p->codigo} — {$p->nombre}"),
 
             Toggle::make('activa')
                 ->label('Activa')
