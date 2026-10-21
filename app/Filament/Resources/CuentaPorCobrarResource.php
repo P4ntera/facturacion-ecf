@@ -181,6 +181,7 @@ class CuentaPorCobrarResource extends Resource
                             ->numeric()
                             ->prefix('RD$')
                             ->minValue(0.01)
+                            ->maxValue(fn (CuentaPorCobrar $record) => (float) $record->montoPendiente())
                             ->required(),
                         DatePicker::make('fecha')
                             ->label('Fecha del pago')
