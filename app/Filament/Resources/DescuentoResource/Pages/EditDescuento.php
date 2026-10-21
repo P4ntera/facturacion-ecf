@@ -8,4 +8,9 @@ use Filament\Resources\Pages\EditRecord;
 class EditDescuento extends EditRecord
 {
     protected static string $resource = DescuentoResource::class;
+
+    protected function getRedirectUrl(): string
+    {
+        return $this->getResource()::getUrl('index');
+    }
 }

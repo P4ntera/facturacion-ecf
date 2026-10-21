@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Widgets;
 
 use App\Services\ReporteService;
+use Filament\Facades\Filament;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Filament\Widgets\TableWidget;
@@ -31,6 +32,7 @@ class TopProductosWidget extends TableWidget
                     Carbon::today()->startOfMonth(),
                     Carbon::today()->endOfMonth(),
                     5,
+                    Filament::getTenant()->id,
                 )['por_ingresos'];
 
                 return $productos->map(fn ($producto) => [

@@ -18,6 +18,7 @@ use App\Services\CostoPrecioService;
 use App\Services\InventarioService;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -29,6 +30,7 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
+use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\ToggleColumn;
 use Filament\Tables\Filters\SelectFilter;
@@ -139,6 +141,19 @@ class ProductoResource extends Resource
                             ->label('Descripción')
                             ->rows(2)
                             ->columnSpanFull(),
+
+                        FileUpload::make('imagen')
+                            ->label('Foto del producto')
+                            ->image()
+                            ->imageEditor()
+                            ->directory('productos')
+                            ->disk('public')
+                            ->maxSize(2048) // 2 MB
+                            ->imageResizeMode('cover')
+                            ->imageCropAspectRatio('1:1')
+                            ->imageResizeTargetWidth('400')
+                            ->imageResizeTargetHeight('400')
+                            ->columnSpanFull(),
                     ]),
 
                 Section::make('Precios')
@@ -174,7 +189,8 @@ class ProductoResource extends Resource
                                 MetodoCosto::MANUAL => 'Sin ITBIS. Método manual: las compras no cambian este costo.',
                                 MetodoCosto::ULTIMA_COMPRA => 'Sin ITBIS. Se actualiza con cada compra (costo de la última compra).',
                                 MetodoCosto::PROMEDIO_PONDERADO => 'Sin ITBIS. Se recalcula con cada compra (promedio ponderado).',
-                            }),
+                            })
+                            ->visible(fn (): bool => auth()->user()?->can('productos.ver_costo') ?? false),
 
                         TextInput::make('margen_ganancia')
                             ->label('% de ganancia')
@@ -188,10 +204,12 @@ class ProductoResource extends Resource
 
                                 return $margenCategoria !== null ? "{$margenCategoria} % (de la categoría)" : 'Sin porcentaje';
                             })
-                            ->helperText('Sobre el costo. Vacío = usa el de la categoría.'),
+                            ->helperText('Sobre el costo. Vacío = usa el de la categoría.')
+                            ->visible(fn (): bool => auth()->user()?->can('productos.ver_costo') ?? false),
 
                         TextEntry::make('precio_sugerido_preview')
                             ->label('Precio sugerido')
+                            ->visible(fn (): bool => auth()->user()?->can('productos.ver_costo') ?? false)
                             ->state(function (Get $get): string {
                                 $tipoVenta = TipoVenta::tryFrom((string) $get('tipo_venta'));
                                 $tasa = TasaItbis::tryFrom((string) $get('tasa_itbis'));
@@ -367,6 +385,13 @@ class ProductoResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true)
                     ->placeholder('—'),
 
+                ImageColumn::make('imagen')
+                    ->label('Foto')
+                    ->disk('public')
+                    ->circular()
+                    ->defaultImageUrl(fn () => null)
+                    ->toggleable(),
+
                 TextColumn::make('nombre')
                     ->label('Nombre')
                     ->searchable()
@@ -432,7 +457,9 @@ class ProductoResource extends Resource
                     ->label('Categoría')
                     // Scope manual obligatorio — Filament NO aplica tenant scope dentro de
                     // ->relationship(), ni siquiera dentro de su propio Resource.
-                    ->relationship('categoria', 'nombre', modifyQueryUsing: fn (Builder $query) => $query->where('empresa_id', Filament::getTenant()->id)),
+                    ->relationship('categoria', 'nombre', modifyQueryUsing: fn (Builder $query) => $query->where('empresa_id', Filament::getTenant()->id))
+                    ->searchable()
+                    ->preload(),
                 TernaryFilter::make('activo')->label('Activo')->default(true),
             ])
             ->recordActions([
@@ -466,7 +493,7 @@ class ProductoResource extends Resource
                                 $record,
                                 TipoMovimiento::from($data['tipo']),
                                 OrigenMovimiento::AJUSTE,
-                                (float) $data['cantidad'],
+                                (string) $data['cantidad'],
                                 null,
                                 auth()->id(),
                                 $data['observacion'] ?? null,

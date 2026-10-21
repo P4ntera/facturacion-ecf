@@ -3,12 +3,14 @@
 namespace App\Filament\Resources;
 
 use App\Enums\Modulo;
+use App\Enums\ModoImpresionPos;
 use App\Filament\Concerns\RestringidoPorModulo;
 use App\Filament\Resources\CajaResource\Pages;
 use App\Models\Caja;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Infolists\Components\TextEntry;
@@ -68,6 +70,12 @@ class CajaResource extends Resource
                 ->placeholder('¡Gracias por su compra!')
                 ->maxLength(120)
                 ->columnSpanFull(),
+
+            Select::make('modo_impresion_pos')
+                ->label('Modo de impresión')
+                ->options(collect(ModoImpresionPos::cases())->mapWithKeys(fn (ModoImpresionPos $m) => [$m->value => $m->etiqueta()]))
+                ->placeholder('Usar el de la empresa')
+                ->helperText('Si se deja vacío, usa la configuración de la empresa.'),
 
             Toggle::make('activo')
                 ->label('Activa')

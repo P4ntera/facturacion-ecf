@@ -41,6 +41,7 @@ class VentaService
         private readonly SecuenciaNcfService $ncfService,
         private readonly InventarioService $inventarioService,
         private readonly CuentaPorCobrarService $cuentaPorCobrarService,
+        private readonly PromocionService $promocionService,
     ) {}
 
     /**
@@ -56,6 +57,10 @@ class VentaService
      *   descuento_global?: string|float|int|null,
      *   descuento_id?: int|null,
      *   forma_pago?: FormaPago|string|null,
+     *   monto_efectivo?: string|float|null,
+     *   monto_tarjeta?: string|float|null,
+     *   monto_transferencia?: string|float|null,
+     *   vuelto?: string|float|null,
      *   arqueo_caja_id?: int|null,
      *   caja_id?: int|null,
      *   permite_precio_cero?: bool,
@@ -208,6 +213,10 @@ class VentaService
                 'ncf' => $ncf,
                 'ncf_modifica' => $ncfModifica,
                 'forma_pago' => $datos['forma_pago'] ?? FormaPago::EFECTIVO,
+                'monto_efectivo' => $datos['monto_efectivo'] ?? null,
+                'monto_tarjeta' => $datos['monto_tarjeta'] ?? null,
+                'monto_transferencia' => $datos['monto_transferencia'] ?? null,
+                'vuelto' => $datos['vuelto'] ?? null,
                 'arqueo_caja_id' => $datos['arqueo_caja_id'] ?? null,
                 'caja_id' => $cajaId,
                 'tipo_pago' => $tipoPago,
@@ -373,7 +382,7 @@ class VentaService
 
             $cuentaPorCobrar = $venta->cuentaPorCobrar;
 
-            if ($cuentaPorCobrar !== null && (float) $cuentaPorCobrar->monto_pagado > 0) {
+            if ($cuentaPorCobrar !== null && bccomp((string) $cuentaPorCobrar->monto_pagado, '0', 2) > 0) {
                 throw new CuentaConPagosRegistradosException(
                     "No se puede anular la venta #{$venta->id}: su cuenta por cobrar ya tiene pagos registrados."
                 );
@@ -395,7 +404,7 @@ class VentaService
                         $producto,
                         TipoMovimiento::ENTRADA,
                         OrigenMovimiento::ANULACION,
-                        (float) $detalle->cantidad * (float) $detalle->factor,
+                        bcmul((string) $detalle->cantidad, (string) $detalle->factor, 3),
                         $venta->id,
                         $userId,
                         $motivo,
@@ -509,9 +518,9 @@ class VentaService
                 }
 
                 $producto = Producto::where('empresa_id', $empresa->id)->findOrFail($detalle['producto_id']);
-                $cantidad = (float) ($detalle['cantidad'] ?? 1);
+                $cantidad = (string) ($detalle['cantidad'] ?? '1');
                 $tasaEfectiva = $config->aplica_itbis ? $producto->tasa_itbis : TasaItbis::CERO;
-                $base = bcmul($monto, number_format($cantidad, 4, '.', ''), 2);
+                $base = bcmul($monto, $this->bcround((string) $cantidad, 4), 2);
                 $itbis = bcdiv(bcmul($base, (string) $tasaEfectiva->porcentaje(), 4), '100', 2);
 
                 $acumulado['subtotal'] = bcadd($acumulado['subtotal'], $base, 2);
@@ -660,9 +669,9 @@ class VentaService
             $stockMovimientos = [];
 
             foreach ($detalles as $detalle) {
-                $cantidad = (float) $detalle['cantidad'];
+                $cantidad = (string) ($detalle['cantidad'] ?? '0');
 
-                if ($cantidad <= 0) {
+                if (bccomp($cantidad, '0', 3) <= 0) {
                     throw new VentaInvalidaException('La cantidad a devolver debe ser mayor que cero.');
                 }
 
@@ -703,7 +712,7 @@ class VentaService
 
                 $disponible = bcsub((string) $detalleOriginal->cantidad, (string) $yaDevuelto, 3);
 
-                if (bccomp(number_format($cantidad, 3, '.', ''), $disponible, 3) > 0) {
+                if (bccomp($this->bcround((string) $cantidad, 3), $disponible, 3) > 0) {
                     $nombre = $detalleOriginal->descripcion;
 
                     throw new VentaInvalidaException(
@@ -715,9 +724,9 @@ class VentaService
                 $descuentoLinea = (string) $detalleOriginal->descuento;
                 $tasaEfectiva = $detalleOriginal->tasa_itbis;
                 $cantidadOriginal = (string) $detalleOriginal->cantidad;
-                $proporcion = bcdiv(number_format($cantidad, 4, '.', ''), $cantidadOriginal, 12);
-                $base = bcadd(bcmul((string) $detalleOriginal->subtotal, $proporcion, 6), '0.005', 2);
-                $itbis = bcadd(bcmul((string) $detalleOriginal->itbis_monto, $proporcion, 6), '0.005', 2);
+                $proporcion = bcdiv($this->bcround((string) $cantidad, 4), $cantidadOriginal, 12);
+                $base = $this->bcround(bcmul((string) $detalleOriginal->subtotal, $proporcion, 6));
+                $itbis = $this->bcround(bcmul((string) $detalleOriginal->itbis_monto, $proporcion, 6));
 
                 $acumulado['subtotal'] = bcadd($acumulado['subtotal'], $base, 2);
                 $acumulado['total_itbis'] = bcadd($acumulado['total_itbis'], $itbis, 2);
@@ -752,7 +761,7 @@ class VentaService
 
                 $stockMovimientos[] = [
                     'producto' => $detalleOriginal->producto,
-                    'cantidad' => $cantidad * (float) $detalleOriginal->factor,
+                    'cantidad' => bcmul($cantidad, (string) $detalleOriginal->factor, 3),
                     'destino' => $destino,
                 ];
             }
@@ -1031,7 +1040,22 @@ class VentaService
             }, $lineas);
         }
 
+        // Aplicar promociones vigentes antes de procesar líneas: el descuento por promoción
+        // se inyecta en el campo `descuento` de cada línea (mismo campo que DetalleVenta usa).
+        [$lineas, $promocionesAplicadas] = $this->promocionService->aplicar($lineas, $empresa);
+
         [$detalles, $productosLineas, $acumulado] = $this->procesarLineas($lineas, $config, $estrategia, $empresa, $permitePrecioCero);
+
+        // Propagar metadata de promociones a los detalles para trazabilidad en el POS.
+        foreach ($detalles as $i => &$detalle) {
+            $lineaOriginal = $lineas[$i] ?? [];
+            if (isset($lineaOriginal['_promocion_id'])) {
+                $detalle['_promocion_id'] = $lineaOriginal['_promocion_id'];
+                $detalle['_promocion_nombre'] = $lineaOriginal['_promocion_nombre'];
+                $detalle['_promocion_tipo'] = $lineaOriginal['_promocion_tipo'];
+            }
+        }
+        unset($detalle);
 
         $subtotalBruto = $acumulado['subtotal'];
         $descuentoGlobal = $this->resolverDescuentoGlobal($datos, $subtotalBruto, $empresa);
@@ -1068,6 +1092,28 @@ class VentaService
      */
     private function procesarLineas(array $lineas, EmpresaConfiguracion $config, ImpuestoStrategy $estrategia, Empresa $empresa, bool $permitePrecioCero = false, string $proporcionDescuentoGlobal = '0'): array
     {
+        // Consolidar líneas duplicadas del mismo producto+presentación: el POS puede mandar
+        // varias líneas del mismo ítem; sumar cantidades y descuentos evita detalles repetidos.
+        $consolidadas = [];
+        foreach ($lineas as $linea) {
+            $key = ($linea['producto_id'] ?? '') . '_' . ($linea['presentacion_id'] ?? '');
+            if (isset($consolidadas[$key])) {
+                $consolidadas[$key]['cantidad'] = bcadd(
+                    (string) ($consolidadas[$key]['cantidad'] ?? '0'),
+                    (string) ($linea['cantidad'] ?? '0'),
+                    3
+                );
+                $consolidadas[$key]['descuento'] = bcadd(
+                    (string) ($consolidadas[$key]['descuento'] ?? '0'),
+                    (string) ($linea['descuento'] ?? '0'),
+                    2
+                );
+            } else {
+                $consolidadas[$key] = $linea;
+            }
+        }
+        $lineas = array_values($consolidadas);
+
         $detalles = [];
         $productosLineas = [];
         $acumulado = [
@@ -1081,9 +1127,9 @@ class VentaService
         ];
 
         foreach ($lineas as $linea) {
-            $cantidad = (float) ($linea['cantidad'] ?? 0);
+            $cantidad = (string) ($linea['cantidad'] ?? '0');
 
-            if ($cantidad <= 0) {
+            if (bccomp($cantidad, '0', 3) <= 0) {
                 throw new VentaInvalidaException('La cantidad de cada línea debe ser mayor que cero.');
             }
 
@@ -1101,7 +1147,7 @@ class VentaService
             // facturar) como si fuera 1 unidad. La restricción producto_id = $producto->id de
             // paso impide referenciar la presentación de otro producto.
             $presentacion = null;
-            $factor = 1.0;
+            $factor = '1.000';
             $descripcion = $producto->nombre;
 
             if (filled($linea['presentacion_id'] ?? null)) {
@@ -1111,7 +1157,7 @@ class VentaService
                     throw new VentaInvalidaException("La presentación indicada no existe o no pertenece a «{$producto->nombre}».");
                 }
 
-                $factor = (float) $presentacion->factor;
+                $factor = (string) $presentacion->factor;
                 $descripcion = $presentacion->es_base ? $producto->nombre : "{$producto->nombre} - {$presentacion->nombre}";
             }
 
@@ -1133,7 +1179,7 @@ class VentaService
 
             $descuentoLinea = $this->aMoneda($linea['descuento'] ?? '0');
             // Mismo redondeo que las estrategias de ITBIS (cantidad a 4 decimales, half-up).
-            $brutoLinea = bcadd(bcmul($precioUnitario, number_format($cantidad, 4, '.', ''), 6), '0.005', 2);
+            $brutoLinea = $this->bcround(bcmul($precioUnitario, $this->bcround($cantidad, 4), 6));
 
             // El descuento de línea viene del carrito del POS (client-controllable): negativo
             // subiría el precio; mayor que la línea la dejaría en negativo.
@@ -1146,7 +1192,7 @@ class VentaService
             }
 
             if (bccomp($proporcionDescuentoGlobal, '0', 12) > 0) {
-                $parteGlobal = bcadd(bcmul(bcsub($brutoLinea, $descuentoLinea, 2), $proporcionDescuentoGlobal, 6), '0.005', 2);
+                $parteGlobal = $this->bcround(bcmul(bcsub($brutoLinea, $descuentoLinea, 2), $proporcionDescuentoGlobal, 6));
                 $descuentoLinea = bccomp(bcadd($descuentoLinea, $parteGlobal, 2), $brutoLinea, 2) > 0
                     ? $brutoLinea
                     : bcadd($descuentoLinea, $parteGlobal, 2);
@@ -1184,12 +1230,12 @@ class VentaService
                 // Costo del momento (sin ITBIS) por unidad VENDIDA: una caja de 24 cuesta 24
                 // veces el costo base. Queda fijo en la línea para que los reportes de ganancia
                 // no cambien cuando luego cambie el costo del producto.
-                'costo_unitario' => bcadd(bcmul((string) $producto->costo, number_format($factor, 3, '.', ''), 6), '0.005', 2),
+                'costo_unitario' => $this->bcround(bcmul((string) $producto->costo, $this->bcround((string) $factor, 3), 6)),
             ];
 
             // El inventario SIEMPRE se mueve en unidad base: cantidad × factor (una caja de 24
             // consume 24 unidades base aunque la línea diga cantidad 1).
-            $productosLineas[] = ['producto' => $producto, 'cantidad' => $cantidad * $factor];
+            $productosLineas[] = ['producto' => $producto, 'cantidad' => bcmul($cantidad, $factor, 3)];
         }
 
         return [$detalles, $productosLineas, $acumulado];
@@ -1199,6 +1245,21 @@ class VentaService
     private function aMoneda(string|int|float $valor): string
     {
         return bcadd((string) $valor, '0', 2);
+    }
+
+    /**
+     * Redondeo HALF_UP puro vía bcmath (sin conversión a float).
+     *
+     * Reemplaza el truco anterior `bcadd($x, '0.005', 2)` que solo funcionaba
+     * para 2 decimales y no manejaba negativos.
+     */
+    private function bcround(string $valor, int $decimales = 2): string
+    {
+        $offset = '0.' . str_repeat('0', $decimales) . '5';
+
+        return bccomp($valor, '0', 10) >= 0
+            ? bcadd($valor, $offset, $decimales)
+            : bcsub($valor, $offset, $decimales);
     }
 
     /**

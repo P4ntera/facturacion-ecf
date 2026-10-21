@@ -8,4 +8,9 @@ use Filament\Resources\Pages\CreateRecord;
 class CreateCaja extends CreateRecord
 {
     protected static string $resource = CajaResource::class;
+
+    protected function getRedirectUrl(): string
+    {
+        return $this->getResource()::getUrl('index');
+    }
 }

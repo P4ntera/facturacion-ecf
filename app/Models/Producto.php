@@ -23,7 +23,7 @@ class Producto extends Model
     use LogsActivity;
 
     protected $fillable = [
-        'empresa_id', 'codigo', 'codigo_barra', 'nombre', 'descripcion', 'tipo', 'categoria_id',
+        'empresa_id', 'codigo', 'codigo_barra', 'nombre', 'descripcion', 'imagen', 'tipo', 'categoria_id',
         'costo', 'precio', 'tasa_itbis', 'controla_stock',
         'stock', 'stock_minimo', 'activo',
         'tipo_venta', 'unidad_base', 'precio_por_peso', 'margen_ganancia',
@@ -115,7 +115,7 @@ class Producto extends Model
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
-            ->logOnly(['codigo', 'codigo_barra', 'nombre', 'tipo', 'categoria_id', 'costo', 'precio', 'tasa_itbis', 'controla_stock', 'stock_minimo', 'activo', 'tipo_venta', 'unidad_base', 'precio_por_peso'])
+            ->logOnly(['codigo', 'codigo_barra', 'nombre', 'imagen', 'tipo', 'categoria_id', 'costo', 'precio', 'tasa_itbis', 'controla_stock', 'stock_minimo', 'activo', 'tipo_venta', 'unidad_base', 'precio_por_peso'])
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs()
             ->useLogName('Productos');

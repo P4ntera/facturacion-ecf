@@ -12,6 +12,7 @@ use App\Filament\Resources\VentaResource;
 use App\Models\Venta;
 use App\Services\ReporteService;
 use BackedEnum;
+use Filament\Facades\Filament;
 use Filament\Forms\Components\DatePicker;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\Summarizers\Summarizer;
@@ -123,7 +124,9 @@ class ReporteVentas extends ReportePage
 
                 SelectFilter::make('caja_id')
                     ->label('Caja')
-                    ->relationship('caja', 'nombre'),
+                    ->relationship('caja', 'nombre', modifyQueryUsing: fn ($query) => $query->where('empresa_id', Filament::getTenant()->id))
+                    ->searchable()
+                    ->preload(),
             ])
             ->defaultSort('fecha', 'desc');
     }

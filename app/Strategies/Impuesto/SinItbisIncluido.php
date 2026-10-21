@@ -11,7 +11,7 @@ final class SinItbisIncluido implements ImpuestoStrategy
 {
     use RedondeoMonetario;
 
-    public function calcular(string $precioUnitario, float $cantidad, string $descuento, TasaItbis $tasa): DesgloseLinea
+    public function calcular(string $precioUnitario, string $cantidad, string $descuento, TasaItbis $tasa): DesgloseLinea
     {
         $base = $this->redondear(bcsub(bcmul($precioUnitario, $this->formatearCantidad($cantidad), 6), $descuento, 6));
 

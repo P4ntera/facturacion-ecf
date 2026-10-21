@@ -1,30 +1,11 @@
+@use('Illuminate\Support\Facades\Storage')
 <x-filament-panels::page>
   <div
     class="pos-screen"
-    x-data
-    x-init="
-      /*
-       * Paso 1: el POS es una pantalla de trabajo, así que entra con el sidebar colapsado
-       * para aprovechar el ancho. Usamos el store global de Alpine que trae Filament
-       * ($store.sidebar, ver vendor/filament/filament/resources/js/stores/sidebar.js) para
-       * cerrarlo al montar esta página y restaurar el estado que tenía al salir de ella
-       * (evento `livewire:navigate`, que Livewire dispara justo antes de navegar a otra
-       * página). El botón de hamburguesa del topbar de Filament no se toca: sigue
-       * funcionando en todo momento para reabrir el sidebar manualmente.
-       */
-      let posSidebarAbiertoAntes = $store.sidebar.isOpen;
-      $store.sidebar.close();
-
-      let posRestaurarSidebar = () => {
-        if (posSidebarAbiertoAntes) {
-          $store.sidebar.open();
-        }
-        document.removeEventListener('livewire:navigate', posRestaurarSidebar);
-      };
-      document.addEventListener('livewire:navigate', posRestaurarSidebar);
-    "
-    x-on:abrir-ticket.window="window.open($event.detail.url, '_blank')"
-    x-on:producto-escaneado.window="$nextTick(() => $refs.buscadorProducto?.focus())"
+    x-data="{ modalCobro: false }"
+    x-on:abrir-ticket.window="modalCobro = false; window.open($event.detail.url, '_blank')"
+    x-on:producto-escaneado.window="$nextTick(() => { highlightProducto = -1; highlightCliente = -1; $refs.buscadorProducto?.focus(); })"
+    x-on:keydown.escape.window="modalCobro = false"
   >
     @if ($this->arqueoAbierto() === null)
       {{-- Sin caja abierta: se bloquea la pantalla de venta hasta abrirla --}}
@@ -78,14 +59,15 @@
               <input
                 type="text"
                 class="form-input"
-                placeholder="Buscar cliente por nombre o documento (opcional)..."
+                placeholder="Buscar cliente por nombre o documento..."
                 wire:model.live.debounce.300ms="busquedaCliente"
+                x-on:input="highlightCliente = -1"
               />
 
               @if ($busquedaCliente !== '')
-                <ul class="pos-resultados">
+                <ul class="pos-resultados pos-resultados-cliente">
                   @forelse ($this->clientesSugeridos() as $cliente)
-                    <li>
+                    <li :class="{ 'pos-highlight': highlightCliente === {{ $loop->index }} }">
                       <button type="button" wire:click="seleccionarCliente({{ $cliente->id }})">
                         <span>{{ $cliente->nombre }}</span>
                         @if ($cliente->documento)
@@ -142,19 +124,22 @@
           <input
             type="text"
             class="form-input"
-            x-ref="buscadorProducto"
-            placeholder="Buscar por código, nombre o escanear código de barras..."
+            placeholder="Buscar producto o escanear código..."
             wire:model.live.debounce.300ms="busquedaProducto"
             wire:keydown.enter="escanearOBuscar($event.target.value)"
+            x-on:input="highlightProducto = -1"
           />
 
           @if ($busquedaProducto !== '')
-            <ul class="pos-resultados">
+            <ul class="pos-resultados pos-resultados-producto">
               @forelse ($this->resultadosBusqueda() as $fila)
-                <li>
+                <li :class="{ 'pos-highlight': highlightProducto === {{ $loop->index }} }">
                   @if ($fila['tipo'] === 'pesado')
                     <div class="flex items-center justify-between gap-2 pos-resultado-pesado" x-data="{ peso: '1.000' }">
-                      <span>
+                      <span class="flex items-center gap-2">
+                        @if ($fila['imagen'])
+                          <img src="{{ Storage::disk('public')->url($fila['imagen']) }}" alt="" class="pos-thumb" />
+                        @endif
                         {{ $fila['etiqueta'] }}
                         <span class="pos-muted">({{ $fila['precio_texto'] }})</span>
                       </span>
@@ -174,7 +159,12 @@
                       type="button"
                       wire:click="{{ $fila['presentacion_id'] ? 'agregarPresentacion('.$fila['presentacion_id'].')' : 'agregarProducto('.$fila['producto_id'].')' }}"
                     >
-                      <span>{{ $fila['etiqueta'] }}</span>
+                      <span class="flex items-center gap-2">
+                        @if ($fila['imagen'])
+                          <img src="{{ Storage::disk('public')->url($fila['imagen']) }}" alt="" class="pos-thumb" />
+                        @endif
+                        {{ $fila['etiqueta'] }}
+                      </span>
                       <span class="flex items-center gap-2 pos-muted">
                         {{ $fila['precio_texto'] }}
                         @if ($fila['controla_stock'])
@@ -213,6 +203,9 @@
                   <tr wire:key="linea-{{ $indice }}">
                     <td>
                       {{ $linea['codigo'] }} — {{ $linea['nombre'] }}
+                      @if (in_array($linea['producto_id'], $this->productosEnPromocion()))
+                        <span class="badge badge-success" title="Promoción aplicada automáticamente">🏷️ Promo</span>
+                      @endif
                       @if ($this->lineaConStockInsuficiente($linea))
                         <div class="mt-1">
                           <span class="badge badge-danger">
@@ -265,6 +258,21 @@
 
       {{-- Totales --}}
       <div class="pos-side">
+        @if ($this->promocionesVigentes()->isNotEmpty())
+          <div class="card mb-2" style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 0.75rem;">
+            <h4 style="font-size: 0.85rem; font-weight: 600; color: #166534; margin-bottom: 0.5rem;">🏷️ Promociones activas</h4>
+            <ul style="list-style: none; padding: 0; margin: 0; font-size: 0.8rem;">
+              @foreach ($this->promocionesVigentes() as $promo)
+                <li style="padding: 0.2rem 0; color: #15803d;">
+                  <strong>{{ $promo->nombre }}</strong>
+                  <span style="color: #6b7280;">({{ $promo->tipo->etiqueta() }}{{ $promo->valor ? ' — ' . ($promo->tipo->value === 'porcentaje' ? $promo->valor . '%' : 'RD$ ' . number_format((float) $promo->valor, 2)) : '' }})</span>
+                  <span style="color: #9ca3af; font-size: 0.75rem;">hasta {{ $promo->fecha_fin->format('d/m/Y') }}</span>
+                </li>
+              @endforeach
+            </ul>
+          </div>
+        @endif
+
         <div class="card pos-totales">
           <h3 class="card-title">Totales</h3>
 
@@ -308,40 +316,119 @@
             </p>
           @endif
 
-          <div class="mt-2">
-            <label class="form-label">Forma de pago</label>
-            <select class="form-select" wire:model.live="formaPago">
-              @foreach ($this->formasPago() as $valor => $etiqueta)
-                <option value="{{ $valor }}">{{ $etiqueta }}</option>
-              @endforeach
-            </select>
-          </div>
-
-          <div class="mt-2">
-            <label class="form-label">
-              <input type="checkbox" wire:model.live="ventaACredito" />
-              Vender a crédito (fiar al cliente)
-            </label>
-          </div>
-
-          @if ($ventaACredito)
-            <div class="mt-2">
-              <label class="form-label">Fecha límite de pago</label>
-              <input type="date" class="form-input" wire:model.live="fechaLimitePago" />
-              <p style="color:var(--text-muted);font-size:0.8125rem;margin-top:0.25rem;">Si la dejas vacía, se usan 30 días desde hoy.</p>
-            </div>
-          @endif
-
           <button
             type="button"
-            class="btn btn-primary btn-cobrar mt-2"
-            wire:click="cobrar"
-            @disabled(! $this->puedeCobrar())
+            class="btn btn-cobrar-caja mt-2"
+            x-on:click="modalCobro = true"
+            @disabled(empty($carrito) || $this->hayLineasConStockInsuficiente())
           >
-            Cobrar
+            Cobrar — RD$ {{ number_format((float) ($totales['total'] ?? 0), 2) }}
           </button>
         </div>
       </div>
+      </div>
+
+      {{-- ============ MODAL DE COBRO ============ --}}
+      <div
+        class="pos-modal-overlay"
+        x-show="modalCobro"
+        x-cloak
+        x-transition:enter="pos-modal-enter"
+        x-transition:enter-start="pos-modal-enter-start"
+        x-transition:enter-end="pos-modal-enter-end"
+        x-transition:leave="pos-modal-leave"
+        x-transition:leave-start="pos-modal-leave-start"
+        x-transition:leave-end="pos-modal-leave-end"
+        x-on:click.self="modalCobro = false"
+      >
+        <div class="pos-modal" x-on:click.stop>
+          <div class="pos-modal-header">
+            <h3>Cobrar</h3>
+            <button type="button" class="pos-modal-close" x-on:click="modalCobro = false">&times;</button>
+          </div>
+
+          <div class="pos-modal-body">
+            {{-- Resumen del total --}}
+            <div class="pos-modal-total">
+              <span>Total a cobrar</span>
+              <span class="pos-total-valor">RD$ {{ number_format((float) $totales['total'], 2) }}</span>
+            </div>
+
+            {{-- Forma de pago --}}
+            <div class="mt-2">
+              <label class="form-label">Forma de pago</label>
+              <select class="form-select" wire:model.live="formaPago">
+                @foreach ($this->formasPago() as $valor => $etiqueta)
+                  <option value="{{ $valor }}">{{ $etiqueta }}</option>
+                @endforeach
+              </select>
+            </div>
+
+            @if ($formaPago === \App\Enums\FormaPago::EFECTIVO->value)
+              <div class="mt-2">
+                <label class="form-label">Monto recibido (efectivo)</label>
+                <input type="number" step="0.01" min="0" class="form-input" wire:model.live.debounce.400ms="montoEfectivo"
+                  placeholder="{{ $totales['total'] ?? '0.00' }}" />
+              </div>
+              @if (bccomp($this->vueltoCalculado(), '0.00', 2) > 0)
+                <div class="pos-modal-vuelto">
+                  Vuelto: RD$ {{ number_format((float) $this->vueltoCalculado(), 2) }}
+                </div>
+              @endif
+            @endif
+
+            @if ($formaPago === \App\Enums\FormaPago::MIXTO->value)
+              <div class="mt-2" style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;">
+                <div>
+                  <label class="form-label">Efectivo</label>
+                  <input type="number" step="0.01" min="0" class="form-input" wire:model.live.debounce.400ms="montoEfectivo" />
+                </div>
+                <div>
+                  <label class="form-label">Tarjeta</label>
+                  <input type="number" step="0.01" min="0" class="form-input" wire:model.live.debounce.400ms="montoTarjeta" />
+                </div>
+              </div>
+              @if (bccomp($this->vueltoCalculado(), '0.00', 2) > 0)
+                <div class="pos-modal-vuelto">
+                  Vuelto: RD$ {{ number_format((float) $this->vueltoCalculado(), 2) }}
+                </div>
+              @endif
+            @endif
+
+            <div class="mt-2">
+              <label class="form-label">
+                <input type="checkbox" wire:model.live="ventaACredito" />
+                Vender a crédito (fiar al cliente)
+              </label>
+            </div>
+
+            @if ($ventaACredito)
+              <div class="mt-2">
+                <label class="form-label">Fecha límite de pago</label>
+                <input type="date" class="form-input" wire:model.live="fechaLimitePago" />
+                <p style="color:var(--text-muted);font-size:0.8125rem;margin-top:0.25rem;">Si la dejas vacía, se usan 30 días desde hoy.</p>
+              </div>
+            @endif
+          </div>
+
+          <div class="pos-modal-footer">
+            <button
+              type="button"
+              class="btn btn-secondary"
+              x-on:click="modalCobro = false"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              class="btn btn-cobrar-caja"
+              wire:click="cobrar"
+              @disabled(! $this->puedeCobrar())
+            >
+              Confirmar cobro — RD$ {{ number_format((float) ($totales['total'] ?? 0), 2) }}
+            </button>
+          </div>
+        </div>
       </div>
     @endif
   </div>

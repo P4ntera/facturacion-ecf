@@ -2,15 +2,18 @@
 
 namespace Tests\Support;
 
+use App\Models\AreaRestaurante;
 use App\Models\Caja;
 use App\Models\Categoria;
 use App\Models\Cliente;
+use App\Models\Comanda;
 use App\Models\Compra;
 use App\Models\Cotizacion;
 use App\Models\Descuento;
 use App\Models\DevolucionCompra;
 use App\Models\Empresa;
 use App\Models\Impresora;
+use App\Models\Mesa;
 use App\Models\MovimientoInventario;
 use App\Models\OrdenCompra;
 use App\Models\Producto;
@@ -46,6 +49,9 @@ class TenantDefaults
         OrdenCompra::class,
         RecepcionCompra::class,
         Cotizacion::class,
+        AreaRestaurante::class,
+        Mesa::class,
+        Comanda::class,
         User::class,
         Descuento::class,
         Caja::class,

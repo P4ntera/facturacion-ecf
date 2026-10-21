@@ -52,7 +52,7 @@ class DevolucionCompraService
         }
 
         return DB::transaction(function () use ($datos, $userId, $empresa) {
-            $compra = Compra::where('empresa_id', $empresa->id)->findOrFail($datos['compra_id']);
+            $compra = Compra::lockForUpdate()->where('empresa_id', $empresa->id)->findOrFail($datos['compra_id']);
 
             if ($compra->estaAnulada()) {
                 throw new RuntimeException('No se puede devolver mercancía de una compra anulada.');
@@ -64,21 +64,21 @@ class DevolucionCompraService
                 $detalleCompra = DetalleCompra::where('compra_id', $compra->id)
                     ->findOrFail($linea['detalle_compra_id']);
 
-                $cantidad = (float) $linea['cantidad'];
+                $cantidad = (string) ($linea['cantidad'] ?? '0');
 
-                if ($cantidad <= 0) {
+                if (bccomp($cantidad, '0', 3) <= 0) {
                     throw new RuntimeException('La cantidad a devolver debe ser mayor a cero.');
                 }
 
-                $disponible = $detalleCompra->cantidadDisponibleParaDevolver();
+                $disponible = (string) $detalleCompra->cantidadDisponibleParaDevolver();
 
-                if ($cantidad > $disponible) {
+                if (bccomp($cantidad, $disponible, 3) > 0) {
                     throw new RuntimeException(
                         "No puedes devolver {$cantidad} de «{$detalleCompra->producto->nombre}»: solo hay {$disponible} disponible para devolver."
                     );
                 }
 
-                $cantidadStr = (string) $cantidad;
+                $cantidadStr = $cantidad;
                 $costoStr = (string) $detalleCompra->costo_unitario;
                 $porcentaje = $detalleCompra->tasa_itbis->porcentaje();
                 $porcentajeStr = (string) $porcentaje;
@@ -141,7 +141,7 @@ class DevolucionCompraService
             }
 
             if ($compra->cuentaPorPagar !== null) {
-                $this->cuentaPorPagarService->reducirPorDevolucion($compra->cuentaPorPagar, (float) $totales['total']); // @phpstan-ignore cast.useless
+                $this->cuentaPorPagarService->reducirPorDevolucion($compra->cuentaPorPagar, (string) $totales['total']);
             }
 
             return $devolucion->load('detalles.producto', 'compra.proveedor');
@@ -158,6 +158,13 @@ class DevolucionCompraService
         }
 
         return DB::transaction(function () use ($devolucion, $motivo, $userId) {
+            // Re-leer con lock para evitar anulación concurrente
+            $devolucion = DevolucionCompra::lockForUpdate()->findOrFail($devolucion->id);
+
+            if ($devolucion->estaAnulada()) {
+                throw new RuntimeException('La devolución ya está anulada.');
+            }
+
             foreach ($devolucion->detalles as $detalle) {
                 $producto = $detalle->producto;
 
@@ -166,7 +173,7 @@ class DevolucionCompraService
                         $producto,
                         TipoMovimiento::ENTRADA,
                         OrigenMovimiento::ANULACION,
-                        (float) $detalle->cantidad,
+                        (string) $detalle->cantidad,
                         $devolucion->id,
                         $userId,
                         "Anulación devolución #{$devolucion->id}",
@@ -177,7 +184,7 @@ class DevolucionCompraService
             $cuentaPorPagar = $devolucion->compra->cuentaPorPagar;
 
             if ($cuentaPorPagar !== null) {
-                $this->cuentaPorPagarService->restaurarPorAnulacionDevolucion($cuentaPorPagar, (float) $devolucion->total);
+                $this->cuentaPorPagarService->restaurarPorAnulacionDevolucion($cuentaPorPagar, (string) $devolucion->total);
             }
 
             $devolucion->update([

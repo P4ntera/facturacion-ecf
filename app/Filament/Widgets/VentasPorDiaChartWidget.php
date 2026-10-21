@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Widgets;
 
 use App\Services\ReporteService;
+use Filament\Facades\Filament;
 use Filament\Widgets\ChartWidget;
 use Illuminate\Support\Carbon;
 
@@ -31,7 +32,7 @@ class VentasPorDiaChartWidget extends ChartWidget
         $desde = Carbon::today()->subDays(29);
         $hasta = Carbon::today();
 
-        $serie = app(ReporteService::class)->ventasPorDia($desde, $hasta);
+        $serie = app(ReporteService::class)->ventasPorDia($desde, $hasta, Filament::getTenant()->id);
 
         $etiquetas = [];
         $totales = [];

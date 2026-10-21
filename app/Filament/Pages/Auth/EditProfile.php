@@ -44,6 +44,7 @@ class EditProfile extends BaseEditProfile
                 ->activas()
                 ->porModulo(ModuloImpresion::FACTURACION))
             ->preload()
+            ->searchable()
             ->native(false);
     }
 }

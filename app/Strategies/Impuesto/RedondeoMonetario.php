@@ -14,8 +14,8 @@ trait RedondeoMonetario
         return bcadd($numero, $ajuste, 2);
     }
 
-    private function formatearCantidad(float $cantidad): string
+    private function formatearCantidad(string $cantidad): string
     {
-        return number_format($cantidad, 4, '.', '');
+        return number_format((float) $cantidad, 4, '.', '');
     }
 }

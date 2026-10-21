@@ -9,6 +9,7 @@ use App\Filament\Exports\ReporteArqueosExporter;
 use App\Services\ReporteService;
 use BackedEnum;
 use Filament\Forms\Components\DatePicker;
+use Filament\Facades\Filament;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
@@ -105,7 +106,7 @@ class ReporteArqueos extends ReportePage
 
                 SelectFilter::make('user_id')
                     ->label('Cajero')
-                    ->relationship('user', 'name')
+                    ->relationship('user', 'name', modifyQueryUsing: fn ($query) => $query->where('empresa_id', Filament::getTenant()->id))
                     ->searchable()
                     ->preload(),
 
@@ -115,7 +116,7 @@ class ReporteArqueos extends ReportePage
 
                 SelectFilter::make('caja_id')
                     ->label('Caja')
-                    ->relationship('caja', 'nombre')
+                    ->relationship('caja', 'nombre', modifyQueryUsing: fn ($query) => $query->where('empresa_id', Filament::getTenant()->id))
                     ->searchable()
                     ->preload(),
             ])

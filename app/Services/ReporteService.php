@@ -6,8 +6,10 @@ namespace App\Services;
 
 use App\Enums\EstadoCompra;
 use App\Enums\EstadoVenta;
+use App\Enums\FormaPago;
 use App\Enums\TipoComprobante;
 use App\Enums\TipoDocumentoCliente;
+use App\Enums\TipoPago;
 use App\Models\Compra;
 use App\Models\ArqueoCaja;
 use App\Models\CuentaPorCobrar;
@@ -40,21 +42,21 @@ class ReporteService
      * anulación (venta_modificada_id) — la venta que anulan ya queda fuera por ANULADA, así que
      * contar la nota restaría (o sumaría) dos veces.
      */
-    protected function ventasEmitidasEnRango(Carbon $desde, Carbon $hasta): Builder
+    protected function ventasEmitidasEnRango(Carbon $desde, Carbon $hasta, ?int $empresaId = null): Builder
     {
         return Venta::query()
             ->whereBetween('fecha', [$desde->copy()->startOfDay(), $hasta->copy()->endOfDay()])
             ->where('estado', '!=', EstadoVenta::ANULADA)
-            ->whereNull('venta_modificada_id');
+            ->whereNull('venta_modificada_id')
+            ->when($empresaId, fn (Builder $query, int $id) => $query->where('empresa_id', $id));
     }
 
     /**
      * Todas las ventas del rango (incluye ANULADAs) para el listado del reporte de ventas:
      * a diferencia de los agregados de ingresos, aquí interesa la trazabilidad completa.
      *
-     * $empresaId: solo lo necesitan los controllers de PDF (rutas fuera del panel de Filament,
-     * donde el scoping automático por tenant no aplica). Los widgets del dashboard, que corren
-     * dentro del panel, no lo pasan porque ya llegan scopeados por el global scope de Filament.
+     * $empresaId: todos los consumidores (widgets, controllers, PDF) deben pasarlo explícitamente
+     * para no depender del scoping automático de Filament (falla en colas, tests, comandos).
      */
     public function ventasEnRangoQuery(Carbon $desde, Carbon $hasta, ?int $empresaId = null): Builder
     {
@@ -131,6 +133,112 @@ class ReporteService
                 'itbis_facturado' => (string) $venta->total_itbis,
                 'monto_total' => (string) $venta->total,
             ]);
+    }
+
+    /**
+     * Genera el contenido TXT del formato 607 según Norma General 07-2018 de la DGII.
+     *
+     * Layout: pipe-separated, 23 columnas por fila.
+     * Cabecera: 607|RNC_EMPRESA|AAAAMM|CANTIDAD_REGISTROS
+     *
+     * Columnas detalle:
+     *  1  RNC/Cédula comprador         8  Monto facturado (sin ITBIS)    15 Otros impuestos/tasas
+     *  2  Tipo identificación          9  ITBIS facturado                16 Monto propina legal
+     *  3  NCF                         10  ITBIS retenido por terceros    17 Efectivo (con impuestos)
+     *  4  NCF modificado              11  ITBIS percibido                18 Cheque/Transf/Depósito
+     *  5  Tipo de ingreso             12  Retención renta por terceros   19 Tarjeta déb/créd
+     *  6  Fecha comprobante (AAAAMMDD)13  ISR percibido                  20 Venta a crédito
+     *  7  Fecha retención (AAAAMMDD)  14  Impuesto selectivo al consumo  21 Bonos/certificados regalo
+     *                                                                    22 Permuta
+     *                                                                    23 Otras formas de ventas
+     *
+     * Columnas 17-23: formas de pago INCLUYENDO impuestos; su suma = total factura.
+     *
+     * Nombre de archivo sugerido: DGII_F_607_{RNC}_{AAAAMM}.TXT
+     */
+    public function reporte607Txt(Carbon $desde, Carbon $hasta, int $empresaId, string $rncEmpresa): string
+    {
+        $periodo = $desde->format('Ym');
+
+        $ventas = $this->reporte607Query($desde, $hasta, $empresaId)
+            ->orderBy('fecha')
+            ->get();
+
+        $lineas = [];
+
+        foreach ($ventas as $venta) {
+            /** @var Venta $venta */
+            $rncCedula = $this->rncCedula607($venta->cliente?->tipo_documento, $venta->cliente?->documento);
+            $tipoId    = $this->tipoIdentificacion607($venta->cliente?->tipo_documento);
+
+            // Formas de pago (cols 17-23): el monto incluye impuestos → va el total.
+            // Si es crédito, todo va a la columna 20.
+            $efectivo      = '0.00';
+            $transferencia = '0.00';
+            $tarjeta       = '0.00';
+            $credito       = '0.00';
+
+            if ($venta->tipo_pago === TipoPago::CREDITO) {
+                $credito = number_format((float) $venta->total, 2, '.', '');
+            } else {
+                switch ($venta->forma_pago) {
+                    case FormaPago::EFECTIVO:
+                        // En efectivo puro se usa el total (ya descontado el vuelto).
+                        $efectivo = number_format((float) $venta->total, 2, '.', '');
+                        break;
+                    case FormaPago::TARJETA:
+                        $tarjeta = number_format((float) $venta->total, 2, '.', '');
+                        break;
+                    case FormaPago::TRANSFERENCIA:
+                        $transferencia = number_format((float) $venta->total, 2, '.', '');
+                        break;
+                    case FormaPago::MIXTO:
+                        // En MIXTO: monto_efectivo puede incluir exceso (vuelto). La DGII
+                        // exige que cols 17-23 sumen exactamente al total, así que restamos
+                        // el vuelto del efectivo reportado.
+                        $vuelto = (float) ($venta->vuelto ?? 0);
+                        $efectivo = number_format((float) ($venta->monto_efectivo ?? 0) - $vuelto, 2, '.', '');
+                        $tarjeta  = number_format((float) ($venta->monto_tarjeta ?? 0), 2, '.', '');
+                        break;
+                    default:
+                        // Fallback: todo a efectivo.
+                        $efectivo = number_format((float) $venta->total, 2, '.', '');
+                }
+            }
+
+            $campos = [
+                $rncCedula ?? '',                                                    // 1  RNC/Cédula
+                $tipoId !== null ? (string) $tipoId : '',                            // 2  Tipo Identificación
+                $venta->ncf,                                                         // 3  NCF
+                $venta->ncf_modifica ?? '',                                           // 4  NCF Modificado
+                self::TIPO_INGRESO_DEFECTO,                                          // 5  Tipo de Ingreso
+                $venta->fecha->format('Ymd'),                                        // 6  Fecha Comprobante
+                '',                                                                  // 7  Fecha Retención
+                number_format((float) $venta->subtotalNeto(), 2, '.', ''),           // 8  Monto Facturado
+                number_format((float) $venta->total_itbis, 2, '.', ''),              // 9  ITBIS Facturado
+                '',                                                                  // 10 ITBIS Retenido por Terceros
+                '',                                                                  // 11 ITBIS Percibido
+                '',                                                                  // 12 Retención Renta por Terceros
+                '',                                                                  // 13 ISR Percibido
+                '',                                                                  // 14 Impuesto Selectivo al Consumo
+                '',                                                                  // 15 Otros Impuestos/Tasas
+                '',                                                                  // 16 Monto Propina Legal
+                $efectivo,                                                           // 17 Efectivo
+                $transferencia,                                                      // 18 Cheque/Transferencia/Depósito
+                $tarjeta,                                                            // 19 Tarjeta Débito/Crédito
+                $credito,                                                            // 20 Venta a Crédito
+                '',                                                                  // 21 Bonos o Certificados de Regalo
+                '',                                                                  // 22 Permuta
+                '',                                                                  // 23 Otras Formas de Ventas
+            ];
+
+            $lineas[] = implode('|', $campos);
+        }
+
+        // Cabecera: 607|RNC_EMPRESA|PERIODO|CANTIDAD
+        $cabecera = implode('|', ['607', $rncEmpresa, $periodo, (string) count($lineas)]);
+
+        return $cabecera."\n".implode("\n", $lineas);
     }
 
     /**
@@ -433,9 +541,9 @@ class ReporteService
     /**
      * @return array{total_vendido: string, total_itbis: string, cantidad_ventas: int, ticket_promedio: string}
      */
-    public function ventasPorRango(Carbon $desde, Carbon $hasta): array
+    public function ventasPorRango(Carbon $desde, Carbon $hasta, ?int $empresaId = null): array
     {
-        $fila = $this->ventasEmitidasEnRango($desde, $hasta)
+        $fila = $this->ventasEmitidasEnRango($desde, $hasta, $empresaId)
             ->selectRaw('COALESCE(SUM(total), 0) as total_vendido')
             ->selectRaw('COALESCE(SUM(total_itbis), 0) as total_itbis')
             ->selectRaw('COUNT(*) as cantidad_ventas')
@@ -460,12 +568,12 @@ class ReporteService
      *
      * @return array{electronicos: int, fisicos: int}
      */
-    public function desgloseComprobantes(Carbon $desde, Carbon $hasta): array
+    public function desgloseComprobantes(Carbon $desde, Carbon $hasta, ?int $empresaId = null): array
     {
         $tiposElectronicos = collect(TipoComprobante::cases())->filter->esElectronico()->map->value->all();
         $tiposFisicos = collect(TipoComprobante::cases())->filter->esFisico()->map->value->all();
 
-        $base = $this->ventasEmitidasEnRango($desde, $hasta)->whereNotNull('ncf');
+        $base = $this->ventasEmitidasEnRango($desde, $hasta, $empresaId)->whereNotNull('ncf');
 
         return [
             'electronicos' => (clone $base)->whereIn('tipo_comprobante', $tiposElectronicos)->count(),
@@ -478,9 +586,9 @@ class ReporteService
      *
      * @return Collection<string, string>
      */
-    public function ventasPorDia(Carbon $desde, Carbon $hasta): Collection
+    public function ventasPorDia(Carbon $desde, Carbon $hasta, ?int $empresaId = null): Collection
     {
-        return $this->ventasEmitidasEnRango($desde, $hasta)
+        return $this->ventasEmitidasEnRango($desde, $hasta, $empresaId)
             ->selectRaw('DATE(fecha) as dia')
             ->selectRaw('COALESCE(SUM(total), 0) as total')
             ->groupBy('dia')
@@ -507,9 +615,9 @@ class ReporteService
     /**
      * @return array{por_cantidad: Collection, por_ingresos: Collection}
      */
-    public function topProductos(Carbon $desde, Carbon $hasta, int $limite = 10): array
+    public function topProductos(Carbon $desde, Carbon $hasta, int $limite = 10, ?int $empresaId = null): array
     {
-        $base = $this->productosVendidosQuery($desde, $hasta);
+        $base = $this->productosVendidosQuery($desde, $hasta, $empresaId);
 
         return [
             'por_cantidad' => (clone $base)->orderByDesc('cantidad_vendida')->limit($limite)->get(),
@@ -519,8 +627,7 @@ class ReporteService
 
     public function ventasPorClienteQuery(Carbon $desde, Carbon $hasta, ?int $empresaId = null): Builder
     {
-        return $this->ventasEmitidasEnRango($desde, $hasta)
-            ->when($empresaId, fn (Builder $query, int $id) => $query->where('ventas.empresa_id', $id))
+        return $this->ventasEmitidasEnRango($desde, $hasta, $empresaId)
             // leftJoin: las ventas al portador (cliente_id null) se agrupan en una sola fila.
             ->leftJoin('clientes', 'clientes.id', '=', 'ventas.cliente_id')
             ->groupBy('clientes.id', 'clientes.nombre')
@@ -533,15 +640,14 @@ class ReporteService
             ->selectRaw('COUNT(*) as cantidad_ventas');
     }
 
-    public function ventasPorCliente(Carbon $desde, Carbon $hasta): Collection
+    public function ventasPorCliente(Carbon $desde, Carbon $hasta, ?int $empresaId = null): Collection
     {
-        return $this->ventasPorClienteQuery($desde, $hasta)->orderByDesc('total_vendido')->get();
+        return $this->ventasPorClienteQuery($desde, $hasta, $empresaId)->orderByDesc('total_vendido')->get();
     }
 
     public function ventasPorUsuarioQuery(Carbon $desde, Carbon $hasta, ?int $empresaId = null): Builder
     {
-        return $this->ventasEmitidasEnRango($desde, $hasta)
-            ->when($empresaId, fn (Builder $query, int $id) => $query->where('ventas.empresa_id', $id))
+        return $this->ventasEmitidasEnRango($desde, $hasta, $empresaId)
             ->join('users', 'users.id', '=', 'ventas.user_id')
             ->groupBy('users.id', 'users.name')
             ->selectRaw('users.id as id, users.id as user_id, users.name as user_nombre')
@@ -549,19 +655,20 @@ class ReporteService
             ->selectRaw('COUNT(*) as cantidad_ventas');
     }
 
-    public function ventasPorUsuario(Carbon $desde, Carbon $hasta): Collection
+    public function ventasPorUsuario(Carbon $desde, Carbon $hasta, ?int $empresaId = null): Collection
     {
-        return $this->ventasPorUsuarioQuery($desde, $hasta)->orderByDesc('total_vendido')->get();
+        return $this->ventasPorUsuarioQuery($desde, $hasta, $empresaId)->orderByDesc('total_vendido')->get();
     }
 
     /**
      * Conteo por estado_fiscal, separado también por estado (emitida/anulada): incluye
      * anuladas porque el propósito aquí es monitoreo del ciclo fiscal DGII, no ingresos.
      */
-    public function ventasPorEstadoFiscal(Carbon $desde, Carbon $hasta): Collection
+    public function ventasPorEstadoFiscal(Carbon $desde, Carbon $hasta, ?int $empresaId = null): Collection
     {
         return Venta::query()
             ->whereBetween('fecha', [$desde->copy()->startOfDay(), $hasta->copy()->endOfDay()])
+            ->when($empresaId, fn (Builder $query, int $id) => $query->where('empresa_id', $id))
             ->groupBy('estado', 'estado_fiscal')
             ->selectRaw('estado, estado_fiscal, COUNT(*) as cantidad')
             ->orderBy('estado_fiscal')
@@ -593,9 +700,9 @@ class ReporteService
     /**
      * @return Collection<int, Producto>
      */
-    public function productosBajoMinimo(): Collection
+    public function productosBajoMinimo(?int $empresaId = null): Collection
     {
-        return $this->productosBajoMinimoQuery()->orderBy('nombre')->get();
+        return $this->productosBajoMinimoQuery($empresaId)->orderBy('nombre')->get();
     }
 
     // ──────────────────────────────────────────────────────────────────────

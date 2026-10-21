@@ -62,4 +62,9 @@ class EditEmpresa extends EditRecord
 
         app(ModulosEmpresaService::class)->actualizarModulos($record, $this->data['modulos'] ?? []);
     }
+
+    protected function getRedirectUrl(): string
+    {
+        return $this->getResource()::getUrl('index');
+    }
 }

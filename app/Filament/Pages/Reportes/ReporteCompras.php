@@ -10,6 +10,7 @@ use App\Filament\Exports\ReporteComprasExporter;
 use App\Services\ReporteService;
 use BackedEnum;
 use Filament\Forms\Components\DatePicker;
+use Filament\Facades\Filament;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\Summarizers\Summarizer;
 use Filament\Tables\Columns\TextColumn;
@@ -108,7 +109,7 @@ class ReporteCompras extends ReportePage
 
                 SelectFilter::make('proveedor_id')
                     ->label('Proveedor')
-                    ->relationship('proveedor', 'nombre')
+                    ->relationship('proveedor', 'nombre', modifyQueryUsing: fn ($query) => $query->where('empresa_id', Filament::getTenant()->id))
                     ->searchable()
                     ->preload(),
 

@@ -8,4 +8,9 @@ use Filament\Resources\Pages\EditRecord;
 class EditCaja extends EditRecord
 {
     protected static string $resource = CajaResource::class;
+
+    protected function getRedirectUrl(): string
+    {
+        return $this->getResource()::getUrl('index');
+    }
 }

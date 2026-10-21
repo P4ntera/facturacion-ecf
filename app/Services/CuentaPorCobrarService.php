@@ -35,20 +35,25 @@ class CuentaPorCobrarService
      */
     public function registrarPago(CuentaPorCobrar $cuenta, array $datos, int $userId): PagoRecibido
     {
-        $monto = (float) ($datos['monto'] ?? 0);
+        $monto = $datos['monto'] ?? '0';
 
-        if ($monto <= 0) {
+        if (bccomp($monto, '0', 2) <= 0) {
             throw new RuntimeException('El monto del pago debe ser mayor a cero.');
         }
 
-        if ($monto > $cuenta->montoPendiente()) {
-            throw new PagoExcedeSaldoException(
-                "El pago (RD$" . number_format($monto, 2) . ') supera el monto pendiente (RD$'
-                . number_format($cuenta->montoPendiente(), 2) . ').'
-            );
-        }
-
         return DB::transaction(function () use ($cuenta, $datos, $monto, $userId) {
+            // Bloquear la cuenta dentro de la transacción para evitar pagos concurrentes
+            $cuenta = CuentaPorCobrar::lockForUpdate()->findOrFail($cuenta->id);
+
+            $pendiente = bcsub((string) $cuenta->monto_total, (string) $cuenta->monto_pagado, 2);
+
+            if (bccomp($monto, $pendiente, 2) > 0) {
+                throw new PagoExcedeSaldoException(
+                    "El pago (RD$" . number_format((float) $monto, 2) . ') supera el monto pendiente (RD$'
+                    . number_format((float) $pendiente, 2) . ').'
+                );
+            }
+
             $pago = PagoRecibido::create([
                 'empresa_id' => $cuenta->empresa_id,
                 'cuenta_por_cobrar_id' => $cuenta->id,
@@ -60,7 +65,9 @@ class CuentaPorCobrarService
                 'estado' => EstadoPago::REGISTRADO,
             ]);
 
-            $cuenta->update(['monto_pagado' => (float) $cuenta->monto_pagado + $monto]);
+            $cuenta->update([
+                'monto_pagado' => bcadd((string) $cuenta->monto_pagado, $monto, 2),
+            ]);
 
             return $pago;
         });
@@ -73,8 +80,11 @@ class CuentaPorCobrarService
         }
 
         return DB::transaction(function () use ($pago, $motivo) {
-            $cuenta = $pago->cuentaPorCobrar;
-            $cuenta->update(['monto_pagado' => (float) $cuenta->monto_pagado - (float) $pago->monto]);
+            $cuenta = CuentaPorCobrar::lockForUpdate()->findOrFail($pago->cuenta_por_cobrar_id);
+
+            $cuenta->update([
+                'monto_pagado' => bcsub((string) $cuenta->monto_pagado, (string) $pago->monto, 2),
+            ]);
 
             $pago->update([
                 'estado' => EstadoPago::ANULADO,

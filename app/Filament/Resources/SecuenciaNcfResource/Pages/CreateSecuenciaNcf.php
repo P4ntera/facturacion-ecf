@@ -15,6 +15,11 @@ class CreateSecuenciaNcf extends CreateRecord
 {
     protected static string $resource = SecuenciaNcfResource::class;
 
+    protected function getRedirectUrl(): string
+    {
+        return $this->getResource()::getUrl('index');
+    }
+
     protected function mutateFormDataBeforeCreate(array $data): array
     {
         $data['secuencia_actual'] = $data['secuencia_desde'];

@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Enums\PerfilEmpresa;
 use App\Models\Empresa;
 use App\Models\Role;
 use App\Models\User;
 use App\Support\Permisos;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Spatie\Permission\PermissionRegistrar;
 
 /**
@@ -22,7 +24,7 @@ class RolesEmpresaService
     public function sembrarRolesBase(Empresa $empresa): void
     {
         $this->dentroDelContextoDe($empresa, function () use ($empresa) {
-            $administrador = Role::firstOrCreate([
+            $administrador = $this->rolSeguro([
                 'empresa_id' => $empresa->id,
                 'name' => 'Administrador',
                 'guard_name' => 'web',
@@ -32,7 +34,7 @@ class RolesEmpresaService
             // no solo los del catálogo.
             $administrador->syncPermissions([...Permisos::todos(), 'gestionar_arqueo_caja']);
 
-            $vendedor = Role::firstOrCreate([
+            $vendedor = $this->rolSeguro([
                 'empresa_id' => $empresa->id,
                 'name' => 'Vendedor',
                 'guard_name' => 'web',
@@ -44,12 +46,14 @@ class RolesEmpresaService
                 'pos.acceder',
                 'facturacion.acceder',
                 'ventas.ver',
+                'ventas.aplicar_descuento',
                 'ventas.imprimir',
                 'gestionar_arqueo_caja',
                 // "Maestros" del Vendedor se limita a consultar lo que necesita para vender
                 // (precios de productos, datos de clientes); crear/editar/desactivar maestros
                 // queda fuera de su pantalla de trabajo.
                 'productos.ver',
+                'promociones.ver',
                 'clientes.ver',
                 // Exportar va junto con ver: un vendedor que puede consultar un reporte también
                 // necesita poder sacarlo en PDF/Excel para el día a día (cierre de caja, etc.).
@@ -66,7 +70,7 @@ class RolesEmpresaService
                 'cotizaciones.exportar',
             ]);
 
-            $almacenista = Role::firstOrCreate([
+            $almacenista = $this->rolSeguro([
                 'empresa_id' => $empresa->id,
                 'name' => 'Almacenista',
                 'guard_name' => 'web',
@@ -97,6 +101,36 @@ class RolesEmpresaService
                 // (las de NCF, e-CF y cuentas son del Administrador).
                 'notificaciones.stock_bajo',
             ]);
+
+            if ($empresa->perfil === PerfilEmpresa::RESTAURANTE) {
+                $mesero = $this->rolSeguro([
+                    'empresa_id' => $empresa->id,
+                    'name' => 'Mesero',
+                    'guard_name' => 'web',
+                ]);
+                $mesero->syncPermissions([
+                    'pos.acceder',
+                    'ventas.ver',
+                    'ventas.imprimir',
+                    'productos.ver',
+                    'clientes.ver',
+                    'comandas.ver',
+                    'comandas.crear',
+                    'comandas.editar',
+                    'comandas.cerrar',
+                    'mesas.ver',
+                ]);
+
+                $cocinero = $this->rolSeguro([
+                    'empresa_id' => $empresa->id,
+                    'name' => 'Cocinero',
+                    'guard_name' => 'web',
+                ]);
+                $cocinero->syncPermissions([
+                    'cocina.ver',
+                    'cocina.preparar',
+                ]);
+            }
         });
 
         app(PermissionRegistrar::class)->forgetCachedPermissions();
@@ -109,6 +143,22 @@ class RolesEmpresaService
             $usuario->unsetRelation('roles')->unsetRelation('permissions');
             $usuario->assignRole('Administrador');
         });
+    }
+
+    /**
+     * firstOrCreate seguro: si el INSERT viola la unique constraint (race condition, doble
+     * request, o desajuste entre el scope de Spatie y la constraint de BD), recupera el
+     * registro existente en vez de lanzar.
+     */
+    private function rolSeguro(array $atributos): Role
+    {
+        try {
+            return Role::firstOrCreate($atributos);
+        } catch (UniqueConstraintViolationException) {
+            // El registro existe pero el SELECT de firstOrCreate no lo encontró (scope de
+            // Spatie vs constraint de BD). Lo buscamos sin scope global.
+            return Role::withoutGlobalScopes()->where($atributos)->firstOrFail();
+        }
     }
 
     /**

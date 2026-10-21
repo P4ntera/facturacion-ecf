@@ -8,6 +8,8 @@ use App\Filament\Exports\Reporte607Exporter;
 use App\Models\Venta;
 use App\Services\ReporteService;
 use BackedEnum;
+use Filament\Actions\Action;
+use Filament\Facades\Filament;
 use Filament\Forms\Components\DatePicker;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\Summarizers\Sum;
@@ -17,6 +19,7 @@ use Filament\Tables\Filters\Filter;
 use Filament\Tables\Table;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Facades\DB;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * Formato 607 (Envío de Ventas de Bienes y Servicios) de la DGII. La regla fiscal de qué se
@@ -106,6 +109,41 @@ class ReporteFiscal607 extends ReportePage
                     ]),
             ])
             ->defaultSort('fecha');
+    }
+
+    protected function getHeaderActions(): array
+    {
+        return [
+            Action::make('exportarTxt')
+                ->label('Exportar TXT (DGII)')
+                ->icon(Heroicon::OutlinedDocumentArrowDown)
+                ->color('success')
+                ->visible(auth()->user()?->can('reportes.exportar') ?? false)
+                ->action(function (): StreamedResponse {
+                    /** @var \App\Models\Empresa $empresa */
+                    $empresa = Filament::getTenant();
+                    $servicio = app(ReporteService::class);
+                    $desde = $this->rangoDesde();
+                    $hasta = $this->rangoHasta();
+
+                    $contenido = $servicio->reporte607Txt(
+                        $desde,
+                        $hasta,
+                        $empresa->id,
+                        $empresa->rnc,
+                    );
+
+                    $nombreArchivo = 'DGII_F_607_'.$empresa->rnc.'_'.$desde->format('Ym').'.TXT';
+
+                    return response()->streamDownload(function () use ($contenido) {
+                        echo $contenido;
+                    }, $nombreArchivo, [
+                        'Content-Type' => 'text/plain',
+                    ]);
+                }),
+
+            ...parent::getHeaderActions(),
+        ];
     }
 
     protected function pdfRouteName(): string

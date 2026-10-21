@@ -18,6 +18,7 @@ enum Modulo: string
     case MAESTROS_PRODUCTOS = 'maestros_productos';
     case MAESTROS_CATEGORIAS = 'maestros_categorias';
     case MAESTROS_DESCUENTOS = 'maestros_descuentos';
+    case MAESTROS_PROMOCIONES = 'maestros_promociones';
     case MAESTROS_LISTAS_PRECIO = 'maestros_listas_precio';
 
     case COTIZACIONES = 'cotizaciones';
@@ -40,6 +41,10 @@ enum Modulo: string
     case ECF_SECUENCIAS = 'ecf_secuencias';
     case ECF_RECIBIDOS = 'ecf_recibidos';
 
+    case RESTAURANTE_MESAS = 'restaurante_mesas';
+    case RESTAURANTE_COMANDAS = 'restaurante_comandas';
+    case RESTAURANTE_COCINA = 'restaurante_cocina';
+
     case IMPRESORAS = 'impresoras';
     case AUDITORIA = 'auditoria';
 
@@ -51,6 +56,7 @@ enum Modulo: string
             self::MAESTROS_PRODUCTOS => 'Productos',
             self::MAESTROS_CATEGORIAS => 'Categorías',
             self::MAESTROS_DESCUENTOS => 'Descuentos',
+            self::MAESTROS_PROMOCIONES => 'Promociones',
             self::MAESTROS_LISTAS_PRECIO => 'Listas de Precio',
             self::COTIZACIONES => 'Cotizaciones',
             self::VENTAS_POS => 'Punto de Venta',
@@ -66,6 +72,9 @@ enum Modulo: string
             self::CUENTAS_POR_PAGAR => 'Cuentas por Pagar',
             self::ECF_SECUENCIAS => 'Secuencias NCF',
             self::ECF_RECIBIDOS => 'e-CF Recibidos',
+            self::RESTAURANTE_MESAS => 'Mesas',
+            self::RESTAURANTE_COMANDAS => 'Comandas',
+            self::RESTAURANTE_COCINA => 'Cocina (KDS)',
             self::IMPRESORAS => 'Impresoras',
             self::AUDITORIA => 'Auditoría',
         };
@@ -77,7 +86,8 @@ enum Modulo: string
         return match ($this) {
             self::MAESTROS_CLIENTES, self::MAESTROS_PROVEEDORES,
             self::MAESTROS_PRODUCTOS, self::MAESTROS_CATEGORIAS,
-            self::MAESTROS_DESCUENTOS, self::MAESTROS_LISTAS_PRECIO => 'Maestros',
+            self::MAESTROS_DESCUENTOS, self::MAESTROS_PROMOCIONES,
+            self::MAESTROS_LISTAS_PRECIO => 'Maestros',
 
             self::COTIZACIONES => 'Comercial',
 
@@ -92,6 +102,9 @@ enum Modulo: string
             self::CUENTAS_POR_COBRAR, self::CUENTAS_POR_PAGAR => 'Cuentas',
 
             self::ECF_SECUENCIAS, self::ECF_RECIBIDOS => 'e-CF',
+
+            self::RESTAURANTE_MESAS, self::RESTAURANTE_COMANDAS,
+            self::RESTAURANTE_COCINA => 'Restaurante',
 
             self::IMPRESORAS, self::AUDITORIA => 'Configuración',
         };
@@ -122,6 +135,8 @@ enum Modulo: string
             self::DEVOLUCIONES => [self::COMPRAS],
             self::CUENTAS_POR_COBRAR => [self::VENTAS_LISTADO],
             self::CUENTAS_POR_PAGAR => [self::COMPRAS],
+            self::RESTAURANTE_COMANDAS => [self::RESTAURANTE_MESAS],
+            self::RESTAURANTE_COCINA => [self::RESTAURANTE_COMANDAS],
             default => [],
         };
     }

@@ -7,6 +7,7 @@ namespace App\Models;
 use App\Enums\AmbienteEcf;
 use App\Enums\FormaReembolso;
 use App\Enums\MetodoCosto;
+use App\Enums\ModoImpresionPos;
 use App\Enums\RedondeoPrecio;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -32,6 +33,7 @@ class EmpresaConfiguracion extends Model
         'tasa_itbis_defecto',
         'tipo_comprobante_defecto',
         'permite_ventas_sin_comprobante',
+        'modo_impresion_pos',
         'moneda',
         'dgii_api_key',
         'dgii_ambiente',
@@ -52,6 +54,7 @@ class EmpresaConfiguracion extends Model
         'aplica_itbis' => 'boolean',
         'precio_incluye_itbis' => 'boolean',
         'permite_ventas_sin_comprobante' => 'boolean',
+        'modo_impresion_pos' => ModoImpresionPos::class,
         'dgii_ambiente' => AmbienteEcf::class,
         'dgii_api_key' => 'encrypted',
         'certificado_password' => 'encrypted',
@@ -74,6 +77,7 @@ class EmpresaConfiguracion extends Model
         'tasa_itbis_defecto' => '18',
         'tipo_comprobante_defecto' => '32',
         'permite_ventas_sin_comprobante' => false,
+        'modo_impresion_pos' => 'directa',
         'moneda' => 'DOP',
         'dgii_ambiente' => 'TesteCF',
         'dgii_base_url' => 'https://sandbox.pac-ecf.example.do/api/v1',

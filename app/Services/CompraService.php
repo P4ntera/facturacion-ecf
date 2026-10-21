@@ -80,6 +80,22 @@ class CompraService
                 $ncf = $datos['ncf'] ?? null;
             }
 
+            // NCF del proveedor no puede estar duplicado para la misma empresa+proveedor
+            // (evita registrar la misma factura dos veces).
+            if (! $proveedor->esInformal() && filled($ncf)) {
+                $duplicado = Compra::where('empresa_id', $empresa->id)
+                    ->where('proveedor_id', $proveedor->id)
+                    ->where('ncf', $ncf)
+                    ->where('estado', '!=', EstadoCompra::ANULADA)
+                    ->exists();
+
+                if ($duplicado) {
+                    throw new RuntimeException(
+                        "Ya existe una compra activa con el NCF «{$ncf}» para este proveedor."
+                    );
+                }
+            }
+
             $tipoPago = $datos['tipo_pago'] ?? TipoPago::CONTADO;
             $tipoPago = $tipoPago instanceof TipoPago ? $tipoPago : TipoPago::from((int) $tipoPago);
 
@@ -124,7 +140,7 @@ class CompraService
                         $producto,
                         TipoMovimiento::ENTRADA,
                         OrigenMovimiento::COMPRA,
-                        (float) $linea['cantidad'],
+                        (string) $linea['cantidad'],
                         $compra->id,
                         $userId,
                     );
@@ -172,9 +188,16 @@ class CompraService
         }
 
         return DB::transaction(function () use ($compra, $motivo, $userId) {
+            // Re-leer con lock para evitar anulación concurrente
+            $compra = Compra::lockForUpdate()->findOrFail($compra->id);
+
+            if ($compra->estaAnulada()) {
+                throw new RuntimeException('La compra ya está anulada.');
+            }
+
             $cuentaPorPagar = $compra->cuentaPorPagar;
 
-            if ($cuentaPorPagar !== null && (float) $cuentaPorPagar->monto_pagado > 0) {
+            if ($cuentaPorPagar !== null && bccomp((string) $cuentaPorPagar->monto_pagado, '0', 2) > 0) {
                 throw new CuentaConPagosRegistradosException(
                     "No se puede anular la compra #{$compra->id}: su cuenta por pagar ya tiene pagos registrados."
                 );
@@ -189,7 +212,7 @@ class CompraService
                         $producto,
                         TipoMovimiento::SALIDA,
                         OrigenMovimiento::ANULACION,
-                        (float) $detalle->cantidad,
+                        (string) $detalle->cantidad,
                         $compra->id,
                         $userId,
                         "Anulación compra #{$compra->id}",
@@ -232,24 +255,21 @@ class CompraService
             $producto = Producto::where('empresa_id', $empresa->id)->findOrFail($l['producto_id']);
             $tasa = $producto->tasa_itbis;
             $porcentaje = $tasa->porcentaje();
-            $cantidad = (float) $l['cantidad'];
-            $digitado = (float) $l['costo_unitario'];
+            $cantidadStr = (string) ($l['cantidad'] ?? '0');
+            $digitadoStr = (string) ($l['costo_unitario'] ?? '0');
+            $porcentajeStr = (string) $porcentaje;
 
             // El formulario ya lo impide, pero el service es el que mueve stock y registra la CxP:
             // una cantidad negativa sacaría inventario como si fuera una "entrada".
-            if ($cantidad <= 0) {
+            if (bccomp($cantidadStr, '0', 3) <= 0) {
                 throw new RuntimeException("La cantidad de «{$producto->nombre}» debe ser mayor que cero.");
             }
 
-            if ($digitado < 0) {
+            if (bccomp($digitadoStr, '0', 2) < 0) {
                 throw new RuntimeException("El costo de «{$producto->nombre}» no puede ser negativo.");
             }
 
-            $digitadoStr = (string) $digitado;
-            $cantidadStr = (string) $cantidad;
-            $porcentajeStr = (string) $porcentaje;
-
-            $costoBase = ($itbisIncluido && $porcentaje > 0)
+            $costoBase = ($itbisIncluido && bccomp($porcentajeStr, '0', 2) > 0)
                 ? bcdiv($digitadoStr, bcadd('1', bcdiv($porcentajeStr, '100', 6), 6), 4)
                 : $digitadoStr;
 
@@ -258,7 +278,7 @@ class CompraService
 
             return [
                 'producto_id' => $l['producto_id'],
-                'cantidad' => $cantidad,
+                'cantidad' => $cantidadStr,
                 'costo_unitario' => bcmul($costoBase, '1', 2),
                 'tasa_itbis' => $tasa,
                 'subtotal' => $subtotal,

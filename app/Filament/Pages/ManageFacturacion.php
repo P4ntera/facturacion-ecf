@@ -4,6 +4,7 @@ namespace App\Filament\Pages;
 
 use App\Enums\FormaReembolso;
 use App\Enums\MetodoCosto;
+use App\Enums\ModoImpresionPos;
 use App\Enums\RedondeoPrecio;
 use App\Enums\TasaItbis;
 use App\Enums\TipoComprobante;
@@ -57,6 +58,7 @@ class ManageFacturacion extends Page
             'tipo_comprobante_defecto' => $config->tipo_comprobante_defecto,
             'permite_ventas_sin_comprobante' => $config->permite_ventas_sin_comprobante,
             'moneda' => $config->moneda,
+            'modo_impresion_pos' => $config->modo_impresion_pos->value,
             'metodo_costo' => $config->metodo_costo->value,
             'redondeo_precio' => $config->redondeo_precio->value,
             'permite_stock_negativo' => $config->permite_stock_negativo,
@@ -102,6 +104,12 @@ class ManageFacturacion extends Page
                     ->label('Permitir ventas sin comprobante fiscal')
                     ->helperText('Agrega "Sin comprobante" al POS (y lo usa por defecto en el POS táctil): la venta se registra sin NCF y no aparece en el 607. Solo para negocios NO obligados a emitir NCF — un contribuyente de ITBIS debe emitir comprobante en cada venta (Decreto 254-06).')
                     ->columnSpanFull(),
+
+                Select::make('modo_impresion_pos')
+                    ->label('Modo de impresión del POS')
+                    ->options(collect(ModoImpresionPos::cases())->mapWithKeys(fn (ModoImpresionPos $m) => [$m->value => $m->etiqueta()]))
+                    ->helperText('Directa: si hay impresora de red, imprime sin diálogo. Previsualizar: siempre abre el ticket en el navegador para elegir impresora. Cada caja registradora puede tener su propio ajuste.')
+                    ->required(),
 
                 Select::make('moneda')
                     ->label('Moneda')

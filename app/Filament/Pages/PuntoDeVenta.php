@@ -6,6 +6,7 @@ namespace App\Filament\Pages;
 
 use App\Enums\FormaPago;
 use App\Enums\Modulo;
+use App\Enums\ModoImpresionPos;
 use App\Enums\ModuloImpresion;
 use App\Enums\TipoComprobante;
 use App\Enums\TipoPago;
@@ -24,6 +25,7 @@ use App\Models\Venta;
 use App\Services\ArqueoCajaService;
 use App\Services\Dgii\ConsultaContribuyenteService;
 use App\Services\Impresion\ImpresionService;
+use App\Services\PromocionService;
 use App\Services\SecuenciaNcfService;
 use App\Services\VentaService;
 use BackedEnum;
@@ -81,6 +83,16 @@ class PuntoDeVenta extends Page
     public string $descuentoGlobal = '0.00';
 
     public string $formaPago = 'efectivo';
+
+    /**
+     * Monto recibido en efectivo (usado cuando formaPago es EFECTIVO o MIXTO).
+     * Cuando es EFECTIVO puro, si montoEfectivo > total se calcula vuelto.
+     * Cuando es MIXTO, montoEfectivo + montoTarjeta debe cubrir el total.
+     */
+    public string $montoEfectivo = '';
+
+    /** Monto cobrado por tarjeta (solo cuando formaPago = MIXTO). */
+    public string $montoTarjeta = '';
 
     public bool $ventaACredito = false;
 
@@ -178,11 +190,17 @@ class PuntoDeVenta extends Page
         $this->busquedaCliente = '';
     }
 
-    /** Vuelve a "Al portador" (sin cliente). */
+    /** Vuelve a "Al portador" / Consumidor Final (sin cliente). */
     public function quitarCliente(): void
     {
         $this->clienteId = null;
         $this->busquedaCliente = '';
+    }
+
+    /** Alias para el botón "Consumidor Final" de la vista de Caja. */
+    public function seleccionarConsumidorFinal(): void
+    {
+        $this->quitarCliente();
     }
 
     public function esSinComprobante(): bool
@@ -359,6 +377,7 @@ class PuntoDeVenta extends Page
             'producto_id' => $producto->id,
             'presentacion_id' => $presentacion->id,
             'etiqueta' => "{$producto->nombre} · {$presentacion->nombre}",
+            'imagen' => $producto->imagen,
             'precio_texto' => 'RD$ '.number_format((float) $presentacion->precio, 2),
             'controla_stock' => $producto->controla_stock,
             'stock' => (float) $producto->stock,
@@ -373,6 +392,7 @@ class PuntoDeVenta extends Page
             'producto_id' => $producto->id,
             'presentacion_id' => null,
             'etiqueta' => $producto->nombre,
+            'imagen' => $producto->imagen,
             'precio_texto' => 'RD$ '.number_format((float) $producto->precio, 2),
             'controla_stock' => $producto->controla_stock,
             'stock' => (float) $producto->stock,
@@ -387,6 +407,7 @@ class PuntoDeVenta extends Page
             'producto_id' => $producto->id,
             'presentacion_id' => null,
             'etiqueta' => $producto->nombre,
+            'imagen' => $producto->imagen,
             'precio_texto' => 'RD$ '.number_format((float) $producto->precio_por_peso, 2).' / '.$producto->unidad_base,
             'controla_stock' => $producto->controla_stock,
             'stock' => (float) $producto->stock,
@@ -552,6 +573,27 @@ class PuntoDeVenta extends Page
     {
         unset($this->carrito[$indice]);
         $this->carrito = array_values($this->carrito);
+        $this->recalcularTotales();
+    }
+
+    /** Quita la última línea del carrito (atajo Supr). */
+    public function quitarUltimaLinea(): void
+    {
+        if (empty($this->carrito)) {
+            return;
+        }
+
+        array_pop($this->carrito);
+        $this->recalcularTotales();
+    }
+
+    /** Vacía el carrito completo (atajo F9). */
+    public function limpiarCarrito(): void
+    {
+        $this->carrito = [];
+        $this->descuentoId = '';
+        $this->descuentoGlobal = '0.00';
+        $this->busquedaProducto = '';
         $this->recalcularTotales();
     }
 
@@ -738,6 +780,10 @@ class PuntoDeVenta extends Page
     /** @return Collection<int, Descuento> */
     public function descuentosDisponibles(): Collection
     {
+        if (! auth()->user()?->can('ventas.aplicar_descuento')) {
+            return collect();
+        }
+
         return Descuento::query()
             ->where('empresa_id', $this->empresaId())
             ->where('activo', true)
@@ -760,6 +806,31 @@ class PuntoDeVenta extends Page
             ->where('empresa_id', $this->empresaId())
             ->where('activo', true)
             ->find((int) $this->descuentoId);
+    }
+
+    /**
+     * Promociones vigentes de la empresa actual, para mostrar en la UI del POS.
+     * Los descuentos por promoción se aplican automáticamente en VentaService::calcularLineas().
+     *
+     * @return Collection<int, \App\Models\Promocion>
+     */
+    public function promocionesVigentes(): Collection
+    {
+        return app(PromocionService::class)->vigentes($this->empresa());
+    }
+
+    /**
+     * IDs de productos que tienen una promoción vigente, para marcar visualmente en el carrito.
+     *
+     * @return array<int, int>
+     */
+    public function productosEnPromocion(): array
+    {
+        return $this->promocionesVigentes()
+            ->flatMap(fn ($promo) => $promo->productos->pluck('id'))
+            ->unique()
+            ->values()
+            ->all();
     }
 
     /** Turno de caja abierto del usuario actual, si tiene uno. Lookup fresco, sin cachear. */
@@ -815,6 +886,7 @@ class PuntoDeVenta extends Page
                 'sin_comprobante' => $this->esSinComprobante(),
                 'descuento_global' => $this->descuentoGlobal,
                 'forma_pago' => $this->formaPago,
+                ...$this->datosDesglosePago(),
                 'arqueo_caja_id' => $this->arqueoAbierto()?->id,
                 'tipo_pago' => $this->ventaACredito ? TipoPago::CREDITO->value : TipoPago::CONTADO->value,
                 'fecha_limite_pago' => $this->ventaACredito && filled($this->fechaLimitePago) ? $this->fechaLimitePago : null,
@@ -833,6 +905,8 @@ class PuntoDeVenta extends Page
         $this->busquedaProducto = '';
         $this->ventaACredito = false;
         $this->fechaLimitePago = '';
+        $this->montoEfectivo = '';
+        $this->montoTarjeta = '';
         $this->recalcularTotales();
 
         $this->notificarVentaRegistradaEImprimirTicket($venta);
@@ -853,14 +927,21 @@ class PuntoDeVenta extends Page
      * La venta ya quedó registrada (atómica, vía VentaService) antes de llegar aquí: un fallo de
      * impresión de aquí en adelante NUNCA la revierte ni la afecta, solo se notifica.
      *
-     * RED -> el servidor manda los bytes ESC/POS directo al socket, sin diálogo. NAVEGADOR (o sin
-     * impresora configurada) -> el navegador decide la impresora física, así que solo podemos
-     * abrir la vista del ticket y dejar que window.print() (en la propia vista) dispare el diálogo.
+     * Cascada del modo de impresión: CajaRegistradora (si tiene override) → Empresa → default
+     * (directa). En modo PREVISUALIZAR se ignora la impresora de red y se abre el ticket en el
+     * navegador; en modo DIRECTA se intenta la red primero y cae al navegador si no hay impresora.
      */
     protected function notificarVentaRegistradaEImprimirTicket(Venta $venta): void
     {
-        $impresora = app(ImpresionService::class)->resolverImpresora(ModuloImpresion::FACTURACION, auth()->user());
-        $resultado = app(ImpresionService::class)->imprimirTicket($venta, $impresora);
+        $modo = $this->resolverModoImpresion();
+        $impresionService = app(ImpresionService::class);
+
+        // En modo previsualizar: saltar la impresora de red, ir directo al navegador.
+        $impresora = $modo === ModoImpresionPos::PREVISUALIZAR
+            ? null
+            : $impresionService->resolverImpresora(ModuloImpresion::FACTURACION, auth()->user());
+
+        $resultado = $impresionService->imprimirTicket($venta, $impresora);
 
         $accionComprobante = Action::make('comprobante')
             ->label('Comprobante PDF')
@@ -908,6 +989,97 @@ class PuntoDeVenta extends Page
                 $accionComprobante,
             ])
             ->send();
+    }
+
+    /**
+     * Modo de impresión efectivo: CajaRegistradora (si el arqueo está asociado a una) -> Empresa.
+     * Subclases como PuntoDeVentaTouch pueden sobreescribir para leer la caja del cajaId actual.
+     */
+    protected function resolverModoImpresion(): ModoImpresionPos
+    {
+        $caja = $this->arqueoAbierto()?->caja;
+
+        if ($caja !== null && $caja->modo_impresion_pos !== null) {
+            return $caja->modo_impresion_pos;
+        }
+
+        return $this->empresa()->config()->modo_impresion_pos;
+    }
+
+    /**
+     * Calcula el vuelto a entregar al cliente.
+     *
+     * - EFECTIVO puro: vuelto = montoEfectivo − total (si montoEfectivo > total).
+     * - MIXTO: vuelto = (montoEfectivo + montoTarjeta) − total (normalmente 0 o positivo solo
+     *   si el cajero recibe de más en efectivo; la tarjeta cobra exacto).
+     *
+     * Se devuelve '0.00' si no aplica o si los montos no están llenos.
+     */
+    public function vueltoCalculado(): string
+    {
+        $formaPago = FormaPago::tryFrom($this->formaPago);
+
+        if ($formaPago === null || ! $formaPago->incluyeEfectivo()) {
+            return '0.00';
+        }
+
+        $total = $this->totales['total'] ?? '0.00';
+        $efectivo = filled($this->montoEfectivo) ? $this->montoEfectivo : '0.00';
+
+        if ($formaPago === FormaPago::MIXTO) {
+            $tarjeta = filled($this->montoTarjeta) ? $this->montoTarjeta : '0.00';
+            $totalRecibido = bcadd($efectivo, $tarjeta, 2);
+        } else {
+            $totalRecibido = $efectivo;
+        }
+
+        $vuelto = bcsub($totalRecibido, $total, 2);
+
+        return bccomp($vuelto, '0.00', 2) > 0 ? $vuelto : '0.00';
+    }
+
+    /**
+     * Arma los datos de desglose de pago (montos por método y vuelto) que cobrar() mezcla en el
+     * array que va a VentaService::registrar(). Los campos se llenan solo cuando tienen sentido
+     * (para no guardar nulls/ceros innecesarios en pagos sencillos).
+     *
+     * @return array<string, string|null>
+     */
+    protected function datosDesglosePago(): array
+    {
+        $formaPago = FormaPago::tryFrom($this->formaPago);
+        $total = $this->totales['total'] ?? '0.00';
+
+        if ($formaPago === FormaPago::MIXTO) {
+            $efectivo = filled($this->montoEfectivo) ? $this->montoEfectivo : '0.00';
+            $tarjeta = filled($this->montoTarjeta) ? $this->montoTarjeta : '0.00';
+            $vuelto = $this->vueltoCalculado();
+
+            return [
+                'monto_efectivo' => $efectivo,
+                'monto_tarjeta' => $tarjeta,
+                'vuelto' => bccomp($vuelto, '0.00', 2) > 0 ? $vuelto : null,
+            ];
+        }
+
+        if ($formaPago === FormaPago::EFECTIVO && filled($this->montoEfectivo)) {
+            $vuelto = $this->vueltoCalculado();
+
+            return [
+                'monto_efectivo' => $this->montoEfectivo,
+                'vuelto' => bccomp($vuelto, '0.00', 2) > 0 ? $vuelto : null,
+            ];
+        }
+
+        if ($formaPago === FormaPago::TARJETA) {
+            return ['monto_tarjeta' => $total];
+        }
+
+        if ($formaPago === FormaPago::TRANSFERENCIA) {
+            return ['monto_transferencia' => $total];
+        }
+
+        return [];
     }
 
     protected function recalcularTotales(): void

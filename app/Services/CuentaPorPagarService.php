@@ -35,20 +35,25 @@ class CuentaPorPagarService
      */
     public function registrarPago(CuentaPorPagar $cuenta, array $datos, int $userId): PagoRealizado
     {
-        $monto = (float) ($datos['monto'] ?? 0);
+        $monto = $datos['monto'] ?? '0';
 
-        if ($monto <= 0) {
+        if (bccomp($monto, '0', 2) <= 0) {
             throw new RuntimeException('El monto del pago debe ser mayor a cero.');
         }
 
-        if ($monto > $cuenta->montoPendiente()) {
-            throw new PagoExcedeSaldoException(
-                "El pago (RD$" . number_format($monto, 2) . ') supera el monto pendiente (RD$'
-                . number_format($cuenta->montoPendiente(), 2) . ').'
-            );
-        }
-
         return DB::transaction(function () use ($cuenta, $datos, $monto, $userId) {
+            // Bloquear la cuenta dentro de la transacción para evitar pagos concurrentes
+            $cuenta = CuentaPorPagar::lockForUpdate()->findOrFail($cuenta->id);
+
+            $pendiente = bcsub((string) $cuenta->monto_total, (string) $cuenta->monto_pagado, 2);
+
+            if (bccomp($monto, $pendiente, 2) > 0) {
+                throw new PagoExcedeSaldoException(
+                    "El pago (RD$" . number_format((float) $monto, 2) . ') supera el monto pendiente (RD$'
+                    . number_format((float) $pendiente, 2) . ').'
+                );
+            }
+
             $pago = PagoRealizado::create([
                 'empresa_id' => $cuenta->empresa_id,
                 'cuenta_por_pagar_id' => $cuenta->id,
@@ -60,7 +65,9 @@ class CuentaPorPagarService
                 'estado' => EstadoPago::REGISTRADO,
             ]);
 
-            $cuenta->update(['monto_pagado' => (float) $cuenta->monto_pagado + $monto]);
+            $cuenta->update([
+                'monto_pagado' => bcadd((string) $cuenta->monto_pagado, $monto, 2),
+            ]);
 
             return $pago;
         });
@@ -73,8 +80,11 @@ class CuentaPorPagarService
         }
 
         return DB::transaction(function () use ($pago, $motivo) {
-            $cuenta = $pago->cuentaPorPagar;
-            $cuenta->update(['monto_pagado' => (float) $cuenta->monto_pagado - (float) $pago->monto]);
+            $cuenta = CuentaPorPagar::lockForUpdate()->findOrFail($pago->cuenta_por_pagar_id);
+
+            $cuenta->update([
+                'monto_pagado' => bcsub((string) $cuenta->monto_pagado, (string) $pago->monto, 2),
+            ]);
 
             $pago->update([
                 'estado' => EstadoPago::ANULADO,
@@ -90,11 +100,13 @@ class CuentaPorPagarService
      * Una devolución a proveedor reduce lo que hay que pagarle. No permite bajar el total por
      * debajo de lo que ya se le pagó (ese caso necesitaría reembolso, fuera de alcance aquí).
      */
-    public function reducirPorDevolucion(CuentaPorPagar $cuenta, float $monto): void
+    public function reducirPorDevolucion(CuentaPorPagar $cuenta, string $monto): void
     {
-        $nuevoTotal = round((float) $cuenta->monto_total - $monto, 2);
+        $cuenta = CuentaPorPagar::lockForUpdate()->findOrFail($cuenta->id);
 
-        if ($nuevoTotal < (float) $cuenta->monto_pagado) {
+        $nuevoTotal = bcsub((string) $cuenta->monto_total, $monto, 2);
+
+        if (bccomp($nuevoTotal, (string) $cuenta->monto_pagado, 2) < 0) {
             throw new RuntimeException(
                 'No se puede reducir la cuenta por pagar por debajo de lo ya pagado; requiere reembolso manual.'
             );
@@ -104,8 +116,9 @@ class CuentaPorPagarService
     }
 
     /** Revierte reducirPorDevolucion() cuando se anula la devolución que la originó. */
-    public function restaurarPorAnulacionDevolucion(CuentaPorPagar $cuenta, float $monto): void
+    public function restaurarPorAnulacionDevolucion(CuentaPorPagar $cuenta, string $monto): void
     {
-        $cuenta->update(['monto_total' => round((float) $cuenta->monto_total + $monto, 2)]);
+        $cuenta = CuentaPorPagar::lockForUpdate()->findOrFail($cuenta->id);
+        $cuenta->update(['monto_total' => bcadd((string) $cuenta->monto_total, $monto, 2)]);
     }
 }

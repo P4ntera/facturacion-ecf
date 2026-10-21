@@ -1,3 +1,4 @@
+@use('Illuminate\Support\Facades\Storage')
 @php
   $caja = $this->cajaSeleccionada();
   $empresa = $this->empresa();
@@ -131,6 +132,7 @@
     .pt-productos button { display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start; text-align: left;
       padding: .6rem; background: var(--pt-card); font-weight: 600; font-size: .95rem; line-height: 1.2; }
     .pt-productos .pt-precio { color: var(--pt-exito); font-variant-numeric: tabular-nums; font-size: 1rem; }
+    .pt-productos .pt-prod-img { width: 48px; height: 48px; border-radius: 6px; object-fit: cover; align-self: center; }
     .pt-teclado-ctn { flex-shrink: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: .5rem; }
     .pt-display-buffer { min-height: 48px; display: flex; align-items: center; justify-content: flex-end; padding: 0 .9rem;
       background: var(--pt-bg); border: 1px solid var(--pt-borde); border-radius: 10px; font-size: 1.5rem; font-variant-numeric: tabular-nums; }
@@ -243,7 +245,12 @@
             <div wire:key="linea-{{ $indice }}-{{ $linea['producto_id'] }}-{{ $linea['presentacion_id'] ?? 'x' }}">
               <button type="button" class="pt-item {{ $lineaSeleccionada === $indice ? 'pt-activo' : '' }}" wire:click="seleccionarLinea({{ $indice }})">
                 <span style="min-width:0">
-                  <span class="pt-nombre" style="display:block">{{ $linea['nombre'] }}</span>
+                  <span class="pt-nombre" style="display:block">
+                    {{ $linea['nombre'] }}
+                    @if (in_array($linea['producto_id'], $this->productosEnPromocion()))
+                      <span style="background:#16a34a;color:#fff;font-size:.7rem;padding:1px 5px;border-radius:4px;margin-left:4px">Promo</span>
+                    @endif
+                  </span>
                   <span class="pt-det pt-muted">
                     RD$ {{ number_format((float) $linea['precio_unitario'], 2) }}
                     @if ((float) $linea['descuento'] > 0)
@@ -357,6 +364,9 @@
         <div class="pt-productos">
           @foreach ($this->productosGrid() as $producto)
             <button type="button" wire:key="prod-{{ $producto['id'] }}" x-on:click="tocar({{ $producto['id'] }})" @disabled($producto['agotado'])>
+              @if ($producto['imagen'])
+                <img src="{{ Storage::disk('public')->url($producto['imagen']) }}" alt="" class="pt-prod-img" />
+              @endif
               <span>{{ $producto['nombre'] }}</span>
               <span class="pt-precio">
                 {{ $producto['precio_texto'] }}
@@ -464,19 +474,38 @@
         @endif
 
         @if ($formaPago === \App\Enums\FormaPago::EFECTIVO->value)
-          <div class="pt-seccion" x-data="{ total: {{ (float) $totales['total'] }} }">
+          <div class="pt-seccion" x-data="{ total: {{ (float) ($totales['total'] ?? 0) }} }">
             <label>Efectivo recibido</label>
-            <input type="number" inputmode="decimal" min="0" step="0.01" x-model="recibido" placeholder="0.00" />
+            <input type="number" inputmode="decimal" min="0" step="0.01"
+              wire:model.blur="montoEfectivo" x-ref="efectivo" placeholder="0.00" />
             <div class="pt-billetes">
               @foreach ([100, 200, 500, 1000, 2000] as $billete)
-                <button type="button" x-on:click="recibido = String((parseFloat(recibido || '0') + {{ $billete }}).toFixed(2))">+{{ number_format($billete) }}</button>
+                <button type="button" x-on:click="$refs.efectivo.value = String((parseFloat($refs.efectivo.value || '0') + {{ $billete }}).toFixed(2)); $wire.set('montoEfectivo', $refs.efectivo.value)">+{{ number_format($billete) }}</button>
               @endforeach
-              <button type="button" x-on:click="recibido = total.toFixed(2)">Exacto</button>
-              <button type="button" x-on:click="recibido = ''" style="grid-column: span 2">Limpiar</button>
+              <button type="button" x-on:click="$refs.efectivo.value = total.toFixed(2); $wire.set('montoEfectivo', $refs.efectivo.value)">Exacto</button>
+              <button type="button" x-on:click="$refs.efectivo.value = ''; $wire.set('montoEfectivo', '')" style="grid-column: span 2">Limpiar</button>
             </div>
-            <p style="margin-top:.6rem;font-size:1.3rem;font-weight:700">
-              Cambio: <span class="pt-num" x-text="'RD$ ' + cambio(total).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })"></span>
-            </p>
+            @if (bccomp($this->vueltoCalculado(), '0.00', 2) > 0)
+              <p style="margin-top:.6rem;font-size:1.3rem;font-weight:700;color:var(--success-500)">
+                Vuelto: RD$ {{ number_format((float) $this->vueltoCalculado(), 2, '.', ',') }}
+              </p>
+            @endif
+          </div>
+        @endif
+
+        @if ($formaPago === \App\Enums\FormaPago::MIXTO->value)
+          <div class="pt-seccion">
+            <label>Efectivo</label>
+            <input type="number" inputmode="decimal" min="0" step="0.01"
+              wire:model.blur="montoEfectivo" placeholder="0.00" />
+            <label style="margin-top:.5rem">Tarjeta</label>
+            <input type="number" inputmode="decimal" min="0" step="0.01"
+              wire:model.blur="montoTarjeta" placeholder="0.00" />
+            @if (bccomp($this->vueltoCalculado(), '0.00', 2) > 0)
+              <p style="margin-top:.6rem;font-size:1.3rem;font-weight:700;color:var(--success-500)">
+                Vuelto: RD$ {{ number_format((float) $this->vueltoCalculado(), 2, '.', ',') }}
+              </p>
+            @endif
           </div>
         @endif
 

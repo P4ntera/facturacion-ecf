@@ -12,6 +12,7 @@ use App\Models\CuentaPorPagar;
 use App\Models\PagoRealizado;
 use App\Services\CuentaPorPagarService;
 use Filament\Actions\Action;
+use Filament\Facades\Filament;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
@@ -226,7 +227,8 @@ class CuentaPorPagarResource extends Resource
                             ->rows(2),
                     ])
                     ->action(function (array $data): void {
-                        $pago = PagoRealizado::findOrFail($data['pago_id']);
+                        $pago = PagoRealizado::where('empresa_id', Filament::getTenant()->id)
+                            ->findOrFail($data['pago_id']);
 
                         try {
                             app(CuentaPorPagarService::class)->anularPago($pago, $data['motivo']);

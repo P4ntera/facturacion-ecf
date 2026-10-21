@@ -13,6 +13,11 @@ class CreateImpresora extends CreateRecord
 {
     protected static string $resource = ImpresoraResource::class;
 
+    protected function getRedirectUrl(): string
+    {
+        return $this->getResource()::getUrl('index');
+    }
+
     // Defensa en profundidad además de la validación reactiva del formulario: las reglas de
     // conexión también las exige ImpresoraObserver::saving(), sin importar cómo se cree el registro.
     protected function handleRecordCreation(array $data): Model
