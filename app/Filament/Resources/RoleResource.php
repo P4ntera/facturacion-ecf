@@ -95,13 +95,13 @@ class RoleResource extends Resource
                     ->searchable()
                     ->sortable(),
 
-                TextColumn::make('permisos_count')
+                TextColumn::make('permissions_count')
                     ->label('Permisos')
-                    ->getStateUsing(fn (Role $record) => $record->permissions()->count()),
+                    ->counts('permissions'),
 
-                TextColumn::make('usuarios_count')
+                TextColumn::make('users_count')
                     ->label('Usuarios')
-                    ->getStateUsing(fn (Role $record) => $record->users()->count()),
+                    ->counts('users'),
             ])
             ->recordActions([
                 EditAction::make(),

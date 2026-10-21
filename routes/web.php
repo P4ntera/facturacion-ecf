@@ -32,6 +32,7 @@ Route::redirect('/', '/admin');
 
 Route::get('/rnc/{rnc}', [RncController::class, 'consultar'])
     ->where('rnc', '[0-9]{9,11}')
+    ->middleware('throttle:10,1')
     ->name('rnc.consultar');
 
 // Rutas autenticadas fuera del panel de Filament (PDFs, tickets, exportaciones).

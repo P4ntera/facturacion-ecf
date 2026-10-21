@@ -14,7 +14,7 @@ class CotizacionPdfController extends Controller
     public function __invoke(Request $request, Cotizacion $cotizacion): Response
     {
         $user = $request->user();
-        abort_unless($user && $user->empresa_id === (int) $cotizacion->empresa_id, 403);
+        abort_unless($user && $user->perteneceAEmpresa($cotizacion->empresa_id), 403);
         abort_unless($user->can('cotizaciones.exportar'), 403);
 
         $cotizacion->load(['empresa', 'cliente', 'detalles.producto', 'user']);
