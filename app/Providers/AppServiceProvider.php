@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Number;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Spatie\Activitylog\Models\Activity;
 
@@ -34,6 +35,13 @@ class AppServiceProvider extends ServiceProvider
         // propio namespace del modelo) nunca encuentra ActivityPolicy para él. Sin este registro
         // explícito, Filament no localiza ninguna policy y —al no estar en modo estricto— abre
         // el acceso a AuditoriaResource por defecto en vez de negarlo.
+        // Fuerza HTTPS cuando la app está detrás de un proxy/túnel (ngrok, load balancer,
+        // Cloudflare, etc.) que termina TLS antes de llegar al contenedor. Sin esto, asset_url(),
+        // route() y url() generan enlaces http:// que el navegador bloquea como mixed-content.
+        if ($this->app->environment('local') && str_starts_with(config('app.url'), 'https')) {
+            URL::forceScheme('https');
+        }
+
         Gate::policy(Activity::class, ActivityPolicy::class);
 
         // Filament dispara este evento cada vez que fija el tenant activo: en cada request
