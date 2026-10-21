@@ -73,10 +73,7 @@ class CajaResource extends Resource
 
             Select::make('modo_impresion_pos')
                 ->label('Modo de impresión')
-                ->options(
-                    collect(['' => 'Usar el de la empresa'])
-                        ->merge(collect(ModoImpresionPos::cases())->mapWithKeys(fn (ModoImpresionPos $m) => [$m->value => $m->etiqueta()]))
-                )
+                ->options(collect(ModoImpresionPos::cases())->mapWithKeys(fn (ModoImpresionPos $m) => [$m->value => $m->etiqueta()]))
                 ->placeholder('Usar el de la empresa')
                 ->helperText('Si se deja vacío, usa la configuración de la empresa.'),
 

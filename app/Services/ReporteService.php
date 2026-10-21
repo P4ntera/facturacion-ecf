@@ -6,8 +6,10 @@ namespace App\Services;
 
 use App\Enums\EstadoCompra;
 use App\Enums\EstadoVenta;
+use App\Enums\FormaPago;
 use App\Enums\TipoComprobante;
 use App\Enums\TipoDocumentoCliente;
+use App\Enums\TipoPago;
 use App\Models\Compra;
 use App\Models\ArqueoCaja;
 use App\Models\CuentaPorCobrar;
@@ -131,6 +133,112 @@ class ReporteService
                 'itbis_facturado' => (string) $venta->total_itbis,
                 'monto_total' => (string) $venta->total,
             ]);
+    }
+
+    /**
+     * Genera el contenido TXT del formato 607 según Norma General 07-2018 de la DGII.
+     *
+     * Layout: pipe-separated, 23 columnas por fila.
+     * Cabecera: 607|RNC_EMPRESA|AAAAMM|CANTIDAD_REGISTROS
+     *
+     * Columnas detalle:
+     *  1  RNC/Cédula comprador         8  Monto facturado (sin ITBIS)    15 Otros impuestos/tasas
+     *  2  Tipo identificación          9  ITBIS facturado                16 Monto propina legal
+     *  3  NCF                         10  ITBIS retenido por terceros    17 Efectivo (con impuestos)
+     *  4  NCF modificado              11  ITBIS percibido                18 Cheque/Transf/Depósito
+     *  5  Tipo de ingreso             12  Retención renta por terceros   19 Tarjeta déb/créd
+     *  6  Fecha comprobante (AAAAMMDD)13  ISR percibido                  20 Venta a crédito
+     *  7  Fecha retención (AAAAMMDD)  14  Impuesto selectivo al consumo  21 Bonos/certificados regalo
+     *                                                                    22 Permuta
+     *                                                                    23 Otras formas de ventas
+     *
+     * Columnas 17-23: formas de pago INCLUYENDO impuestos; su suma = total factura.
+     *
+     * Nombre de archivo sugerido: DGII_F_607_{RNC}_{AAAAMM}.TXT
+     */
+    public function reporte607Txt(Carbon $desde, Carbon $hasta, int $empresaId, string $rncEmpresa): string
+    {
+        $periodo = $desde->format('Ym');
+
+        $ventas = $this->reporte607Query($desde, $hasta, $empresaId)
+            ->orderBy('fecha')
+            ->get();
+
+        $lineas = [];
+
+        foreach ($ventas as $venta) {
+            /** @var Venta $venta */
+            $rncCedula = $this->rncCedula607($venta->cliente?->tipo_documento, $venta->cliente?->documento);
+            $tipoId    = $this->tipoIdentificacion607($venta->cliente?->tipo_documento);
+
+            // Formas de pago (cols 17-23): el monto incluye impuestos → va el total.
+            // Si es crédito, todo va a la columna 20.
+            $efectivo      = '0.00';
+            $transferencia = '0.00';
+            $tarjeta       = '0.00';
+            $credito       = '0.00';
+
+            if ($venta->tipo_pago === TipoPago::CREDITO) {
+                $credito = number_format((float) $venta->total, 2, '.', '');
+            } else {
+                switch ($venta->forma_pago) {
+                    case FormaPago::EFECTIVO:
+                        // En efectivo puro se usa el total (ya descontado el vuelto).
+                        $efectivo = number_format((float) $venta->total, 2, '.', '');
+                        break;
+                    case FormaPago::TARJETA:
+                        $tarjeta = number_format((float) $venta->total, 2, '.', '');
+                        break;
+                    case FormaPago::TRANSFERENCIA:
+                        $transferencia = number_format((float) $venta->total, 2, '.', '');
+                        break;
+                    case FormaPago::MIXTO:
+                        // En MIXTO: monto_efectivo puede incluir exceso (vuelto). La DGII
+                        // exige que cols 17-23 sumen exactamente al total, así que restamos
+                        // el vuelto del efectivo reportado.
+                        $vuelto = (float) ($venta->vuelto ?? 0);
+                        $efectivo = number_format((float) ($venta->monto_efectivo ?? 0) - $vuelto, 2, '.', '');
+                        $tarjeta  = number_format((float) ($venta->monto_tarjeta ?? 0), 2, '.', '');
+                        break;
+                    default:
+                        // Fallback: todo a efectivo.
+                        $efectivo = number_format((float) $venta->total, 2, '.', '');
+                }
+            }
+
+            $campos = [
+                $rncCedula ?? '',                                                    // 1  RNC/Cédula
+                $tipoId !== null ? (string) $tipoId : '',                            // 2  Tipo Identificación
+                $venta->ncf,                                                         // 3  NCF
+                $venta->ncf_modifica ?? '',                                           // 4  NCF Modificado
+                self::TIPO_INGRESO_DEFECTO,                                          // 5  Tipo de Ingreso
+                $venta->fecha->format('Ymd'),                                        // 6  Fecha Comprobante
+                '',                                                                  // 7  Fecha Retención
+                number_format((float) $venta->subtotalNeto(), 2, '.', ''),           // 8  Monto Facturado
+                number_format((float) $venta->total_itbis, 2, '.', ''),              // 9  ITBIS Facturado
+                '',                                                                  // 10 ITBIS Retenido por Terceros
+                '',                                                                  // 11 ITBIS Percibido
+                '',                                                                  // 12 Retención Renta por Terceros
+                '',                                                                  // 13 ISR Percibido
+                '',                                                                  // 14 Impuesto Selectivo al Consumo
+                '',                                                                  // 15 Otros Impuestos/Tasas
+                '',                                                                  // 16 Monto Propina Legal
+                $efectivo,                                                           // 17 Efectivo
+                $transferencia,                                                      // 18 Cheque/Transferencia/Depósito
+                $tarjeta,                                                            // 19 Tarjeta Débito/Crédito
+                $credito,                                                            // 20 Venta a Crédito
+                '',                                                                  // 21 Bonos o Certificados de Regalo
+                '',                                                                  // 22 Permuta
+                '',                                                                  // 23 Otras Formas de Ventas
+            ];
+
+            $lineas[] = implode('|', $campos);
+        }
+
+        // Cabecera: 607|RNC_EMPRESA|PERIODO|CANTIDAD
+        $cabecera = implode('|', ['607', $rncEmpresa, $periodo, (string) count($lineas)]);
+
+        return $cabecera."\n".implode("\n", $lineas);
     }
 
     /**

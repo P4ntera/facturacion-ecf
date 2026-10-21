@@ -2,16 +2,27 @@
 
 namespace Tests\Feature;
 
+use App\Enums\EstadoCompra;
 use App\Enums\EstadoFiscal;
 use App\Enums\EstadoVenta;
+use App\Enums\FormaPago;
 use App\Enums\FormaReembolso;
 use App\Enums\TasaItbis;
 use App\Enums\TipoComprobante;
 use App\Enums\TipoDocumentoCliente;
+use App\Enums\TipoPago;
 use App\Enums\TipoProducto;
 use App\Enums\TipoProveedor;
 use App\Exceptions\SecuenciaNcfAgotadaException;
 use App\Exceptions\VentaInvalidaException;
+use App\Filament\Resources\CuentaPorCobrarResource;
+use App\Filament\Resources\CuentaPorPagarResource;
+use App\Models\CuentaPorCobrar;
+use App\Models\CuentaPorPagar;
+use App\Models\PagoRecibido;
+use App\Models\PagoRealizado;
+use App\Services\CuentaPorCobrarService;
+use App\Services\CuentaPorPagarService;
 use App\Filament\Pages\PuntoDeVenta;
 use App\Filament\Pages\PuntoDeVentaTouch;
 use App\Filament\Resources\ArqueoCajaResource;
@@ -1077,5 +1088,184 @@ class AislamientoEntreEmpresasTest extends TestCase
 
         $this->assertSame(0, Venta::where('venta_modificada_id', $ventaTobogan->id)->count());
         $this->assertEquals(8, (float) $productoTobogan->fresh()->stock);
+    }
+
+    // ──────────────────────────────────────────────────────────────────────
+    // Aislamiento de Cuentas por Cobrar (CxC)
+    // ──────────────────────────────────────────────────────────────────────
+
+    /**
+     * Helper: crea una venta a crédito para la empresa dada y devuelve la CxC generada.
+     */
+    private function crearVentaCreditoConCxC(array $datosEmpresa): CuentaPorCobrar
+    {
+        $empresa  = $datosEmpresa['empresa'];
+        $producto = $datosEmpresa['producto'];
+        $cliente  = $datosEmpresa['cliente'];
+
+        // Secuencia NCF necesaria para registrar la venta.
+        SecuenciaNcf::firstOrCreate(
+            ['empresa_id' => $empresa->id, 'tipo_comprobante' => TipoComprobante::FACTURA_CONSUMO_FISICA->value],
+            [
+                'prefijo' => 'B02',
+                'secuencia_desde' => 1,
+                'secuencia_actual' => 1,
+                'secuencia_hasta' => 999,
+                'vencimiento' => today()->addYear(),
+                'activa' => true,
+            ],
+        );
+
+        $this->comoEmpresa($empresa);
+
+        $venta = app(VentaService::class)->registrar([
+            'cliente_id' => $cliente->id,
+            'tipo_comprobante' => TipoComprobante::FACTURA_CONSUMO_FISICA->value,
+            'tipo_pago' => TipoPago::CREDITO->value,
+            'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
+        ], $empresa);
+
+        return CuentaPorCobrar::where('venta_id', $venta->id)->firstOrFail();
+    }
+
+    /** 28. Cada empresa solo ve sus propias CxC en el índice. */
+    public function test_28_cada_empresa_solo_ve_sus_propias_cxc(): void
+    {
+        $datosA = $this->crearEmpresaConDatos('Empresa A', '131000001');
+        $datosT = $this->crearEmpresaConDatos('Tobogán', '131000002');
+
+        $cxcA = $this->crearVentaCreditoConCxC($datosA);
+        $cxcT = $this->crearVentaCreditoConCxC($datosT);
+
+        $this->comoEmpresa($datosA['empresa']);
+
+        $this->actingAs($datosA['admin'])
+            ->get(CuentaPorCobrarResource::getUrl('index', tenant: $datosA['empresa']))
+            ->assertOk()
+            ->assertSee($datosA['cliente']->nombre)
+            ->assertDontSee($datosT['cliente']->nombre);
+    }
+
+    /** 29. Un admin de Empresa A no puede ver una CxC de Tobogán por URL. */
+    public function test_29_empresa_no_puede_ver_cxc_de_otra_por_url(): void
+    {
+        $datosA = $this->crearEmpresaConDatos('Empresa A', '131000001');
+        $datosT = $this->crearEmpresaConDatos('Tobogán', '131000002');
+
+        $cxcT = $this->crearVentaCreditoConCxC($datosT);
+
+        $this->comoEmpresa($datosA['empresa']);
+
+        $this->actingAs($datosA['admin'])
+            ->get(CuentaPorCobrarResource::getUrl('view', ['record' => $cxcT], tenant: $datosA['empresa']))
+            ->assertNotFound();
+    }
+
+    /** 30. anularPago en CxC no permite anular un pago de otra empresa (fix cross-tenant). */
+    public function test_30_anular_pago_cxc_no_permite_pago_de_otra_empresa(): void
+    {
+        $datosA = $this->crearEmpresaConDatos('Empresa A', '131000001');
+        $datosT = $this->crearEmpresaConDatos('Tobogán', '131000002');
+
+        $cxcT = $this->crearVentaCreditoConCxC($datosT);
+
+        // Registrar un pago en la CxC de Tobogán.
+        $this->comoEmpresa($datosT['empresa']);
+        $pagoT = app(CuentaPorCobrarService::class)->registrarPago($cxcT, [
+            'monto' => 50,
+            'fecha' => now()->toDateString(),
+            'forma_pago' => FormaPago::EFECTIVO->value,
+        ], $datosT['admin']->id);
+
+        // Empresa A intenta anular el pago de Tobogán.
+        $this->comoEmpresa($datosA['empresa']);
+
+        $this->expectException(ModelNotFoundException::class);
+
+        PagoRecibido::where('empresa_id', Filament::getTenant()->id)
+            ->findOrFail($pagoT->id);
+    }
+
+    // ──────────────────────────────────────────────────────────────────────
+    // Aislamiento de Cuentas por Pagar (CxP)
+    // ──────────────────────────────────────────────────────────────────────
+
+    /**
+     * Helper: crea una compra a crédito para la empresa dada y devuelve la CxP generada.
+     */
+    private function crearCompraCreditoConCxP(array $datosEmpresa): CuentaPorPagar
+    {
+        $empresa   = $datosEmpresa['empresa'];
+        $producto  = $datosEmpresa['producto'];
+        $proveedor = $datosEmpresa['proveedor'];
+
+        $this->comoEmpresa($empresa);
+
+        $compra = app(CompraService::class)->crear([
+            'proveedor_id' => $proveedor->id,
+            'fecha' => now()->toDateString(),
+            'tipo_pago' => TipoPago::CREDITO->value,
+            'lineas' => [['producto_id' => $producto->id, 'cantidad' => 5, 'costo_unitario' => 80]],
+        ], $datosEmpresa['admin']->id);
+
+        return CuentaPorPagar::where('compra_id', $compra->id)->firstOrFail();
+    }
+
+    /** 31. Cada empresa solo ve sus propias CxP en el índice. */
+    public function test_31_cada_empresa_solo_ve_sus_propias_cxp(): void
+    {
+        $datosA = $this->crearEmpresaConDatos('Empresa A', '131000001');
+        $datosT = $this->crearEmpresaConDatos('Tobogán', '131000002');
+
+        $cxpA = $this->crearCompraCreditoConCxP($datosA);
+        $cxpT = $this->crearCompraCreditoConCxP($datosT);
+
+        $this->comoEmpresa($datosA['empresa']);
+
+        $this->actingAs($datosA['admin'])
+            ->get(CuentaPorPagarResource::getUrl('index', tenant: $datosA['empresa']))
+            ->assertOk()
+            ->assertSee($datosA['proveedor']->nombre)
+            ->assertDontSee($datosT['proveedor']->nombre);
+    }
+
+    /** 32. Un admin de Empresa A no puede ver una CxP de Tobogán por URL. */
+    public function test_32_empresa_no_puede_ver_cxp_de_otra_por_url(): void
+    {
+        $datosA = $this->crearEmpresaConDatos('Empresa A', '131000001');
+        $datosT = $this->crearEmpresaConDatos('Tobogán', '131000002');
+
+        $cxpT = $this->crearCompraCreditoConCxP($datosT);
+
+        $this->comoEmpresa($datosA['empresa']);
+
+        $this->actingAs($datosA['admin'])
+            ->get(CuentaPorPagarResource::getUrl('view', ['record' => $cxpT], tenant: $datosA['empresa']))
+            ->assertNotFound();
+    }
+
+    /** 33. anularPago en CxP no permite anular un pago de otra empresa (fix cross-tenant). */
+    public function test_33_anular_pago_cxp_no_permite_pago_de_otra_empresa(): void
+    {
+        $datosA = $this->crearEmpresaConDatos('Empresa A', '131000001');
+        $datosT = $this->crearEmpresaConDatos('Tobogán', '131000002');
+
+        $cxpT = $this->crearCompraCreditoConCxP($datosT);
+
+        // Registrar un pago en la CxP de Tobogán.
+        $this->comoEmpresa($datosT['empresa']);
+        $pagoT = app(CuentaPorPagarService::class)->registrarPago($cxpT, [
+            'monto' => 50,
+            'fecha' => now()->toDateString(),
+            'forma_pago' => FormaPago::EFECTIVO->value,
+        ], $datosT['admin']->id);
+
+        // Empresa A intenta anular el pago de Tobogán.
+        $this->comoEmpresa($datosA['empresa']);
+
+        $this->expectException(ModelNotFoundException::class);
+
+        PagoRealizado::where('empresa_id', Filament::getTenant()->id)
+            ->findOrFail($pagoT->id);
     }
 }
