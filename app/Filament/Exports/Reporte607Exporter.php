@@ -12,17 +12,9 @@ use Filament\Actions\Exports\Models\Export;
 use Illuminate\Support\Number;
 
 /**
- * TODO(fiscal-607-txt): la DGII exige, para la carga real en la Oficina Virtual, un archivo
- * TXT de 23 columnas separadas por "|" con un layout posicional propio (no este Excel/CSV, que
- * es para revisión interna). Se intentó confirmar el orden y los códigos exactos de esas 23
- * columnas contra el instructivo oficial (dgii.gov.do, "5-InstructivoLlenadoyenvioFomato607.pdf")
- * pero el PDF no permitió una extracción de texto confiable en este entorno (sin herramientas
- * de renderizado de PDF disponibles) más allá de fragmentos sueltos. Los 9 campos que sí se
- * confirmaron con la comunidad de ayuda de la DGII (RNC/Cédula, tipo de identificación 1/2,
- * NCF, NCF modificado, fecha, monto facturado sin ITBIS, ITBIS facturado) están implementados
- * aquí y en ReporteService::reporte607(). Antes de implementar el TXT de carga, hay que
- * descargar la plantilla oficial vigente (Oficina Virtual DGII > Formularios > Formatos de
- * envío de datos) y fijar el layout completo de las 23 columnas.
+ * Exportador Excel/CSV del 607 para revisión interna. El TXT oficial de 23 columnas para la
+ * Oficina Virtual de la DGII se genera en ReporteService::reporte607Txt() y se descarga desde
+ * el botón "Exportar TXT (DGII)" en la página ReporteFiscal607.
  */
 class Reporte607Exporter extends Exporter
 {
