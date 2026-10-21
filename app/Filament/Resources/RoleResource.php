@@ -13,7 +13,6 @@ use Filament\Facades\Filament;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
-use Illuminate\Support\Str;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
@@ -67,23 +66,20 @@ class RoleResource extends Resource
                 )
                 ->maxLength(255),
 
-            // Las claves del catálogo se normalizan a ASCII para la ruta del campo Livewire
-            // (statePath): un carácter como "ó" en "Configuración" rompe la validación del
-            // CheckboxList en Filament v4 ("El campo configuración seleccionado no es válido").
-            // La etiqueta de la sección conserva el nombre original (con tilde) vía ->heading().
+            // No usar disableOptionWhen() aquí: en Filament v4, getInValidationRuleValues()
+            // devuelve solo getEnabledOptions(), así que un valor deshabilitado pero presente en
+            // el estado del checkbox dispara "seleccionado no es válido". La protección de que
+            // Administrador conserve roles.gestionar ya vive en EditRole::mutateFormDataBeforeSave.
             ...collect(Permisos::catalogo())
-                ->map(fn (array $permisos, string $modulo) => Section::make(Str::ascii($modulo))
-                    ->heading($modulo)
+                ->map(fn (array $permisos, string $modulo) => Section::make($modulo)
                     ->collapsible()
                     ->collapsed()
                     ->schema([
-                        CheckboxList::make('permisos.' . Str::ascii($modulo))
+                        CheckboxList::make("permisos.{$modulo}")
                             ->hiddenLabel()
                             ->options($permisos)
                             ->bulkToggleable()
-                            ->columns(2)
-                            ->disableOptionWhen(fn (string $value, ?Role $record): bool => $value === self::PERMISO_GESTIONAR_ROLES
-                                && $record?->name === self::ROL_PROTEGIDO),
+                            ->columns(2),
                     ]))
                 ->values()
                 ->all(),

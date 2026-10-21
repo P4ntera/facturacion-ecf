@@ -10,7 +10,6 @@ use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Support\Exceptions\Halt;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Str;
 use Spatie\Permission\PermissionRegistrar;
 
 class EditRole extends EditRecord
@@ -32,11 +31,9 @@ class EditRole extends EditRecord
     {
         $permisosActuales = $this->record->permissions->pluck('name');
 
-        // Clave ASCII para que coincida con el statePath del CheckboxList en el form
-        // (ver comentario en RoleResource::form()).
         $data['permisos'] = collect(Permisos::catalogo())
             ->mapWithKeys(fn (array $permisos, string $modulo) => [
-                Str::ascii($modulo) => $permisosActuales->intersect(array_keys($permisos))->values()->all(),
+                $modulo => $permisosActuales->intersect(array_keys($permisos))->values()->all(),
             ])
             ->all();
 
