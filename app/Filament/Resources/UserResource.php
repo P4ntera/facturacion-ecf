@@ -80,6 +80,10 @@ class UserResource extends Resource
                 ->multiple()
                 ->preload()
                 ->searchable()
+                // Un usuario sin rol no puede acceder al panel (canAccessPanel() devuelve false
+                // si getAllPermissions() está vacío): obligar a seleccionar al menos uno evita
+                // crear usuarios "fantasma" que no pueden entrar.
+                ->required()
                 ->visible(fn (): bool => auth()->user()?->can('usuarios.gestionar') ?? false),
 
             Select::make('impresora_facturacion_id')
