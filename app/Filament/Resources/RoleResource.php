@@ -13,6 +13,7 @@ use Filament\Facades\Filament;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
+use Illuminate\Support\Str;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
@@ -66,12 +67,17 @@ class RoleResource extends Resource
                 )
                 ->maxLength(255),
 
+            // Las claves del catálogo se normalizan a ASCII para la ruta del campo Livewire
+            // (statePath): un carácter como "ó" en "Configuración" rompe la validación del
+            // CheckboxList en Filament v4 ("El campo configuración seleccionado no es válido").
+            // La etiqueta de la sección conserva el nombre original (con tilde) vía ->heading().
             ...collect(Permisos::catalogo())
-                ->map(fn (array $permisos, string $modulo) => Section::make($modulo)
+                ->map(fn (array $permisos, string $modulo) => Section::make(Str::ascii($modulo))
+                    ->heading($modulo)
                     ->collapsible()
                     ->collapsed()
                     ->schema([
-                        CheckboxList::make("permisos.{$modulo}")
+                        CheckboxList::make('permisos.' . Str::ascii($modulo))
                             ->hiddenLabel()
                             ->options($permisos)
                             ->bulkToggleable()

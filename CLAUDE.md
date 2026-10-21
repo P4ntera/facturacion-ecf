@@ -30,9 +30,9 @@ la base de datos si los encuentra, para que no queden huérfanos.
 - Cualquier consulta/asignación de roles o permisos fuera del ciclo normal de una request de panel
   (seeders, tests, comandos) necesita `setPermissionsTeamId($empresa->id)` primero, o
   `Role::firstOrCreate()`/`hasRole()`/`can()` no encuentran nada.
-- Gotcha conocido: `gestionar_arqueo_caja` es un permiso real en uso (Administrador y Vendedor lo
-  tienen) que quedó fuera de `Permisos::catalogo()` — al tocar el catálogo, no asumir que
-  `Permisos::todos()` es la lista completa de permisos que existen en la base de datos.
+- `gestionar_arqueo_caja` ya está incluido en `Permisos::catalogo()` (sección Ventas). Al editar
+  un rol, `EditRole::handleRecordUpdate()` preserva permisos que existan en la BD pero no estén
+  en el catálogo, para evitar pérdida accidental de datos al hacer `syncPermissions()`.
 - `User::canAccessPanel()` exige tener al menos un rol.
 - El login de Filament trae rate limiting nativo (5 intentos antes de bloqueo temporal).
 

@@ -29,10 +29,9 @@ class RolesEmpresaService
                 'name' => 'Administrador',
                 'guard_name' => 'web',
             ]);
-            // Preserva el hueco preexistente en Permisos::catalogo() (gestionar_arqueo_caja no
-            // está listado ahí): Administrador debe seguir teniendo TODOS los permisos reales,
-            // no solo los del catálogo.
-            $administrador->syncPermissions([...Permisos::todos(), 'gestionar_arqueo_caja']);
+            // gestionar_arqueo_caja ahora está en Permisos::catalogo() (Ventas), así que
+            // Permisos::todos() ya lo incluye — no hace falta agregarlo a mano.
+            $administrador->syncPermissions(Permisos::todos());
 
             $vendedor = $this->rolSeguro([
                 'empresa_id' => $empresa->id,

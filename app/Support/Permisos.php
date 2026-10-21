@@ -70,6 +70,7 @@ class Permisos
                 'ventas.devolucion' => 'Realizar devoluciones de clientes',
                 'ventas.devolucion_autorizar' => 'Autorizar devoluciones por encima del monto límite (supervisor)',
                 'ventas.imprimir' => 'Imprimir comprobantes y tickets',
+                'gestionar_arqueo_caja' => 'Gestionar arqueo de caja',
                 'arqueo.cerrar_ajeno' => 'Cerrar cajas de otros cajeros (no solo la propia)',
             ],
             'Inventario' => [

@@ -47,10 +47,8 @@ class RolePermissionSeeder extends Seeder
             Permission::firstOrCreate(['name' => $permiso, 'guard_name' => 'web']);
         }
 
-        // gestionar_arqueo_caja: permiso real en uso (RolesEmpresaService lo asigna a
-        // Administrador/Vendedor) que quedó fuera de Permisos::catalogo() — se crea aquí para
-        // no perder el hueco de vista, sin tocar el catálogo (fuera del alcance de este cambio).
-        Permission::firstOrCreate(['name' => 'gestionar_arqueo_caja', 'guard_name' => 'web']);
+        // gestionar_arqueo_caja ya está en Permisos::catalogo() (Ventas) desde que se cerró
+        // el hueco conocido — lo crea el foreach de arriba, no necesita línea especial.
 
         // Los permisos gruesos ya no se asignan a ningún rol: se destruyen directamente (no solo
         // se desasignan) para que no quede un registro "vivo" que alguien reactive por error.
