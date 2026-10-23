@@ -101,6 +101,40 @@ class RolesEmpresaService
                 'notificaciones.stock_bajo',
             ]);
 
+            if ($empresa->perfil === PerfilEmpresa::LAVANDERIA) {
+                $recepcionistaLav = $this->rolSeguro([
+                    'empresa_id' => $empresa->id,
+                    'name' => 'Recepcionista Lavandería',
+                    'guard_name' => 'web',
+                ]);
+                $recepcionistaLav->syncPermissions([
+                    'pos.acceder',
+                    'ventas.ver',
+                    'ventas.imprimir',
+                    'clientes.ver',
+                    'clientes.crear',
+                    'clientes.editar',
+                    'lavanderia.ver_tickets',
+                    'lavanderia.crear_ticket',
+                    'lavanderia.cambiar_estado',
+                    'lavanderia.entregar',
+                    'cxc.ver',
+                    'cxc.cobrar',
+                    'reportes.ver',
+                    'reportes.exportar',
+                ]);
+
+                $operadorLav = $this->rolSeguro([
+                    'empresa_id' => $empresa->id,
+                    'name' => 'Operador Lavandería',
+                    'guard_name' => 'web',
+                ]);
+                $operadorLav->syncPermissions([
+                    'lavanderia.ver_tickets',
+                    'lavanderia.cambiar_estado',
+                ]);
+            }
+
             if ($empresa->perfil === PerfilEmpresa::RESTAURANTE) {
                 $mesero = $this->rolSeguro([
                     'empresa_id' => $empresa->id,

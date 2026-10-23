@@ -5,6 +5,7 @@ namespace Tests\Support;
 use App\Models\AreaRestaurante;
 use App\Models\Caja;
 use App\Models\Categoria;
+use App\Models\DetalleTicketLavanderia;
 use App\Models\Cliente;
 use App\Models\Comanda;
 use App\Models\Compra;
@@ -20,6 +21,9 @@ use App\Models\Producto;
 use App\Models\Proveedor;
 use App\Models\RecepcionCompra;
 use App\Models\SecuenciaNcf;
+use App\Models\ServicioLavanderia;
+use App\Models\TicketLavanderia;
+use App\Models\TipoPrenda;
 use App\Models\User;
 use App\Models\Venta;
 use Illuminate\Database\Eloquent\Model;
@@ -55,6 +59,9 @@ class TenantDefaults
         User::class,
         Descuento::class,
         Caja::class,
+        TipoPrenda::class,
+        ServicioLavanderia::class,
+        TicketLavanderia::class,
     ];
 
     private static ?int $empresaId = null;

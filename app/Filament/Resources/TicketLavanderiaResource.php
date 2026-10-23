@@ -1,0 +1,278 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Filament\Resources;
+
+use App\Enums\EstadoPagoTicket;
+use App\Enums\EstadoTicketLavanderia;
+use App\Enums\Modulo;
+use App\Filament\Concerns\RestringidoPorModulo;
+use App\Filament\Resources\TicketLavanderiaResource\Pages;
+use App\Models\Cliente;
+use App\Models\ServicioLavanderia;
+use App\Models\TicketLavanderia;
+use App\Models\TipoPrenda;
+use Filament\Facades\Filament;
+use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Repeater;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
+use Filament\Forms\Get;
+use Filament\Forms\Set;
+use Filament\Resources\Resource;
+use Filament\Schemas\Schema;
+use Filament\Support\Icons\Heroicon;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\Filter;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
+
+class TicketLavanderiaResource extends Resource
+{
+    use RestringidoPorModulo;
+
+    protected static ?string $model = TicketLavanderia::class;
+
+    protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedTicket;
+
+    protected static string|\UnitEnum|null $navigationGroup = 'Lavandería';
+
+    protected static ?int $navigationSort = 3;
+
+    protected static ?string $navigationLabel = 'Tickets';
+
+    protected static ?string $pluralModelLabel = 'Tickets de Lavandería';
+
+    protected static ?string $modelLabel = 'Ticket de Lavandería';
+
+    public static function modulo(): Modulo
+    {
+        return Modulo::LAVANDERIA_TICKETS;
+    }
+
+    public static function form(Schema $schema): Schema
+    {
+        $empresaId = Filament::getTenant()?->id;
+
+        return $schema->components([
+            Select::make('cliente_id')
+                ->label('Cliente')
+                ->options(fn () => Cliente::where('empresa_id', $empresaId)
+                    ->where('activo', true)
+                    ->pluck('nombre', 'id'))
+                ->searchable()
+                ->nullable()
+                ->preload(),
+
+            DatePicker::make('fecha_prometida')
+                ->label('Fecha Prometida de Entrega')
+                ->minDate(now()),
+
+            Textarea::make('observaciones')
+                ->label('Observaciones Generales')
+                ->rows(2),
+
+            Toggle::make('pagar_ahora')
+                ->label('¿Paga ahora?')
+                ->helperText('Si paga ahora se genera factura inmediatamente. De lo contrario recibe un ticket para pagar al retirar.')
+                ->default(false)
+                ->dehydrated(false)
+                ->live(),
+
+            Repeater::make('detalles')
+                ->label('Prendas')
+                ->schema([
+                    Select::make('tipo_prenda_id')
+                        ->label('Tipo de Prenda')
+                        ->options(fn () => TipoPrenda::where('empresa_id', $empresaId)
+                            ->where('activo', true)
+                            ->pluck('nombre', 'id'))
+                        ->required()
+                        ->searchable(),
+
+                    Select::make('servicio_lavanderia_id')
+                        ->label('Servicio')
+                        ->options(fn () => ServicioLavanderia::where('empresa_id', $empresaId)
+                            ->where('activo', true)
+                            ->pluck('nombre', 'id'))
+                        ->required()
+                        ->searchable()
+                        ->live()
+                        ->afterStateUpdated(function (Get $get, Set $set, ?string $state) {
+                            if ($state) {
+                                $servicio = ServicioLavanderia::find($state);
+                                if ($servicio) {
+                                    $set('precio_unitario', $servicio->precio_base);
+                                    $cantidad = max(1, (int) ($get('cantidad') ?: 1));
+                                    $set('subtotal', round($servicio->precio_base * $cantidad, 2));
+                                }
+                            }
+                        }),
+
+                    TextInput::make('cantidad')
+                        ->label('Cantidad')
+                        ->numeric()
+                        ->default(1)
+                        ->minValue(1)
+                        ->required()
+                        ->live()
+                        ->afterStateUpdated(function (Get $get, Set $set, ?string $state) {
+                            $precio = (float) ($get('precio_unitario') ?: 0);
+                            $cantidad = max(1, (int) ($state ?: 1));
+                            $set('subtotal', round($precio * $cantidad, 2));
+                        }),
+
+                    TextInput::make('precio_unitario')
+                        ->label('Precio Unit.')
+                        ->numeric()
+                        ->prefix('RD$')
+                        ->required()
+                        ->live()
+                        ->afterStateUpdated(function (Get $get, Set $set, ?string $state) {
+                            $precio = (float) ($state ?: 0);
+                            $cantidad = max(1, (int) ($get('cantidad') ?: 1));
+                            $set('subtotal', round($precio * $cantidad, 2));
+                        }),
+
+                    TextInput::make('subtotal')
+                        ->label('Subtotal')
+                        ->numeric()
+                        ->prefix('RD$')
+                        ->disabled()
+                        ->dehydrated(false),
+
+                    Textarea::make('observaciones')
+                        ->label('Observaciones')
+                        ->rows(1),
+                ])
+                ->columns(3)
+                ->minItems(1)
+                ->defaultItems(1)
+                ->required(),
+        ]);
+    }
+
+    public static function table(Table $table): Table
+    {
+        return $table
+            ->columns([
+                TextColumn::make('numero')
+                    ->label('Número')
+                    ->searchable()
+                    ->sortable(),
+
+                TextColumn::make('cliente.nombre')
+                    ->label('Cliente')
+                    ->placeholder('Portador')
+                    ->searchable()
+                    ->sortable(),
+
+                TextColumn::make('recepcionista.name')
+                    ->label('Recepcionista')
+                    ->sortable(),
+
+                TextColumn::make('estado')
+                    ->label('Estado')
+                    ->badge()
+                    ->formatStateUsing(fn (EstadoTicketLavanderia $state) => $state->etiqueta())
+                    ->color(fn (EstadoTicketLavanderia $state) => $state->color()),
+
+                TextColumn::make('estado_pago')
+                    ->label('Pago')
+                    ->badge()
+                    ->formatStateUsing(fn (EstadoPagoTicket $state) => $state->etiqueta())
+                    ->color(fn (EstadoPagoTicket $state) => $state->color()),
+
+                TextColumn::make('total')
+                    ->label('Total')
+                    ->money('DOP')
+                    ->sortable(),
+
+                TextColumn::make('fecha_prometida')
+                    ->label('Entrega')
+                    ->date('d/m/Y')
+                    ->placeholder('—')
+                    ->sortable(),
+
+                TextColumn::make('created_at')
+                    ->label('Recibido')
+                    ->dateTime('d/m/Y H:i')
+                    ->sortable(),
+            ])
+            ->filters([
+                SelectFilter::make('estado')
+                    ->options(collect(EstadoTicketLavanderia::cases())
+                        ->mapWithKeys(fn (EstadoTicketLavanderia $e) => [$e->value => $e->etiqueta()])
+                        ->all()),
+
+                SelectFilter::make('estado_pago')
+                    ->label('Estado de Pago')
+                    ->options(collect(EstadoPagoTicket::cases())
+                        ->mapWithKeys(fn (EstadoPagoTicket $e) => [$e->value => $e->etiqueta()])
+                        ->all()),
+
+                Filter::make('rango')
+                    ->schema([
+                        DatePicker::make('desde')->label('Desde'),
+                        DatePicker::make('hasta')->label('Hasta'),
+                    ])
+                    ->query(function (Builder $query, array $data) {
+                        return $query
+                            ->when($data['desde'] ?? null, fn (Builder $q, $d) => $q->whereDate('created_at', '>=', $d))
+                            ->when($data['hasta'] ?? null, fn (Builder $q, $d) => $q->whereDate('created_at', '<=', $d));
+                    }),
+            ])
+            ->defaultSort('created_at', 'desc');
+    }
+
+    public static function infolist(Schema $schema): Schema
+    {
+        return $schema->components([
+            \Filament\Infolists\Components\TextEntry::make('numero')->label('Número'),
+            \Filament\Infolists\Components\TextEntry::make('cliente.nombre')->label('Cliente')->placeholder('Portador'),
+            \Filament\Infolists\Components\TextEntry::make('recepcionista.name')->label('Recepcionista'),
+            \Filament\Infolists\Components\TextEntry::make('estado')
+                ->label('Estado')
+                ->badge()
+                ->formatStateUsing(fn (EstadoTicketLavanderia $state) => $state->etiqueta())
+                ->color(fn (EstadoTicketLavanderia $state) => $state->color()),
+            \Filament\Infolists\Components\TextEntry::make('estado_pago')
+                ->label('Estado de Pago')
+                ->badge()
+                ->formatStateUsing(fn (EstadoPagoTicket $state) => $state->etiqueta())
+                ->color(fn (EstadoPagoTicket $state) => $state->color()),
+            \Filament\Infolists\Components\TextEntry::make('total')->label('Total')->money('DOP'),
+            \Filament\Infolists\Components\TextEntry::make('itbis')->label('ITBIS')->money('DOP'),
+            \Filament\Infolists\Components\TextEntry::make('fecha_prometida')->label('Fecha Prometida')->date('d/m/Y')->placeholder('—'),
+            \Filament\Infolists\Components\TextEntry::make('observaciones')->label('Observaciones')->placeholder('—')->columnSpanFull(),
+            \Filament\Infolists\Components\TextEntry::make('created_at')->label('Recibido')->dateTime('d/m/Y H:i'),
+            \Filament\Infolists\Components\TextEntry::make('entregado_en')->label('Entregado')->dateTime('d/m/Y H:i')->placeholder('—'),
+            \Filament\Infolists\Components\TextEntry::make('venta.numero_comprobante')->label('Comprobante')->placeholder('—'),
+
+            \Filament\Infolists\Components\RepeatableEntry::make('detalles')
+                ->label('Prendas')
+                ->schema([
+                    \Filament\Infolists\Components\TextEntry::make('tipoPrenda.nombre')->label('Prenda'),
+                    \Filament\Infolists\Components\TextEntry::make('servicioLavanderia.nombre')->label('Servicio'),
+                    \Filament\Infolists\Components\TextEntry::make('cantidad')->label('Cant.'),
+                    \Filament\Infolists\Components\TextEntry::make('precio_unitario')->label('Precio unit.')->money('DOP'),
+                    \Filament\Infolists\Components\TextEntry::make('subtotal')->label('Subtotal')->money('DOP'),
+                    \Filament\Infolists\Components\TextEntry::make('observaciones')->label('Observaciones')->placeholder('—'),
+                ])
+                ->columns(6),
+        ]);
+    }
+
+    public static function getPages(): array
+    {
+        return [
+            'index' => Pages\ListTicketsLavanderia::route('/'),
+            'create' => Pages\CreateTicketLavanderia::route('/create'),
+            'view' => Pages\ViewTicketLavanderia::route('/{record}'),
+        ];
+    }
+}

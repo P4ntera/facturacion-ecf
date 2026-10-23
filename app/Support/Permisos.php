@@ -123,6 +123,15 @@ class Permisos
                 'cocina.ver' => 'Ver pantalla de cocina (KDS)',
                 'cocina.preparar' => 'Marcar ítems como preparados',
             ],
+            'Lavandería' => [
+                'lavanderia.ver_tickets' => 'Ver tickets de lavandería',
+                'lavanderia.crear_ticket' => 'Crear tickets de lavandería',
+                'lavanderia.cambiar_estado' => 'Cambiar estado de tickets',
+                'lavanderia.entregar' => 'Entregar prendas al cliente',
+                'lavanderia.anular_ticket' => 'Anular tickets de lavandería',
+                'lavanderia.ver_reportes' => 'Ver reportes de lavandería',
+                'lavanderia.configurar' => 'Configurar tipos de prenda y servicios',
+            ],
             'Configuración' => [
                 'empresa.administrar' => 'Administrar datos de la empresa',
                 'facturacion.administrar' => 'Administrar configuración de facturación',

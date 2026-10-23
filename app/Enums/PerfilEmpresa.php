@@ -9,6 +9,7 @@ enum PerfilEmpresa: string
     case FACTURACION = 'facturacion';
     case RESTAURANTE = 'restaurante';
     case RETAIL = 'retail';
+    case LAVANDERIA = 'lavanderia';
 
     public function etiqueta(): string
     {
@@ -16,6 +17,7 @@ enum PerfilEmpresa: string
             self::FACTURACION => 'Facturación',
             self::RESTAURANTE => 'Restaurante',
             self::RETAIL => 'Retail',
+            self::LAVANDERIA => 'Lavandería',
         };
     }
 
@@ -25,6 +27,7 @@ enum PerfilEmpresa: string
             self::FACTURACION => 'Facturación general, compras, inventario y cuentas',
             self::RESTAURANTE => 'Mesas, comandas, cocina + facturación',
             self::RETAIL => 'Punto de venta con inventario avanzado',
+            self::LAVANDERIA => 'Tickets de lavandería, servicios por prenda + facturación',
         };
     }
 
@@ -74,6 +77,15 @@ enum PerfilEmpresa: string
                 Modulo::RESTAURANTE_COCINA,
             ],
             self::RETAIL => $base,
+            self::LAVANDERIA => [
+                ...$base,
+                Modulo::VENTAS_ARQUEO_CAJA,
+                Modulo::CUENTAS_POR_COBRAR,
+                Modulo::ECF_SECUENCIAS,
+                Modulo::LAVANDERIA_TIPOS_PRENDA,
+                Modulo::LAVANDERIA_SERVICIOS,
+                Modulo::LAVANDERIA_TICKETS,
+            ],
         };
     }
 }
