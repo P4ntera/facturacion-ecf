@@ -7,6 +7,7 @@ use App\Enums\EstadoTicketLavanderia;
 use App\Enums\PerfilEmpresa;
 use App\Models\DetalleTicketLavanderia;
 use App\Models\Empresa;
+use App\Models\PrecioLavanderia;
 use App\Models\ServicioLavanderia;
 use App\Models\TicketLavanderia;
 use App\Models\TipoPrenda;
@@ -779,5 +780,157 @@ class LavanderiaTest extends TestCase
             $this->assertNotEmpty($estado->etiqueta());
             $this->assertNotEmpty($estado->color());
         }
+    }
+
+    // ───────────────────────────────────────────────────────────────────
+    //  Matriz de precios (prenda × servicio)
+    // ───────────────────────────────────────────────────────────────────
+
+    public function test_precio_matriz_se_usa_cuando_existe(): void
+    {
+        // Crear precio en la matriz: Camisa + Lavado y Planchado = 120
+        PrecioLavanderia::create([
+            'empresa_id' => $this->empresa->id,
+            'tipo_prenda_id' => $this->tipoPrenda->id,
+            'servicio_lavanderia_id' => $this->servicioConItbis->id,
+            'precio' => 120.00,
+        ]);
+
+        // Crear ticket SIN precio manual → debe usar el de la matriz (120), no el base (150)
+        $ticket = $this->crearTicket([
+            'detalles' => [
+                [
+                    'tipo_prenda_id' => $this->tipoPrenda->id,
+                    'servicio_lavanderia_id' => $this->servicioConItbis->id,
+                    'cantidad' => 1,
+                    // sin precio_unitario → cae a la matriz
+                ],
+            ],
+        ]);
+
+        $detalle = $ticket->detalles->first();
+        $this->assertEquals('120.00', $detalle->precio_unitario);
+        // subtotal = 120, ITBIS = 21.60, total = 141.60
+        $this->assertEquals('120.00', $detalle->subtotal);
+        $this->assertEquals('21.60', $ticket->itbis);
+        $this->assertEquals('141.60', $ticket->total);
+    }
+
+    public function test_precio_manual_tiene_prioridad_sobre_matriz(): void
+    {
+        PrecioLavanderia::create([
+            'empresa_id' => $this->empresa->id,
+            'tipo_prenda_id' => $this->tipoPrenda->id,
+            'servicio_lavanderia_id' => $this->servicioConItbis->id,
+            'precio' => 120.00,
+        ]);
+
+        // Precio manual = 200 → debe ignorar la matriz (120) y el base (150)
+        $ticket = $this->crearTicket([
+            'detalles' => [
+                [
+                    'tipo_prenda_id' => $this->tipoPrenda->id,
+                    'servicio_lavanderia_id' => $this->servicioConItbis->id,
+                    'cantidad' => 1,
+                    'precio_unitario' => 200.00,
+                ],
+            ],
+        ]);
+
+        $detalle = $ticket->detalles->first();
+        $this->assertEquals('200.00', $detalle->precio_unitario);
+    }
+
+    public function test_sin_precio_manual_ni_matriz_usa_precio_base_del_servicio(): void
+    {
+        // No hay entrada en la matriz → debe usar precio_base = 150
+        $ticket = $this->crearTicket([
+            'detalles' => [
+                [
+                    'tipo_prenda_id' => $this->tipoPrenda->id,
+                    'servicio_lavanderia_id' => $this->servicioConItbis->id,
+                    'cantidad' => 1,
+                    // sin precio_unitario y sin entrada en la matriz
+                ],
+            ],
+        ]);
+
+        $detalle = $ticket->detalles->first();
+        $this->assertEquals('150.00', $detalle->precio_unitario);
+    }
+
+    public function test_precio_matriz_respeta_aislamiento_entre_empresas(): void
+    {
+        $otraEmpresa = Empresa::factory()->create(['perfil' => PerfilEmpresa::LAVANDERIA]);
+
+        $tipoPrendaOtra = TipoPrenda::create([
+            'empresa_id' => $otraEmpresa->id,
+            'nombre' => 'Camisa',
+            'activo' => true,
+        ]);
+
+        $servicioOtra = ServicioLavanderia::create([
+            'empresa_id' => $otraEmpresa->id,
+            'nombre' => 'Lavado',
+            'precio_base' => 100.00,
+            'aplica_itbis' => true,
+            'activo' => true,
+        ]);
+
+        // Precio en la empresa 2
+        PrecioLavanderia::create([
+            'empresa_id' => $otraEmpresa->id,
+            'tipo_prenda_id' => $tipoPrendaOtra->id,
+            'servicio_lavanderia_id' => $servicioOtra->id,
+            'precio' => 50.00,
+        ]);
+
+        // La empresa 1 no tiene precio en la matriz → debe usar precio_base
+        $resultado = PrecioLavanderia::precioParaCombinacion(
+            $this->empresa->id,
+            $this->tipoPrenda->id,
+            $this->servicioConItbis->id,
+        );
+
+        $this->assertNull($resultado);
+    }
+
+    public function test_precio_lavanderia_modelo_tiene_relaciones(): void
+    {
+        $precio = PrecioLavanderia::create([
+            'empresa_id' => $this->empresa->id,
+            'tipo_prenda_id' => $this->tipoPrenda->id,
+            'servicio_lavanderia_id' => $this->servicioConItbis->id,
+            'precio' => 120.00,
+        ]);
+
+        $this->assertEquals($this->empresa->id, $precio->empresa->id);
+        $this->assertEquals($this->tipoPrenda->id, $precio->tipoPrenda->id);
+        $this->assertEquals($this->servicioConItbis->id, $precio->servicioLavanderia->id);
+    }
+
+    public function test_precio_lavanderia_unique_constraint(): void
+    {
+        PrecioLavanderia::create([
+            'empresa_id' => $this->empresa->id,
+            'tipo_prenda_id' => $this->tipoPrenda->id,
+            'servicio_lavanderia_id' => $this->servicioConItbis->id,
+            'precio' => 120.00,
+        ]);
+
+        $this->expectException(\Illuminate\Database\QueryException::class);
+
+        PrecioLavanderia::create([
+            'empresa_id' => $this->empresa->id,
+            'tipo_prenda_id' => $this->tipoPrenda->id,
+            'servicio_lavanderia_id' => $this->servicioConItbis->id,
+            'precio' => 200.00,
+        ]);
+    }
+
+    public function test_precio_lavanderia_policy_no_permite_delete(): void
+    {
+        $policy = new \App\Policies\PrecioLavanderiaPolicy();
+        $this->assertFalse($policy->delete($this->admin, new PrecioLavanderia()));
     }
 }

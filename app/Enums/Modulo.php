@@ -47,6 +47,7 @@ enum Modulo: string
 
     case LAVANDERIA_TIPOS_PRENDA = 'lavanderia_tipos_prenda';
     case LAVANDERIA_SERVICIOS = 'lavanderia_servicios';
+    case LAVANDERIA_PRECIOS = 'lavanderia_precios';
     case LAVANDERIA_TICKETS = 'lavanderia_tickets';
 
     case IMPRESORAS = 'impresoras';
@@ -81,6 +82,7 @@ enum Modulo: string
             self::RESTAURANTE_COCINA => 'Cocina (KDS)',
             self::LAVANDERIA_TIPOS_PRENDA => 'Tipos de Prenda',
             self::LAVANDERIA_SERVICIOS => 'Servicios de Lavandería',
+            self::LAVANDERIA_PRECIOS => 'Precios por Prenda',
             self::LAVANDERIA_TICKETS => 'Tickets de Lavandería',
             self::IMPRESORAS => 'Impresoras',
             self::AUDITORIA => 'Auditoría',
@@ -114,7 +116,7 @@ enum Modulo: string
             self::RESTAURANTE_COCINA => 'Restaurante',
 
             self::LAVANDERIA_TIPOS_PRENDA, self::LAVANDERIA_SERVICIOS,
-            self::LAVANDERIA_TICKETS => 'Lavandería',
+            self::LAVANDERIA_PRECIOS, self::LAVANDERIA_TICKETS => 'Lavandería',
 
             self::IMPRESORAS, self::AUDITORIA => 'Configuración',
         };
@@ -147,6 +149,7 @@ enum Modulo: string
             self::CUENTAS_POR_PAGAR => [self::COMPRAS],
             self::RESTAURANTE_COMANDAS => [self::RESTAURANTE_MESAS],
             self::RESTAURANTE_COCINA => [self::RESTAURANTE_COMANDAS],
+            self::LAVANDERIA_PRECIOS => [self::LAVANDERIA_TIPOS_PRENDA, self::LAVANDERIA_SERVICIOS],
             self::LAVANDERIA_TICKETS => [self::LAVANDERIA_TIPOS_PRENDA, self::LAVANDERIA_SERVICIOS],
             default => [],
         };

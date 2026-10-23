@@ -17,6 +17,7 @@ use App\Models\Impresora;
 use App\Models\Mesa;
 use App\Models\MovimientoInventario;
 use App\Models\OrdenCompra;
+use App\Models\PrecioLavanderia;
 use App\Models\Producto;
 use App\Models\Proveedor;
 use App\Models\RecepcionCompra;
@@ -62,6 +63,7 @@ class TenantDefaults
         TipoPrenda::class,
         ServicioLavanderia::class,
         TicketLavanderia::class,
+        PrecioLavanderia::class,
     ];
 
     private static ?int $empresaId = null;

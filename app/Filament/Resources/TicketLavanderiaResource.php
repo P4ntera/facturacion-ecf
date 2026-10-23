@@ -10,6 +10,7 @@ use App\Enums\Modulo;
 use App\Filament\Concerns\RestringidoPorModulo;
 use App\Filament\Resources\TicketLavanderiaResource\Pages;
 use App\Models\Cliente;
+use App\Models\PrecioLavanderia;
 use App\Models\ServicioLavanderia;
 use App\Models\TicketLavanderia;
 use App\Models\TipoPrenda;
@@ -41,7 +42,7 @@ class TicketLavanderiaResource extends Resource
 
     protected static string|\UnitEnum|null $navigationGroup = 'Lavandería';
 
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 4;
 
     protected static ?string $navigationLabel = 'Tickets';
 
@@ -92,7 +93,20 @@ class TicketLavanderiaResource extends Resource
                             ->where('activo', true)
                             ->pluck('nombre', 'id'))
                         ->required()
-                        ->searchable(),
+                        ->searchable()
+                        ->live()
+                        ->afterStateUpdated(function (Get $get, Set $set, ?string $state) use ($empresaId) {
+                            $servicioId = $get('servicio_lavanderia_id');
+                            if ($state && $servicioId) {
+                                $precio = PrecioLavanderia::precioParaCombinacion((int) $empresaId, (int) $state, (int) $servicioId)
+                                    ?? ServicioLavanderia::find($servicioId)?->precio_base;
+                                if ($precio !== null) {
+                                    $set('precio_unitario', $precio);
+                                    $cantidad = max(1, (int) ($get('cantidad') ?: 1));
+                                    $set('subtotal', round((float) $precio * $cantidad, 2));
+                                }
+                            }
+                        }),
 
                     Select::make('servicio_lavanderia_id')
                         ->label('Servicio')
@@ -102,13 +116,22 @@ class TicketLavanderiaResource extends Resource
                         ->required()
                         ->searchable()
                         ->live()
-                        ->afterStateUpdated(function (Get $get, Set $set, ?string $state) {
+                        ->afterStateUpdated(function (Get $get, Set $set, ?string $state) use ($empresaId) {
                             if ($state) {
+                                $tipoPrendaId = $get('tipo_prenda_id');
                                 $servicio = ServicioLavanderia::find($state);
-                                if ($servicio) {
-                                    $set('precio_unitario', $servicio->precio_base);
+
+                                // Prioridad: 1) matriz prenda×servicio, 2) precio_base del servicio
+                                $precio = null;
+                                if ($tipoPrendaId) {
+                                    $precio = PrecioLavanderia::precioParaCombinacion((int) $empresaId, (int) $tipoPrendaId, (int) $state);
+                                }
+                                $precio = $precio ?? $servicio?->precio_base;
+
+                                if ($precio !== null) {
+                                    $set('precio_unitario', $precio);
                                     $cantidad = max(1, (int) ($get('cantidad') ?: 1));
-                                    $set('subtotal', round($servicio->precio_base * $cantidad, 2));
+                                    $set('subtotal', round((float) $precio * $cantidad, 2));
                                 }
                             }
                         }),

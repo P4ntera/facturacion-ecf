@@ -84,6 +84,7 @@ enum PerfilEmpresa: string
                 Modulo::ECF_SECUENCIAS,
                 Modulo::LAVANDERIA_TIPOS_PRENDA,
                 Modulo::LAVANDERIA_SERVICIOS,
+                Modulo::LAVANDERIA_PRECIOS,
                 Modulo::LAVANDERIA_TICKETS,
             ],
         };

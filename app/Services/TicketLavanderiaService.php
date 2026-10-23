@@ -10,6 +10,7 @@ use App\Enums\TasaItbis;
 use App\Enums\TipoProducto;
 use App\Models\DetalleTicketLavanderia;
 use App\Models\Empresa;
+use App\Models\PrecioLavanderia;
 use App\Models\Producto;
 use App\Models\ServicioLavanderia;
 use App\Models\TicketLavanderia;
@@ -69,7 +70,11 @@ class TicketLavanderiaService
 
             foreach ($detalles as $linea) {
                 $servicio = ServicioLavanderia::lockForUpdate()->find($linea['servicio_lavanderia_id']);
-                $precioUnitario = $linea['precio_unitario'] ?? $servicio->precio_base;
+
+                // Prioridad de precio: 1) manual del formulario, 2) matriz prenda×servicio, 3) precio_base del servicio
+                $precioUnitario = $linea['precio_unitario']
+                    ?? PrecioLavanderia::precioParaCombinacion($empresa->id, $linea['tipo_prenda_id'], $linea['servicio_lavanderia_id'])
+                    ?? $servicio->precio_base;
                 $cantidad = max(1, (int) $linea['cantidad']);
                 $subtotal = round($precioUnitario * $cantidad, 2);
 
