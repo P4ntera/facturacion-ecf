@@ -16,6 +16,7 @@ use App\Models\TicketLavanderia;
 use App\Models\TipoPrenda;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -69,9 +70,11 @@ class TicketLavanderiaResource extends Resource
                 ->nullable()
                 ->preload(),
 
-            DatePicker::make('fecha_prometida')
-                ->label('Fecha Prometida de Entrega')
-                ->minDate(now()),
+            DateTimePicker::make('fecha_prometida')
+                ->label('Fecha y Hora Prometida de Entrega')
+                ->minDate(now()->addHours(2))
+                ->seconds(false)
+                ->helperText('Mínimo 2 horas a partir de ahora'),
 
             Textarea::make('observaciones')
                 ->label('Observaciones Generales')
@@ -217,7 +220,7 @@ class TicketLavanderiaResource extends Resource
 
                 TextColumn::make('fecha_prometida')
                     ->label('Entrega')
-                    ->date('d/m/Y')
+                    ->dateTime('d/m/Y h:i A')
                     ->placeholder('—')
                     ->sortable(),
 
@@ -270,7 +273,7 @@ class TicketLavanderiaResource extends Resource
                 ->color(fn (EstadoPagoTicket $state) => $state->color()),
             \Filament\Infolists\Components\TextEntry::make('total')->label('Total')->money('DOP'),
             \Filament\Infolists\Components\TextEntry::make('itbis')->label('ITBIS')->money('DOP'),
-            \Filament\Infolists\Components\TextEntry::make('fecha_prometida')->label('Fecha Prometida')->date('d/m/Y')->placeholder('—'),
+            \Filament\Infolists\Components\TextEntry::make('fecha_prometida')->label('Fecha Prometida')->dateTime('d/m/Y h:i A')->placeholder('—'),
             \Filament\Infolists\Components\TextEntry::make('observaciones')->label('Observaciones')->placeholder('—')->columnSpanFull(),
             \Filament\Infolists\Components\TextEntry::make('created_at')->label('Recibido')->dateTime('d/m/Y H:i'),
             \Filament\Infolists\Components\TextEntry::make('entregado_en')->label('Entregado')->dateTime('d/m/Y H:i')->placeholder('—'),

@@ -695,13 +695,28 @@ class LavanderiaTest extends TestCase
 
     public function test_ticket_guarda_observaciones_y_fecha_prometida(): void
     {
+        $fechaPrometida = now()->addHours(5)->format('Y-m-d H:i:s');
+
         $ticket = $this->crearTicket([
             'observaciones' => 'Mancha difícil en cuello',
-            'fecha_prometida' => '2026-11-01',
+            'fecha_prometida' => $fechaPrometida,
         ]);
 
         $this->assertEquals('Mancha difícil en cuello', $ticket->observaciones);
-        $this->assertEquals('2026-11-01', $ticket->fecha_prometida->format('Y-m-d'));
+        $this->assertEquals(
+            now()->addHours(5)->format('Y-m-d H'),
+            $ticket->fecha_prometida->format('Y-m-d H'),
+        );
+    }
+
+    public function test_fecha_prometida_menor_a_dos_horas_lanza_excepcion(): void
+    {
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('La fecha prometida debe ser al menos 2 horas');
+
+        $this->crearTicket([
+            'fecha_prometida' => now()->addHour()->format('Y-m-d H:i:s'),
+        ]);
     }
 
     public function test_detalle_guarda_observaciones(): void

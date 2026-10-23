@@ -17,6 +17,7 @@ use App\Models\TicketLavanderia;
 use App\Models\TipoPrenda;
 use App\Models\User;
 use App\Models\Venta;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -50,6 +51,14 @@ class TicketLavanderiaService
 
         if (empty($detalles)) {
             throw new RuntimeException('El ticket debe tener al menos una prenda.');
+        }
+
+        // Validar fecha prometida: mínimo 2 horas a partir de ahora
+        if (! empty($datos['fecha_prometida'])) {
+            $fechaPrometida = Carbon::parse($datos['fecha_prometida']);
+            if ($fechaPrometida->lt(now()->addHours(2))) {
+                throw new RuntimeException('La fecha prometida debe ser al menos 2 horas a partir de ahora.');
+            }
         }
 
         // Validar que todas las prendas y servicios pertenezcan a la empresa

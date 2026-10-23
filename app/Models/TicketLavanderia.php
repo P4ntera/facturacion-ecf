@@ -25,7 +25,7 @@ class TicketLavanderia extends Model
         'estado_pago' => EstadoPagoTicket::class,
         'total' => 'decimal:2',
         'itbis' => 'decimal:2',
-        'fecha_prometida' => 'date',
+        'fecha_prometida' => 'datetime',
         'entregado_en' => 'datetime',
     ];
 
