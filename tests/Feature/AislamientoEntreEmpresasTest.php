@@ -61,6 +61,11 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
+use App\Filament\Resources\TicketLavanderiaResource;
+use App\Models\ServicioLavanderia;
+use App\Models\TicketLavanderia;
+use App\Models\TipoPrenda;
+use App\Services\TicketLavanderiaService;
 use RuntimeException;
 use Tests\Support\TenantDefaults;
 use Tests\TestCase;
@@ -1267,5 +1272,169 @@ class AislamientoEntreEmpresasTest extends TestCase
 
         PagoRealizado::where('empresa_id', Filament::getTenant()->id)
             ->findOrFail($pagoT->id);
+    }
+
+    // ───────────────────────────────────────────────────────────────────
+    //  Lavandería — aislamiento entre empresas
+    // ───────────────────────────────────────────────────────────────────
+
+    /**
+     * Crea los datos mínimos de lavandería para una empresa: tipo de prenda, servicio y un
+     * ticket. Devuelve los tres más el usuario recepcionista que creó el ticket.
+     *
+     * @return array{tipoPrenda: TipoPrenda, servicio: ServicioLavanderia, ticket: TicketLavanderia, recepcionista: \App\Models\User}
+     */
+    private function crearDatosLavanderia(Empresa $empresa, User $admin): array
+    {
+        // Asegurar que la empresa tenga perfil LAVANDERIA para que sembrarRolesBase() cree
+        // los roles específicos (Recepcionista/Operador Lavandería).
+        if ($empresa->perfil !== \App\Enums\PerfilEmpresa::LAVANDERIA) {
+            $empresa->update(['perfil' => \App\Enums\PerfilEmpresa::LAVANDERIA]);
+            app(RolesEmpresaService::class)->sembrarRolesBase($empresa);
+        }
+
+        $this->comoEmpresa($empresa);
+
+        $recepcionista = User::factory()->create(['empresa_id' => $empresa->id]);
+        $recepcionista->assignRole('Recepcionista Lavandería');
+
+        $tipoPrenda = TipoPrenda::create([
+            'empresa_id' => $empresa->id,
+            'nombre' => "Camisa de {$empresa->razon_social}",
+            'activo' => true,
+        ]);
+
+        $servicio = ServicioLavanderia::create([
+            'empresa_id' => $empresa->id,
+            'nombre' => "Lavado de {$empresa->razon_social}",
+            'precio_base' => 150.00,
+            'aplica_itbis' => true,
+            'activo' => true,
+        ]);
+
+        $ticket = app(TicketLavanderiaService::class)->crear(
+            $empresa,
+            $recepcionista,
+            [
+                'detalles' => [
+                    [
+                        'tipo_prenda_id' => $tipoPrenda->id,
+                        'servicio_lavanderia_id' => $servicio->id,
+                        'cantidad' => 2,
+                    ],
+                ],
+            ],
+        );
+
+        return compact('tipoPrenda', 'servicio', 'ticket', 'recepcionista');
+    }
+
+    /** 34. Cada empresa solo ve sus propios tickets de lavandería en el índice. */
+    public function test_34_tickets_lavanderia_aislados_por_empresa(): void
+    {
+        $datosA = $this->crearEmpresaConDatos('Empresa A', '131000001');
+        $datosT = $this->crearEmpresaConDatos('Tobogán', '131000002');
+
+        $lavA = $this->crearDatosLavanderia($datosA['empresa'], $datosA['admin']);
+        $lavT = $this->crearDatosLavanderia($datosT['empresa'], $datosT['admin']);
+
+        // Verificar aislamiento a nivel de query (el Resource usa getEloquentQuery con tenant
+        // scope automático de Filament BelongsToTenant).
+        $this->comoEmpresa($datosA['empresa']);
+
+        $ticketsMiEmpresa = TicketLavanderia::where('empresa_id', $datosA['empresa']->id)->pluck('id');
+        $this->assertTrue($ticketsMiEmpresa->contains($lavA['ticket']->id));
+        $this->assertFalse($ticketsMiEmpresa->contains($lavT['ticket']->id));
+
+        // Verificar que Empresa A no puede acceder al ticket de Tobogán por URL directa.
+        $this->actingAs($datosA['admin'])
+            ->get(TicketLavanderiaResource::getUrl('view', ['record' => $lavT['ticket']], tenant: $datosA['empresa']))
+            ->assertNotFound();
+    }
+
+    /** 35. No se puede ver el ticket de lavandería de otra empresa por URL directa. */
+    public function test_35_no_puede_ver_ticket_lavanderia_de_otra_empresa_por_url(): void
+    {
+        $datosA = $this->crearEmpresaConDatos('Empresa A', '131000001');
+        $datosT = $this->crearEmpresaConDatos('Tobogán', '131000002');
+
+        $lavT = $this->crearDatosLavanderia($datosT['empresa'], $datosT['admin']);
+
+        $this->comoEmpresa($datosA['empresa']);
+
+        $this->actingAs($datosA['admin'])
+            ->get(TicketLavanderiaResource::getUrl('view', ['record' => $lavT['ticket']], tenant: $datosA['empresa']))
+            ->assertNotFound();
+    }
+
+    /** 36. Crear un ticket de lavandería lo asocia automáticamente a la empresa actual. */
+    public function test_36_crear_ticket_lavanderia_lo_asocia_a_empresa_actual(): void
+    {
+        $datosA = $this->crearEmpresaConDatos('Empresa A', '131000001');
+        $lavA = $this->crearDatosLavanderia($datosA['empresa'], $datosA['admin']);
+
+        $this->assertEquals($datosA['empresa']->id, $lavA['ticket']->empresa_id);
+        $this->assertDatabaseHas('tickets_lavanderia', [
+            'id' => $lavA['ticket']->id,
+            'empresa_id' => $datosA['empresa']->id,
+        ]);
+    }
+
+    /** 37. TicketLavanderiaService rechaza tipo_prenda_id de otra empresa. */
+    public function test_37_service_rechaza_tipo_prenda_de_otra_empresa(): void
+    {
+        $datosA = $this->crearEmpresaConDatos('Empresa A', '131000001');
+        $datosT = $this->crearEmpresaConDatos('Tobogán', '131000002');
+
+        $lavA = $this->crearDatosLavanderia($datosA['empresa'], $datosA['admin']);
+        $lavT = $this->crearDatosLavanderia($datosT['empresa'], $datosT['admin']);
+
+        $this->comoEmpresa($datosA['empresa']);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('no pertenecen a esta empresa');
+
+        app(TicketLavanderiaService::class)->crear(
+            $datosA['empresa'],
+            $lavA['recepcionista'],
+            [
+                'detalles' => [
+                    [
+                        'tipo_prenda_id' => $lavT['tipoPrenda']->id, // ← de otra empresa
+                        'servicio_lavanderia_id' => $lavA['servicio']->id,
+                        'cantidad' => 1,
+                    ],
+                ],
+            ],
+        );
+    }
+
+    /** 38. TicketLavanderiaService rechaza servicio_lavanderia_id de otra empresa. */
+    public function test_38_service_rechaza_servicio_de_otra_empresa(): void
+    {
+        $datosA = $this->crearEmpresaConDatos('Empresa A', '131000001');
+        $datosT = $this->crearEmpresaConDatos('Tobogán', '131000002');
+
+        $lavA = $this->crearDatosLavanderia($datosA['empresa'], $datosA['admin']);
+        $lavT = $this->crearDatosLavanderia($datosT['empresa'], $datosT['admin']);
+
+        $this->comoEmpresa($datosA['empresa']);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('no pertenecen a esta empresa');
+
+        app(TicketLavanderiaService::class)->crear(
+            $datosA['empresa'],
+            $lavA['recepcionista'],
+            [
+                'detalles' => [
+                    [
+                        'tipo_prenda_id' => $lavA['tipoPrenda']->id,
+                        'servicio_lavanderia_id' => $lavT['servicio']->id, // ← de otra empresa
+                        'cantidad' => 1,
+                    ],
+                ],
+            ],
+        );
     }
 }

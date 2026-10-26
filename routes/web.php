@@ -16,7 +16,10 @@ use App\Http\Controllers\Reportes\ReporteInventarioPdfController;
 use App\Http\Controllers\Reportes\ReporteKardexPdfController;
 use App\Http\Controllers\Reportes\ReporteMargenPdfController;
 use App\Http\Controllers\Reportes\ReporteTopProductosPdfController;
+use App\Http\Controllers\Reportes\ReporteProduccionServicioPdfController;
+use App\Http\Controllers\Reportes\ReporteTicketsLavanderiaPdfController;
 use App\Http\Controllers\Reportes\ReporteVentasPdfController;
+use App\Http\Controllers\TicketLavanderiaReciboPdfController;
 use App\Http\Controllers\Reportes\ReporteVentasPorClientePdfController;
 use App\Http\Controllers\Reportes\ReporteVentasPorVendedorPdfController;
 use App\Http\Controllers\RncController;
@@ -73,6 +76,10 @@ Route::middleware(['auth', EstablecerEmpresaPermisos::class])->group(function ()
         ->middleware('can:impresoras.administrar')
         ->name('impresoras.prueba');
 
+    Route::get('/lavanderia/ticket/{ticket}/recibo', TicketLavanderiaReciboPdfController::class)
+        ->middleware('can:lavanderia.ver_tickets')
+        ->name('lavanderia.ticket.recibo');
+
     // Todas las rutas de este grupo generan PDFs para descargar: es la acción "exportar", distinta
     // de solo ver el reporte en pantalla (reportes.ver, gateado a nivel de página).
     Route::middleware('can:reportes.exportar')->prefix('reportes')->name('reportes.')->group(function () {
@@ -88,6 +95,8 @@ Route::middleware(['auth', EstablecerEmpresaPermisos::class])->group(function ()
         Route::get('/cxc/pdf', ReporteCxcPdfController::class)->name('cxc.pdf');
         Route::get('/cxp/pdf', ReporteCxpPdfController::class)->name('cxp.pdf');
         Route::get('/margen/pdf', ReporteMargenPdfController::class)->name('margen.pdf');
+        Route::get('/tickets-lavanderia/pdf', ReporteTicketsLavanderiaPdfController::class)->name('tickets-lavanderia.pdf');
+        Route::get('/produccion-servicio/pdf', ReporteProduccionServicioPdfController::class)->name('produccion-servicio.pdf');
     });
 });
 

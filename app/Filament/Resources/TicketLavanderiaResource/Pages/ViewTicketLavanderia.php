@@ -61,6 +61,12 @@ class ViewTicketLavanderia extends ViewRecord
                     $this->refreshFormData(['estado', 'estado_pago', 'entregado_en']);
                 }),
 
+            Action::make('comprobante')
+                ->label('Imprimir Comprobante')
+                ->icon('heroicon-o-printer')
+                ->color('gray')
+                ->url(fn (): string => route('lavanderia.ticket.recibo', $this->record), shouldOpenInNewTab: true),
+
             Action::make('cancelar')
                 ->label('Cancelar Ticket')
                 ->icon('heroicon-o-x-circle')
