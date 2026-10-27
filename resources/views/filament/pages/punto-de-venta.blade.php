@@ -367,7 +367,7 @@
             @if ($formaPago === \App\Enums\FormaPago::EFECTIVO->value)
               <div class="mt-2">
                 <label class="form-label">Monto recibido (efectivo)</label>
-                <input type="number" step="0.01" min="0" class="form-input" wire:model.live.debounce.400ms="montoEfectivo"
+                <input type="number" step="0.01" min="0" max="99999999.99" class="form-input" wire:model.live.debounce.400ms="montoEfectivo"
                   placeholder="{{ $totales['total'] ?? '0.00' }}" />
               </div>
               @if (bccomp($this->vueltoCalculado(), '0.00', 2) > 0)
@@ -381,11 +381,11 @@
               <div class="mt-2" style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;">
                 <div>
                   <label class="form-label">Efectivo</label>
-                  <input type="number" step="0.01" min="0" class="form-input" wire:model.live.debounce.400ms="montoEfectivo" />
+                  <input type="number" step="0.01" min="0" max="99999999.99" class="form-input" wire:model.live.debounce.400ms="montoEfectivo" />
                 </div>
                 <div>
                   <label class="form-label">Tarjeta</label>
-                  <input type="number" step="0.01" min="0" class="form-input" wire:model.live.debounce.400ms="montoTarjeta" />
+                  <input type="number" step="0.01" min="0" max="99999999.99" class="form-input" wire:model.live.debounce.400ms="montoTarjeta" />
                 </div>
               </div>
               @if (bccomp($this->vueltoCalculado(), '0.00', 2) > 0)

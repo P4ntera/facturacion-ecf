@@ -12,6 +12,7 @@ use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Forms\Set;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
@@ -95,8 +96,24 @@ class EmpresaResource extends Resource
                             )
                             ->default(PerfilEmpresa::FACTURACION->value)
                             ->required()
-                            ->helperText('Define qué módulos se activan por defecto. Puedes personalizarlos después.')
-                            ->native(false),
+                            ->helperText('Al cambiar el tipo de negocio se preseleccionan los módulos recomendados para ese perfil. Puedes personalizarlos después.')
+                            ->native(false)
+                            ->afterStateUpdated(function (?string $state, Set $set, string $operation): void {
+                                $perfil = PerfilEmpresa::tryFrom($state ?? '');
+
+                                if ($perfil === null) {
+                                    return;
+                                }
+
+                                $activos = collect($perfil->modulosPorDefecto())
+                                    ->map(fn (Modulo $m) => $m->value)
+                                    ->all();
+
+                                foreach (Modulo::cases() as $modulo) {
+                                    $set("modulos.{$modulo->value}", in_array($modulo->value, $activos, true));
+                                }
+                            })
+                            ->live(),
                     ]),
 
                 Section::make('Módulos')
