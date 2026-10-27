@@ -896,9 +896,7 @@ class PuntoDeVenta extends Page
                 'user_id' => auth()->id(),
                 'tipo_comprobante' => $this->esSinComprobante() ? null : $this->tipoComprobante,
                 'sin_comprobante' => $this->esSinComprobante(),
-                'descuento_global' => $this->descuentoGlobal,
                 'descuento_id' => filled($this->descuentoId) ? (int) $this->descuentoId : null,
-                'descuento_porcentaje' => $this->descuentoSeleccionado()?->porcentaje,
                 'forma_pago' => $this->formaPago,
                 ...$this->datosDesglosePago(),
                 'arqueo_caja_id' => $this->arqueoAbierto()?->id,
@@ -1124,32 +1122,17 @@ class PuntoDeVenta extends Page
         try {
             $lineas = $this->lineasParaService();
 
-            // El % del descuento seleccionado se aplica sobre el subtotal (ya con descuentos de
-            // línea aplicados, antes de ITBIS): primero se necesita ese subtotal sin descuento
-            // global para poder calcular el monto en pesos que se le pasa a VentaService, que
-            // sigue trabajando con un monto fijo (descuento_global), no con un porcentaje.
-            $sinDescuento = app(VentaService::class)->previsualizar(['descuento_global' => '0', 'lineas' => $lineas], $this->empresa());
-            $this->descuentoGlobal = $this->calcularMontoDescuento($sinDescuento['subtotal']);
-
+            // El servicio resuelve el descuento internamente a partir del descuento_id:
+            // valida que pertenezca a la empresa, que esté activo, y calcula el monto.
             $this->totales = app(VentaService::class)->previsualizar([
-                'descuento_global' => $this->descuentoGlobal,
+                'descuento_id' => filled($this->descuentoId) ? (int) $this->descuentoId : null,
                 'lineas' => $lineas,
             ], $this->empresa());
+            $this->descuentoGlobal = $this->totales['descuento'];
         } catch (VentaInvalidaException) {
             $this->totales = $this->totalesVacios();
             $this->descuentoGlobal = '0.00';
         }
-    }
-
-    private function calcularMontoDescuento(string $subtotal): string
-    {
-        $descuento = $this->descuentoSeleccionado();
-
-        if ($descuento === null) {
-            return '0.00';
-        }
-
-        return bcdiv(bcmul($subtotal, (string) $descuento->porcentaje, 4), '100', 2);
     }
 
     /** @return array<string, string> */
