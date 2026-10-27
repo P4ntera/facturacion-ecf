@@ -15,6 +15,7 @@ use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
+use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
@@ -94,15 +95,16 @@ class ServicioLavanderiaResource extends Resource
                     ->label('Activo')
                     ->boolean(),
             ])
-            ->defaultSort('nombre');
+            ->defaultSort('nombre')
+            ->actions([
+                EditAction::make(),
+            ]);
     }
 
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListServiciosLavanderia::route('/'),
-            'create' => Pages\CreateServicioLavanderia::route('/create'),
-            'edit' => Pages\EditServicioLavanderia::route('/{record}/edit'),
+            'index' => Pages\ManageServiciosLavanderia::route('/'),
         ];
     }
 }

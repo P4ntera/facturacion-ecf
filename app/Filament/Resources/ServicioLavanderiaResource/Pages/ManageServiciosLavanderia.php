@@ -5,14 +5,15 @@ declare(strict_types=1);
 namespace App\Filament\Resources\ServicioLavanderiaResource\Pages;
 
 use App\Filament\Resources\ServicioLavanderiaResource;
-use Filament\Resources\Pages\EditRecord;
+use Filament\Actions\CreateAction;
+use Filament\Resources\Pages\ManageRecords;
 
-class EditServicioLavanderia extends EditRecord
+class ManageServiciosLavanderia extends ManageRecords
 {
     protected static string $resource = ServicioLavanderiaResource::class;
 
-    protected function getRedirectUrl(): string
+    protected function getHeaderActions(): array
     {
-        return $this->getResource()::getUrl('index');
+        return [CreateAction::make()];
     }
 }

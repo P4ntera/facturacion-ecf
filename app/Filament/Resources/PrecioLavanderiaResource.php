@@ -16,6 +16,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
+use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 
@@ -91,15 +92,16 @@ class PrecioLavanderiaResource extends Resource
                     ->money('DOP')
                     ->sortable(),
             ])
-            ->defaultSort('tipoPrenda.nombre');
+            ->defaultSort('tipoPrenda.nombre')
+            ->actions([
+                EditAction::make(),
+            ]);
     }
 
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListPreciosLavanderia::route('/'),
-            'create' => Pages\CreatePrecioLavanderia::route('/create'),
-            'edit' => Pages\EditPrecioLavanderia::route('/{record}/edit'),
+            'index' => Pages\ManagePreciosLavanderia::route('/'),
         ];
     }
 }

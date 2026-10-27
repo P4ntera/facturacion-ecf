@@ -25,6 +25,7 @@ use Filament\Forms\Components\Toggle;
 use Filament\Forms\Get;
 use Filament\Forms\Set;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
@@ -61,124 +62,140 @@ class TicketLavanderiaResource extends Resource
         $empresaId = Filament::getTenant()?->id;
 
         return $schema->components([
-            Select::make('cliente_id')
-                ->label('Cliente')
-                ->options(fn () => Cliente::where('empresa_id', $empresaId)
-                    ->where('activo', true)
-                    ->pluck('nombre', 'id'))
-                ->searchable()
-                ->nullable()
-                ->preload(),
-
-            DateTimePicker::make('fecha_prometida')
-                ->label('Fecha y Hora Prometida de Entrega')
-                ->minDate(now()->addHours(2))
-                ->seconds(false)
-                ->helperText('Mínimo 2 horas a partir de ahora'),
-
-            Textarea::make('observaciones')
-                ->label('Observaciones Generales')
-                ->rows(2),
-
-            Toggle::make('pagar_ahora')
-                ->label('¿Paga ahora?')
-                ->helperText('Si paga ahora se genera factura inmediatamente. De lo contrario recibe un ticket para pagar al retirar.')
-                ->default(false)
-                ->dehydrated(false)
-                ->live(),
-
-            Repeater::make('detalles')
-                ->label('Prendas')
+            Section::make('Información del Ticket')
+                ->icon(Heroicon::OutlinedUser)
+                ->columns(2)
                 ->schema([
-                    Select::make('tipo_prenda_id')
-                        ->label('Tipo de Prenda')
-                        ->options(fn () => TipoPrenda::where('empresa_id', $empresaId)
+                    Select::make('cliente_id')
+                        ->label('Cliente')
+                        ->options(fn () => Cliente::where('empresa_id', $empresaId)
                             ->where('activo', true)
                             ->pluck('nombre', 'id'))
-                        ->required()
                         ->searchable()
-                        ->live()
-                        ->afterStateUpdated(function (Get $get, Set $set, ?string $state) use ($empresaId) {
-                            $servicioId = $get('servicio_lavanderia_id');
-                            if ($state && $servicioId) {
-                                $precio = PrecioLavanderia::precioParaCombinacion((int) $empresaId, (int) $state, (int) $servicioId)
-                                    ?? ServicioLavanderia::find($servicioId)?->precio_base;
-                                if ($precio !== null) {
-                                    $set('precio_unitario', $precio);
-                                    $cantidad = max(1, (int) ($get('cantidad') ?: 1));
-                                    $set('subtotal', round((float) $precio * $cantidad, 2));
-                                }
-                            }
-                        }),
+                        ->nullable()
+                        ->preload()
+                        ->placeholder('Portador (sin cliente)')
+                        ->helperText('Opcional — dejar vacío para venta al portador'),
 
-                    Select::make('servicio_lavanderia_id')
-                        ->label('Servicio')
-                        ->options(fn () => ServicioLavanderia::where('empresa_id', $empresaId)
-                            ->where('activo', true)
-                            ->pluck('nombre', 'id'))
-                        ->required()
-                        ->searchable()
-                        ->live()
-                        ->afterStateUpdated(function (Get $get, Set $set, ?string $state) use ($empresaId) {
-                            if ($state) {
-                                $tipoPrendaId = $get('tipo_prenda_id');
-                                $servicio = ServicioLavanderia::find($state);
-
-                                // Prioridad: 1) matriz prenda×servicio, 2) precio_base del servicio
-                                $precio = null;
-                                if ($tipoPrendaId) {
-                                    $precio = PrecioLavanderia::precioParaCombinacion((int) $empresaId, (int) $tipoPrendaId, (int) $state);
-                                }
-                                $precio = $precio ?? $servicio?->precio_base;
-
-                                if ($precio !== null) {
-                                    $set('precio_unitario', $precio);
-                                    $cantidad = max(1, (int) ($get('cantidad') ?: 1));
-                                    $set('subtotal', round((float) $precio * $cantidad, 2));
-                                }
-                            }
-                        }),
-
-                    TextInput::make('cantidad')
-                        ->label('Cantidad')
-                        ->numeric()
-                        ->default(1)
-                        ->minValue(1)
-                        ->required()
-                        ->live()
-                        ->afterStateUpdated(function (Get $get, Set $set, ?string $state) {
-                            $precio = (float) ($get('precio_unitario') ?: 0);
-                            $cantidad = max(1, (int) ($state ?: 1));
-                            $set('subtotal', round($precio * $cantidad, 2));
-                        }),
-
-                    TextInput::make('precio_unitario')
-                        ->label('Precio Unit.')
-                        ->numeric()
-                        ->prefix('RD$')
-                        ->required()
-                        ->live()
-                        ->afterStateUpdated(function (Get $get, Set $set, ?string $state) {
-                            $precio = (float) ($state ?: 0);
-                            $cantidad = max(1, (int) ($get('cantidad') ?: 1));
-                            $set('subtotal', round($precio * $cantidad, 2));
-                        }),
-
-                    TextInput::make('subtotal')
-                        ->label('Subtotal')
-                        ->numeric()
-                        ->prefix('RD$')
-                        ->disabled()
-                        ->dehydrated(false),
+                    DateTimePicker::make('fecha_prometida')
+                        ->label('Fecha Prometida de Entrega')
+                        ->minDate(now()->addHours(2))
+                        ->seconds(false)
+                        ->helperText('Mínimo 2 horas a partir de ahora'),
 
                     Textarea::make('observaciones')
-                        ->label('Observaciones')
-                        ->rows(1),
-                ])
-                ->columns(3)
-                ->minItems(1)
-                ->defaultItems(1)
-                ->required(),
+                        ->label('Observaciones Generales')
+                        ->rows(2)
+                        ->columnSpanFull(),
+
+                    Toggle::make('pagar_ahora')
+                        ->label('¿Paga ahora?')
+                        ->helperText('Si paga ahora se genera factura inmediatamente. De lo contrario recibe un ticket para pagar al retirar.')
+                        ->default(false)
+                        ->dehydrated(false)
+                        ->live(),
+                ]),
+
+            Section::make('Prendas')
+                ->icon(Heroicon::OutlinedShoppingBag)
+                ->schema([
+                    Repeater::make('detalles')
+                        ->label('')
+                        ->schema([
+                            Select::make('tipo_prenda_id')
+                                ->label('Tipo de Prenda')
+                                ->options(fn () => TipoPrenda::where('empresa_id', $empresaId)
+                                    ->where('activo', true)
+                                    ->pluck('nombre', 'id'))
+                                ->required()
+                                ->searchable()
+                                ->preload()
+                                ->live()
+                                ->afterStateUpdated(function (Get $get, Set $set, ?string $state) use ($empresaId) {
+                                    $servicioId = $get('servicio_lavanderia_id');
+                                    if ($state && $servicioId) {
+                                        $precio = PrecioLavanderia::precioParaCombinacion((int) $empresaId, (int) $state, (int) $servicioId)
+                                            ?? ServicioLavanderia::find($servicioId)?->precio_base;
+                                        if ($precio !== null) {
+                                            $set('precio_unitario', $precio);
+                                            $cantidad = max(1, (int) ($get('cantidad') ?: 1));
+                                            $set('subtotal', round((float) $precio * $cantidad, 2));
+                                        }
+                                    }
+                                }),
+
+                            Select::make('servicio_lavanderia_id')
+                                ->label('Servicio')
+                                ->options(fn () => ServicioLavanderia::where('empresa_id', $empresaId)
+                                    ->where('activo', true)
+                                    ->pluck('nombre', 'id'))
+                                ->required()
+                                ->searchable()
+                                ->preload()
+                                ->live()
+                                ->afterStateUpdated(function (Get $get, Set $set, ?string $state) use ($empresaId) {
+                                    if ($state) {
+                                        $tipoPrendaId = $get('tipo_prenda_id');
+                                        $servicio = ServicioLavanderia::find($state);
+
+                                        // Prioridad: 1) matriz prenda×servicio, 2) precio_base del servicio
+                                        $precio = null;
+                                        if ($tipoPrendaId) {
+                                            $precio = PrecioLavanderia::precioParaCombinacion((int) $empresaId, (int) $tipoPrendaId, (int) $state);
+                                        }
+                                        $precio = $precio ?? $servicio?->precio_base;
+
+                                        if ($precio !== null) {
+                                            $set('precio_unitario', $precio);
+                                            $cantidad = max(1, (int) ($get('cantidad') ?: 1));
+                                            $set('subtotal', round((float) $precio * $cantidad, 2));
+                                        }
+                                    }
+                                }),
+
+                            TextInput::make('cantidad')
+                                ->label('Cant.')
+                                ->numeric()
+                                ->default(1)
+                                ->minValue(1)
+                                ->required()
+                                ->live()
+                                ->afterStateUpdated(function (Get $get, Set $set, ?string $state) {
+                                    $precio = (float) ($get('precio_unitario') ?: 0);
+                                    $cantidad = max(1, (int) ($state ?: 1));
+                                    $set('subtotal', round($precio * $cantidad, 2));
+                                }),
+
+                            TextInput::make('precio_unitario')
+                                ->label('Precio Unit.')
+                                ->numeric()
+                                ->prefix('RD$')
+                                ->required()
+                                ->live()
+                                ->afterStateUpdated(function (Get $get, Set $set, ?string $state) {
+                                    $precio = (float) ($state ?: 0);
+                                    $cantidad = max(1, (int) ($get('cantidad') ?: 1));
+                                    $set('subtotal', round($precio * $cantidad, 2));
+                                }),
+
+                            TextInput::make('subtotal')
+                                ->label('Subtotal')
+                                ->numeric()
+                                ->prefix('RD$')
+                                ->disabled()
+                                ->dehydrated(false),
+
+                            Textarea::make('observaciones')
+                                ->label('Nota')
+                                ->rows(1),
+                        ])
+                        ->columns(6)
+                        ->minItems(1)
+                        ->defaultItems(1)
+                        ->required()
+                        ->addActionLabel('Agregar prenda')
+                        ->reorderable(false),
+                ]),
         ]);
     }
 

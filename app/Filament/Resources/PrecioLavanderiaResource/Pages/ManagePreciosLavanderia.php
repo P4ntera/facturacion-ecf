@@ -6,9 +6,9 @@ namespace App\Filament\Resources\PrecioLavanderiaResource\Pages;
 
 use App\Filament\Resources\PrecioLavanderiaResource;
 use Filament\Actions\CreateAction;
-use Filament\Resources\Pages\ListRecords;
+use Filament\Resources\Pages\ManageRecords;
 
-class ListPreciosLavanderia extends ListRecords
+class ManagePreciosLavanderia extends ManageRecords
 {
     protected static string $resource = PrecioLavanderiaResource::class;
 

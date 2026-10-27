@@ -6,9 +6,9 @@ namespace App\Filament\Resources\TipoPrendaResource\Pages;
 
 use App\Filament\Resources\TipoPrendaResource;
 use Filament\Actions\CreateAction;
-use Filament\Resources\Pages\ListRecords;
+use Filament\Resources\Pages\ManageRecords;
 
-class ListTiposPrenda extends ListRecords
+class ManageTiposPrenda extends ManageRecords
 {
     protected static string $resource = TipoPrendaResource::class;
 
