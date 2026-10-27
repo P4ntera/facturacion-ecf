@@ -75,7 +75,25 @@ class TicketLavanderiaResource extends Resource
                         ->nullable()
                         ->preload()
                         ->placeholder('Portador (sin cliente)')
-                        ->helperText('Opcional — dejar vacío para venta al portador'),
+                        ->helperText('Opcional — dejar vacío para venta al portador')
+                        ->createOptionForm([
+                            TextInput::make('nombre')
+                                ->label('Nombre')
+                                ->required()
+                                ->maxLength(255),
+                            TextInput::make('telefono')
+                                ->label('Teléfono')
+                                ->tel()
+                                ->maxLength(20),
+                        ])
+                        ->createOptionUsing(function (array $data) use ($empresaId): int {
+                            return Cliente::create([
+                                'empresa_id' => $empresaId,
+                                'nombre' => $data['nombre'],
+                                'telefono' => $data['telefono'] ?? null,
+                                'activo' => true,
+                            ])->getKey();
+                        }),
 
                     DateTimePicker::make('fecha_prometida')
                         ->label('Fecha Prometida de Entrega')
@@ -110,6 +128,19 @@ class TicketLavanderiaResource extends Resource
                                 ->required()
                                 ->searchable()
                                 ->preload()
+                                ->createOptionForm([
+                                    TextInput::make('nombre')
+                                        ->label('Nombre')
+                                        ->required()
+                                        ->maxLength(255),
+                                ])
+                                ->createOptionUsing(function (array $data) use ($empresaId): int {
+                                    return TipoPrenda::create([
+                                        'empresa_id' => $empresaId,
+                                        'nombre' => $data['nombre'],
+                                        'activo' => true,
+                                    ])->getKey();
+                                })
                                 ->live()
                                 ->afterStateUpdated(function (Get $get, Set $set, ?string $state) use ($empresaId) {
                                     $servicioId = $get('servicio_lavanderia_id');
@@ -132,6 +163,30 @@ class TicketLavanderiaResource extends Resource
                                 ->required()
                                 ->searchable()
                                 ->preload()
+                                ->createOptionForm([
+                                    TextInput::make('nombre')
+                                        ->label('Nombre')
+                                        ->required()
+                                        ->maxLength(255),
+                                    TextInput::make('precio_base')
+                                        ->label('Precio Base')
+                                        ->required()
+                                        ->numeric()
+                                        ->prefix('RD$')
+                                        ->minValue(0),
+                                    Toggle::make('aplica_itbis')
+                                        ->label('Aplica ITBIS')
+                                        ->default(true),
+                                ])
+                                ->createOptionUsing(function (array $data) use ($empresaId): int {
+                                    return ServicioLavanderia::create([
+                                        'empresa_id' => $empresaId,
+                                        'nombre' => $data['nombre'],
+                                        'precio_base' => $data['precio_base'],
+                                        'aplica_itbis' => $data['aplica_itbis'] ?? true,
+                                        'activo' => true,
+                                    ])->getKey();
+                                })
                                 ->live()
                                 ->afterStateUpdated(function (Get $get, Set $set, ?string $state) use ($empresaId) {
                                     if ($state) {
