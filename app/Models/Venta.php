@@ -31,7 +31,7 @@ class Venta extends Model
         'forma_pago', 'monto_efectivo', 'monto_tarjeta', 'monto_transferencia', 'vuelto',
         'arqueo_caja_id', 'caja_id',
         'fecha', 'moneda', 'tasa_cambio',
-        'subtotal', 'descuento',
+        'subtotal', 'descuento', 'descuento_id', 'descuento_porcentaje',
         'monto_gravado_18', 'monto_gravado_16', 'monto_gravado_0', 'monto_exento',
         'itbis_18', 'itbis_16', 'total_itbis', 'total',
         'estado', 'estado_fiscal', 'ecf_track_id',
@@ -61,6 +61,7 @@ class Venta extends Model
         'tasa_cambio' => 'decimal:4',
         'subtotal' => 'decimal:2',
         'descuento' => 'decimal:2',
+        'descuento_porcentaje' => 'decimal:2',
         'monto_gravado_18' => 'decimal:2',
         'monto_gravado_16' => 'decimal:2',
         'monto_gravado_0' => 'decimal:2',
@@ -102,6 +103,12 @@ class Venta extends Model
     public function caja(): BelongsTo
     {
         return $this->belongsTo(Caja::class);
+    }
+
+    /** Descuento global que se aplicó a esta venta (puede haber sido desactivado después). */
+    public function descuentoAplicado(): BelongsTo
+    {
+        return $this->belongsTo(Descuento::class, 'descuento_id');
     }
 
     public function cuentaPorCobrar(): HasOne

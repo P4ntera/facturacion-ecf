@@ -897,6 +897,8 @@ class PuntoDeVenta extends Page
                 'tipo_comprobante' => $this->esSinComprobante() ? null : $this->tipoComprobante,
                 'sin_comprobante' => $this->esSinComprobante(),
                 'descuento_global' => $this->descuentoGlobal,
+                'descuento_id' => filled($this->descuentoId) ? (int) $this->descuentoId : null,
+                'descuento_porcentaje' => $this->descuentoSeleccionado()?->porcentaje,
                 'forma_pago' => $this->formaPago,
                 ...$this->datosDesglosePago(),
                 'arqueo_caja_id' => $this->arqueoAbierto()?->id,

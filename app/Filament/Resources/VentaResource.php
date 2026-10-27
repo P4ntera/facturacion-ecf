@@ -202,7 +202,11 @@ class VentaResource extends Resource
                     TextEntry::make('itbis_18')->label('ITBIS 18%')->money(fn (Venta $record) => $record->moneda),
                     TextEntry::make('itbis_16')->label('ITBIS 16%')->money(fn (Venta $record) => $record->moneda),
                     TextEntry::make('monto_gravado_0')->label('Exento/0%')->money(fn (Venta $record) => $record->moneda),
-                    TextEntry::make('descuento')->label('Descuento')->money(fn (Venta $record) => $record->moneda),
+                    TextEntry::make('descuento')->label('Descuento')->money(fn (Venta $record) => $record->moneda)
+                        ->suffix(fn (Venta $record) => $record->descuento_porcentaje !== null
+                            ? ' ('.number_format((float) $record->descuento_porcentaje, 2).'%'
+                                .($record->descuentoAplicado ? ' — '.$record->descuentoAplicado->nombre : '').')'
+                            : ''),
                     TextEntry::make('total')->label('Total')->money(fn (Venta $record) => $record->moneda)->weight('bold'),
                 ]),
         ]);

@@ -225,6 +225,8 @@ class VentaService
                 'moneda' => $config->moneda,
                 'subtotal' => $acumulado['subtotal'],
                 'descuento' => $descuentoGlobal,
+                'descuento_id' => $datos['descuento_id'] ?? null,
+                'descuento_porcentaje' => $datos['descuento_porcentaje'] ?? null,
                 'monto_gravado_18' => $acumulado['monto_gravado_18'],
                 'monto_gravado_16' => $acumulado['monto_gravado_16'],
                 'monto_gravado_0' => $acumulado['monto_gravado_0'],
