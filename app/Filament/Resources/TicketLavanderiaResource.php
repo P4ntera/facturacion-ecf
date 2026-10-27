@@ -122,6 +122,7 @@ class TicketLavanderiaResource extends Resource
                         ->schema([
                             Select::make('tipo_prenda_id')
                                 ->label('Tipo de Prenda')
+                                ->columnSpan(3)
                                 ->options(fn () => TipoPrenda::where('empresa_id', $empresaId)
                                     ->where('activo', true)
                                     ->pluck('nombre', 'id'))
@@ -157,6 +158,7 @@ class TicketLavanderiaResource extends Resource
 
                             Select::make('servicio_lavanderia_id')
                                 ->label('Servicio')
+                                ->columnSpan(3)
                                 ->options(fn () => ServicioLavanderia::where('empresa_id', $empresaId)
                                     ->where('activo', true)
                                     ->pluck('nombre', 'id'))
@@ -210,6 +212,7 @@ class TicketLavanderiaResource extends Resource
 
                             TextInput::make('cantidad')
                                 ->label('Cant.')
+                                ->columnSpan(1)
                                 ->numeric()
                                 ->default(1)
                                 ->minValue(1)
@@ -223,6 +226,7 @@ class TicketLavanderiaResource extends Resource
 
                             TextInput::make('precio_unitario')
                                 ->label('Precio Unit.')
+                                ->columnSpan(2)
                                 ->numeric()
                                 ->prefix('RD$')
                                 ->required()
@@ -235,16 +239,17 @@ class TicketLavanderiaResource extends Resource
 
                             TextInput::make('subtotal')
                                 ->label('Subtotal')
+                                ->columnSpan(2)
                                 ->numeric()
                                 ->prefix('RD$')
                                 ->disabled()
                                 ->dehydrated(false),
 
-                            Textarea::make('observaciones')
+                            TextInput::make('observaciones')
                                 ->label('Nota')
-                                ->rows(1),
+                                ->columnSpan(1),
                         ])
-                        ->columns(6)
+                        ->columns(12)
                         ->minItems(1)
                         ->defaultItems(1)
                         ->required()
