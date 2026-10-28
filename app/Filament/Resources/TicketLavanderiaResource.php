@@ -126,9 +126,10 @@ class TicketLavanderiaResource extends Resource
                         ->schema([
                             Select::make('tipo_prenda_id')
                                 ->label('Tipo de Prenda')
-                                ->columnSpan(4)
+                                ->columnSpan(3)
                                 ->placeholder('Buscar prenda...')
                                 ->searchable()
+                                ->preload()
                                 ->required()
                                 ->allowHtml()
                                 ->getSearchResultsUsing(function (string $search) use ($empresaId) {
@@ -178,6 +179,7 @@ class TicketLavanderiaResource extends Resource
                                 ->columnSpan(3)
                                 ->placeholder('Buscar servicio...')
                                 ->searchable()
+                                ->preload()
                                 ->required()
                                 ->allowHtml()
                                 ->getSearchResultsUsing(function (string $search) use ($empresaId) {
@@ -243,7 +245,7 @@ class TicketLavanderiaResource extends Resource
 
                             TextInput::make('cantidad')
                                 ->label('Cant.')
-                                ->columnSpan(1)
+                                ->columnSpan(2)
                                 ->numeric()
                                 ->default(1)
                                 ->minValue(1)
@@ -260,6 +262,7 @@ class TicketLavanderiaResource extends Resource
                                 ->columnSpan(2)
                                 ->numeric()
                                 ->prefix('RD$')
+                                ->minValue(0)
                                 ->required()
                                 ->live()
                                 ->afterStateUpdated(function (Get $get, Set $set, ?string $state) {
