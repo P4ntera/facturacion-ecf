@@ -382,8 +382,10 @@ class LavanderiaTest extends TestCase
         $ticket = $this->crearTicket();
         $this->assertEquals(EstadoPagoTicket::PENDIENTE, $ticket->estado_pago);
 
+        // total = 2 × 150 = 300 + 54 ITBIS = 354
         $venta = app(TicketLavanderiaService::class)->cobrar($ticket, $this->empresa, [
             'forma_pago' => \App\Enums\FormaPago::EFECTIVO,
+            'monto_efectivo' => 354.00,
             'user_id' => $this->admin->id,
         ]);
 
@@ -400,6 +402,7 @@ class LavanderiaTest extends TestCase
         $ticket = $this->crearTicket();
         app(TicketLavanderiaService::class)->cobrar($ticket, $this->empresa, [
             'forma_pago' => \App\Enums\FormaPago::EFECTIVO,
+            'monto_efectivo' => 354.00,
             'user_id' => $this->admin->id,
         ]);
         $ticket->refresh();
@@ -407,7 +410,11 @@ class LavanderiaTest extends TestCase
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('ya fue cobrado');
 
-        app(TicketLavanderiaService::class)->cobrar($ticket, $this->empresa);
+        app(TicketLavanderiaService::class)->cobrar($ticket, $this->empresa, [
+            'forma_pago' => \App\Enums\FormaPago::EFECTIVO,
+            'monto_efectivo' => 354.00,
+            'user_id' => $this->admin->id,
+        ]);
     }
 
     public function test_no_se_puede_cobrar_ticket_cancelado(): void
@@ -999,5 +1006,309 @@ class LavanderiaTest extends TestCase
     {
         $policy = new \App\Policies\PrecioLavanderiaPolicy();
         $this->assertFalse($policy->delete($this->admin, new PrecioLavanderia()));
+    }
+
+    // ───────────────────────────────────────────────────────────────────
+    //  Validación de monto recibido
+    // ───────────────────────────────────────────────────────────────────
+
+    public function test_cobrar_efectivo_sin_monto_lanza_excepcion(): void
+    {
+        $ticket = $this->crearTicket();
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Debe ingresar el monto recibido');
+
+        app(TicketLavanderiaService::class)->cobrar($ticket, $this->empresa, [
+            'forma_pago' => \App\Enums\FormaPago::EFECTIVO,
+            'monto_efectivo' => 0,
+            'user_id' => $this->admin->id,
+        ]);
+    }
+
+    public function test_cobrar_efectivo_monto_menor_al_total_lanza_excepcion(): void
+    {
+        $ticket = $this->crearTicket();
+        // total = 354.00
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('no puede ser menor al total');
+
+        app(TicketLavanderiaService::class)->cobrar($ticket, $this->empresa, [
+            'forma_pago' => \App\Enums\FormaPago::EFECTIVO,
+            'monto_efectivo' => 100.00,
+            'user_id' => $this->admin->id,
+        ]);
+    }
+
+    public function test_cobrar_tarjeta_no_requiere_monto_efectivo(): void
+    {
+        $ticket = $this->crearTicket();
+
+        $venta = app(TicketLavanderiaService::class)->cobrar($ticket, $this->empresa, [
+            'forma_pago' => \App\Enums\FormaPago::TARJETA,
+            'user_id' => $this->admin->id,
+        ]);
+
+        $ticket->refresh();
+        $this->assertEquals(EstadoPagoTicket::PAGADO, $ticket->estado_pago);
+        $this->assertNotNull($venta->id);
+    }
+
+    public function test_crear_con_pagar_ahora_efectivo_sin_monto_lanza_excepcion(): void
+    {
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Debe ingresar el monto recibido');
+
+        $this->crearTicket([
+            'pagar_ahora' => true,
+            'datos_venta' => [
+                'forma_pago' => \App\Enums\FormaPago::EFECTIVO,
+                'monto_efectivo' => 0,
+                'user_id' => $this->admin->id,
+            ],
+        ]);
+    }
+
+    public function test_crear_con_pagar_ahora_efectivo_monto_menor_lanza_excepcion(): void
+    {
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('no puede ser menor al total');
+
+        $this->crearTicket([
+            'pagar_ahora' => true,
+            'datos_venta' => [
+                'forma_pago' => \App\Enums\FormaPago::EFECTIVO,
+                'monto_efectivo' => 50.00,
+                'user_id' => $this->admin->id,
+            ],
+        ]);
+    }
+
+    // ───────────────────────────────────────────────────────────────────
+    //  Flujo completo end-to-end
+    // ───────────────────────────────────────────────────────────────────
+
+    public function test_flujo_crear_listo_cobrar_entregar(): void
+    {
+        $service = app(TicketLavanderiaService::class);
+        $ticket = $this->crearTicket();
+
+        // Estado inicial
+        $this->assertEquals(EstadoTicketLavanderia::RECIBIDO, $ticket->estado);
+        $this->assertEquals(EstadoPagoTicket::PENDIENTE, $ticket->estado_pago);
+
+        // RECIBIDO → LISTO
+        $service->avanzarEstado($ticket);
+        $ticket->refresh();
+        $this->assertEquals(EstadoTicketLavanderia::LISTO, $ticket->estado);
+        $this->assertEquals(EstadoPagoTicket::PENDIENTE, $ticket->estado_pago);
+
+        // Cobrar (ticket en LISTO, pago pendiente)
+        $venta = $service->cobrar($ticket, $this->empresa, [
+            'forma_pago' => \App\Enums\FormaPago::EFECTIVO,
+            'monto_efectivo' => 400.00,
+            'user_id' => $this->admin->id,
+        ]);
+        $ticket->refresh();
+        $this->assertEquals(EstadoPagoTicket::PAGADO, $ticket->estado_pago);
+        $this->assertEquals(EstadoTicketLavanderia::LISTO, $ticket->estado); // No cambia estado
+        $this->assertEquals($venta->id, $ticket->venta_id);
+
+        // Entregar (ya pagado, no auto-factura)
+        $service->entregar($ticket, $this->empresa);
+        $ticket->refresh();
+        $this->assertEquals(EstadoTicketLavanderia::ENTREGADO, $ticket->estado);
+        $this->assertNotNull($ticket->entregado_en);
+    }
+
+    public function test_flujo_crear_con_pago_listo_entregar(): void
+    {
+        $service = app(TicketLavanderiaService::class);
+
+        // Crear ticket pagando al recibirlo
+        $ticket = $this->crearTicket([
+            'pagar_ahora' => true,
+            'datos_venta' => [
+                'forma_pago' => \App\Enums\FormaPago::EFECTIVO,
+                'monto_efectivo' => 400.00,
+                'user_id' => $this->admin->id,
+            ],
+        ]);
+
+        $this->assertEquals(EstadoTicketLavanderia::RECIBIDO, $ticket->estado);
+        $this->assertEquals(EstadoPagoTicket::PAGADO, $ticket->estado_pago);
+        $this->assertNotNull($ticket->venta_id);
+
+        // RECIBIDO → LISTO
+        $service->avanzarEstado($ticket);
+        $ticket->refresh();
+        $this->assertEquals(EstadoTicketLavanderia::LISTO, $ticket->estado);
+
+        // Entregar (ya pagado, sin facturación adicional)
+        $ventaIdAntes = $ticket->venta_id;
+        $service->entregar($ticket, $this->empresa);
+        $ticket->refresh();
+        $this->assertEquals(EstadoTicketLavanderia::ENTREGADO, $ticket->estado);
+        $this->assertEquals($ventaIdAntes, $ticket->venta_id); // No genera nueva venta
+    }
+
+    public function test_flujo_crear_listo_entregar_auto_factura(): void
+    {
+        $service = app(TicketLavanderiaService::class);
+        $ticket = $this->crearTicket();
+
+        // RECIBIDO → LISTO
+        $service->avanzarEstado($ticket);
+        $ticket->refresh();
+        $this->assertNull($ticket->venta_id);
+
+        // Entregar sin haber cobrado → auto-factura
+        $service->entregar($ticket, $this->empresa, [
+            'user_id' => $this->admin->id,
+        ]);
+        $ticket->refresh();
+        $this->assertEquals(EstadoTicketLavanderia::ENTREGADO, $ticket->estado);
+        $this->assertEquals(EstadoPagoTicket::PAGADO, $ticket->estado_pago);
+        $this->assertNotNull($ticket->venta_id);
+        $this->assertNotNull($ticket->entregado_en);
+    }
+
+    public function test_flujo_cancelar_ticket_recibido(): void
+    {
+        $service = app(TicketLavanderiaService::class);
+        $ticket = $this->crearTicket();
+
+        $service->cancelar($ticket);
+        $ticket->refresh();
+        $this->assertEquals(EstadoTicketLavanderia::CANCELADO, $ticket->estado);
+        $this->assertEquals(EstadoPagoTicket::PENDIENTE, $ticket->estado_pago);
+    }
+
+    public function test_flujo_cancelar_ticket_listo(): void
+    {
+        $service = app(TicketLavanderiaService::class);
+        $ticket = $this->crearTicket();
+
+        $service->avanzarEstado($ticket);
+        $ticket->refresh();
+
+        $service->cancelar($ticket);
+        $ticket->refresh();
+        $this->assertEquals(EstadoTicketLavanderia::CANCELADO, $ticket->estado);
+    }
+
+    public function test_flujo_cancelar_ticket_pagado_no_entregado(): void
+    {
+        $service = app(TicketLavanderiaService::class);
+        $ticket = $this->crearTicket();
+
+        // Cobrar (en estado RECIBIDO)
+        $service->cobrar($ticket, $this->empresa, [
+            'forma_pago' => \App\Enums\FormaPago::TARJETA,
+            'user_id' => $this->admin->id,
+        ]);
+        $ticket->refresh();
+        $this->assertEquals(EstadoPagoTicket::PAGADO, $ticket->estado_pago);
+
+        // Cancelar (pagado pero no entregado → permitido)
+        $service->cancelar($ticket);
+        $ticket->refresh();
+        $this->assertEquals(EstadoTicketLavanderia::CANCELADO, $ticket->estado);
+    }
+
+    public function test_flujo_no_se_puede_cancelar_ticket_entregado(): void
+    {
+        $service = app(TicketLavanderiaService::class);
+        $ticket = $this->crearTicket();
+
+        $service->avanzarEstado($ticket);
+        $ticket->refresh();
+
+        $service->entregar($ticket, $this->empresa, [
+            'user_id' => $this->admin->id,
+        ]);
+        $ticket->refresh();
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('ya entregado');
+
+        $service->cancelar($ticket);
+    }
+
+    public function test_flujo_no_se_puede_cobrar_despues_de_cancelar(): void
+    {
+        $service = app(TicketLavanderiaService::class);
+        $ticket = $this->crearTicket();
+
+        $service->cancelar($ticket);
+        $ticket->refresh();
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('ticket cancelado');
+
+        $service->cobrar($ticket, $this->empresa, [
+            'forma_pago' => \App\Enums\FormaPago::EFECTIVO,
+            'monto_efectivo' => 354.00,
+            'user_id' => $this->admin->id,
+        ]);
+    }
+
+    public function test_flujo_no_se_puede_avanzar_despues_de_cancelar(): void
+    {
+        $service = app(TicketLavanderiaService::class);
+        $ticket = $this->crearTicket();
+
+        $service->cancelar($ticket);
+        $ticket->refresh();
+
+        $this->expectException(RuntimeException::class);
+
+        $service->avanzarEstado($ticket);
+    }
+
+    public function test_cobrar_con_monto_exacto_funciona(): void
+    {
+        $ticket = $this->crearTicket();
+        // total = 354.00
+
+        $venta = app(TicketLavanderiaService::class)->cobrar($ticket, $this->empresa, [
+            'forma_pago' => \App\Enums\FormaPago::EFECTIVO,
+            'monto_efectivo' => 354.00,
+            'user_id' => $this->admin->id,
+        ]);
+
+        $ticket->refresh();
+        $this->assertEquals(EstadoPagoTicket::PAGADO, $ticket->estado_pago);
+    }
+
+    public function test_cobrar_con_vuelto_funciona(): void
+    {
+        $ticket = $this->crearTicket();
+        // total = 354.00
+
+        $venta = app(TicketLavanderiaService::class)->cobrar($ticket, $this->empresa, [
+            'forma_pago' => \App\Enums\FormaPago::EFECTIVO,
+            'monto_efectivo' => 500.00,
+            'vuelto' => 146.00,
+            'user_id' => $this->admin->id,
+        ]);
+
+        $ticket->refresh();
+        $this->assertEquals(EstadoPagoTicket::PAGADO, $ticket->estado_pago);
+    }
+
+    public function test_crear_con_pagar_ahora_tarjeta_sin_monto_funciona(): void
+    {
+        $ticket = $this->crearTicket([
+            'pagar_ahora' => true,
+            'datos_venta' => [
+                'forma_pago' => \App\Enums\FormaPago::TARJETA,
+                'user_id' => $this->admin->id,
+            ],
+        ]);
+
+        $this->assertEquals(EstadoPagoTicket::PAGADO, $ticket->estado_pago);
+        $this->assertNotNull($ticket->venta_id);
     }
 }

@@ -8,7 +8,9 @@ use App\Enums\FormaPago;
 use App\Filament\Resources\TicketLavanderiaResource;
 use App\Services\TicketLavanderiaService;
 use Filament\Facades\Filament;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
+use Filament\Support\Exceptions\Halt;
 
 class CreateTicketLavanderia extends CreateRecord
 {
@@ -44,11 +46,17 @@ class CreateTicketLavanderia extends CreateRecord
             unset($data['datos_venta']);
         }
 
-        return app(TicketLavanderiaService::class)->crear(
-            empresa: $empresa,
-            recepcionista: auth()->user(),
-            datos: $data,
-        );
+        try {
+            return app(TicketLavanderiaService::class)->crear(
+                empresa: $empresa,
+                recepcionista: auth()->user(),
+                datos: $data,
+            );
+        } catch (\RuntimeException $e) {
+            Notification::make()->title($e->getMessage())->danger()->send();
+
+            throw new Halt();
+        }
     }
 
     protected function getRedirectUrl(): string

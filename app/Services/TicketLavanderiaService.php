@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Enums\EstadoPagoTicket;
 use App\Enums\EstadoTicketLavanderia;
+use App\Enums\FormaPago;
 use App\Enums\TasaItbis;
 use App\Enums\TipoProducto;
 use App\Models\DetalleTicketLavanderia;
@@ -109,9 +110,27 @@ class TicketLavanderiaService
                 'itbis' => $totalItbis,
             ]);
 
-            // Si paga ahora, generar venta inmediatamente
+            // Si paga ahora, validar monto y generar venta
             if (! empty($datos['pagar_ahora'])) {
-                $venta = $this->facturar($ticket, $empresa, $datos['datos_venta'] ?? []);
+                $datosVenta = $datos['datos_venta'] ?? [];
+
+                if (($datosVenta['forma_pago'] ?? null) === FormaPago::EFECTIVO) {
+                    $montoEfectivo = (float) ($datosVenta['monto_efectivo'] ?? 0);
+                    $totalFinal = $totalNeto + $totalItbis;
+
+                    if ($montoEfectivo <= 0) {
+                        throw new RuntimeException('Debe ingresar el monto recibido.');
+                    }
+
+                    if ($montoEfectivo < $totalFinal) {
+                        throw new RuntimeException(
+                            'El monto recibido (RD$ ' . number_format($montoEfectivo, 2)
+                            . ') no puede ser menor al total (RD$ ' . number_format($totalFinal, 2) . ').'
+                        );
+                    }
+                }
+
+                $venta = $this->facturar($ticket, $empresa, $datosVenta);
                 $ticket->refresh();
             }
 
@@ -196,6 +215,22 @@ class TicketLavanderiaService
 
         if ($ticket->empresa_id !== $empresa->id) {
             throw new RuntimeException('El ticket no pertenece a esta empresa.');
+        }
+
+        // Validar monto para pagos en efectivo
+        if (($datosVenta['forma_pago'] ?? null) === FormaPago::EFECTIVO) {
+            $montoEfectivo = (float) ($datosVenta['monto_efectivo'] ?? 0);
+
+            if ($montoEfectivo <= 0) {
+                throw new RuntimeException('Debe ingresar el monto recibido.');
+            }
+
+            if ($montoEfectivo < (float) $ticket->total) {
+                throw new RuntimeException(
+                    'El monto recibido (RD$ ' . number_format($montoEfectivo, 2)
+                    . ') no puede ser menor al total (RD$ ' . number_format((float) $ticket->total, 2) . ').'
+                );
+            }
         }
 
         return DB::transaction(function () use ($ticket, $empresa, $datosVenta) {

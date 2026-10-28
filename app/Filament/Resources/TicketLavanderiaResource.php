@@ -15,6 +15,8 @@ use App\Models\PrecioLavanderia;
 use App\Models\ServicioLavanderia;
 use App\Models\TicketLavanderia;
 use App\Models\TipoPrenda;
+use App\Services\TicketLavanderiaService;
+use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\DateTimePicker;
@@ -24,6 +26,7 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Notifications\Notification;
 use Illuminate\Support\HtmlString;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
@@ -140,6 +143,7 @@ class TicketLavanderiaResource extends Resource
                                 ->label('Monto Recibido')
                                 ->numeric()
                                 ->prefix('RD$')
+                                ->required()
                                 ->minValue(0)
                                 ->visible(fn (Get $get): bool => ($get('datos_venta.forma_pago') ?? FormaPago::EFECTIVO->value) === FormaPago::EFECTIVO->value)
                                 ->live(debounce: 500)
@@ -424,7 +428,136 @@ class TicketLavanderiaResource extends Resource
                             ->when($data['hasta'] ?? null, fn (Builder $q, $d) => $q->whereDate('created_at', '<=', $d));
                     }),
             ])
-            ->defaultSort('created_at', 'desc');
+            ->defaultSort('created_at', 'desc')
+            ->actions([
+                Action::make('marcar_listo')
+                    ->label('Listo')
+                    ->icon('heroicon-o-check')
+                    ->color('success')
+                    ->visible(fn (TicketLavanderia $record): bool => in_array($record->estado, [
+                        EstadoTicketLavanderia::RECIBIDO,
+                        EstadoTicketLavanderia::EN_PROCESO,
+                    ]))
+                    ->requiresConfirmation()
+                    ->action(function (TicketLavanderia $record): void {
+                        try {
+                            app(TicketLavanderiaService::class)->avanzarEstado($record);
+                            Notification::make()->title('Marcado como Listo')->success()->send();
+                        } catch (\RuntimeException $e) {
+                            Notification::make()->title($e->getMessage())->danger()->send();
+                        }
+                    }),
+
+                Action::make('cobrar')
+                    ->label('Cobrar')
+                    ->icon('heroicon-o-banknotes')
+                    ->color('primary')
+                    ->visible(fn (TicketLavanderia $record): bool => $record->estado_pago === EstadoPagoTicket::PENDIENTE
+                        && $record->estado !== EstadoTicketLavanderia::CANCELADO)
+                    ->modalHeading('Cobrar Ticket')
+                    ->modalDescription(fn (TicketLavanderia $record): string => 'Total: RD$ ' . number_format((float) $record->total, 2))
+                    ->schema(fn (TicketLavanderia $record): array => [
+                        Select::make('forma_pago')
+                            ->label('Forma de Pago')
+                            ->options(
+                                collect(FormaPago::cases())
+                                    ->reject(fn (FormaPago $fp) => $fp === FormaPago::MIXTO)
+                                    ->mapWithKeys(fn (FormaPago $fp) => [$fp->value => $fp->etiqueta()])
+                            )
+                            ->default(FormaPago::EFECTIVO->value)
+                            ->required()
+                            ->live(),
+
+                        TextInput::make('monto_recibido')
+                            ->label('Monto Recibido')
+                            ->numeric()
+                            ->prefix('RD$')
+                            ->required()
+                            ->minValue((float) $record->total)
+                            ->visible(fn (Get $get): bool => ($get('forma_pago') ?? FormaPago::EFECTIVO->value) === FormaPago::EFECTIVO->value)
+                            ->live(debounce: 500)
+                            ->afterStateUpdated(function (Get $get, Set $set) use ($record) {
+                                $recibido = (float) ($get('monto_recibido') ?? 0);
+                                $total = (float) $record->total;
+                                $vuelto = max(0, round($recibido - $total, 2));
+                                $set('vuelto', $vuelto > 0 ? $vuelto : 0);
+                            }),
+
+                        Placeholder::make('vuelto_display')
+                            ->label('Devuelta')
+                            ->visible(fn (Get $get): bool => ($get('forma_pago') ?? FormaPago::EFECTIVO->value) === FormaPago::EFECTIVO->value)
+                            ->content(function (Get $get): HtmlString {
+                                $vuelto = (float) ($get('vuelto') ?? 0);
+
+                                return new HtmlString(
+                                    '<span class="text-2xl font-bold text-success-600 dark:text-success-400">RD$ ' . number_format($vuelto, 2) . '</span>'
+                                );
+                            }),
+
+                        TextInput::make('vuelto')
+                            ->hidden()
+                            ->default(0),
+                    ])
+                    ->action(function (TicketLavanderia $record, array $data): void {
+                        $formaPago = FormaPago::tryFrom($data['forma_pago'] ?? '') ?? FormaPago::EFECTIVO;
+
+                        $datosVenta = [
+                            'forma_pago' => $formaPago,
+                            'user_id' => auth()->id(),
+                        ];
+
+                        if ($formaPago === FormaPago::EFECTIVO) {
+                            $montoRecibido = (float) ($data['monto_recibido'] ?? 0);
+                            $datosVenta['monto_efectivo'] = $montoRecibido > 0 ? $montoRecibido : null;
+                            $datosVenta['vuelto'] = (float) ($data['vuelto'] ?? 0) ?: null;
+                        }
+
+                        try {
+                            app(TicketLavanderiaService::class)->cobrar($record, Filament::getTenant(), $datosVenta);
+                            Notification::make()->title('Ticket cobrado')->success()->send();
+                        } catch (\RuntimeException $e) {
+                            Notification::make()->title($e->getMessage())->danger()->send();
+                        }
+                    }),
+
+                Action::make('entregar')
+                    ->label('Entregar')
+                    ->icon('heroicon-o-check-circle')
+                    ->color('success')
+                    ->visible(fn (TicketLavanderia $record): bool => $record->estado === EstadoTicketLavanderia::LISTO)
+                    ->requiresConfirmation()
+                    ->modalDescription(fn (TicketLavanderia $record): string => $record->estado_pago === EstadoPagoTicket::PENDIENTE
+                        ? 'Se generará la factura y se marcará como entregado.'
+                        : 'Se marcará como entregado.')
+                    ->action(function (TicketLavanderia $record): void {
+                        try {
+                            app(TicketLavanderiaService::class)->entregar($record, Filament::getTenant());
+                            Notification::make()->title('Ticket entregado')->success()->send();
+                        } catch (\RuntimeException $e) {
+                            Notification::make()->title($e->getMessage())->danger()->send();
+                        }
+                    }),
+
+                Action::make('cancelar')
+                    ->label('Cancelar')
+                    ->icon('heroicon-o-x-circle')
+                    ->color('danger')
+                    ->visible(fn (TicketLavanderia $record): bool => ! in_array($record->estado, [
+                        EstadoTicketLavanderia::ENTREGADO,
+                        EstadoTicketLavanderia::CANCELADO,
+                    ]))
+                    ->requiresConfirmation()
+                    ->modalHeading('¿Cancelar este ticket?')
+                    ->modalDescription('Esta acción no se puede deshacer.')
+                    ->action(function (TicketLavanderia $record): void {
+                        try {
+                            app(TicketLavanderiaService::class)->cancelar($record);
+                            Notification::make()->title('Ticket cancelado')->warning()->send();
+                        } catch (\RuntimeException $e) {
+                            Notification::make()->title($e->getMessage())->danger()->send();
+                        }
+                    }),
+            ]);
     }
 
     public static function infolist(Schema $schema): Schema

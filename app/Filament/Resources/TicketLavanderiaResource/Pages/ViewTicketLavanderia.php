@@ -66,7 +66,8 @@ class ViewTicketLavanderia extends ViewRecord
                         ->label('Monto Recibido')
                         ->numeric()
                         ->prefix('RD$')
-                        ->minValue(0)
+                        ->required()
+                        ->minValue(fn () => (float) $this->record->total)
                         ->visible(fn (Get $get): bool => ($get('forma_pago') ?? FormaPago::EFECTIVO->value) === FormaPago::EFECTIVO->value)
                         ->live(debounce: 500)
                         ->afterStateUpdated(function (Get $get, Set $set) {
@@ -105,14 +106,17 @@ class ViewTicketLavanderia extends ViewRecord
                         $datosVenta['vuelto'] = (float) ($data['vuelto'] ?? 0) ?: null;
                     }
 
-                    app(TicketLavanderiaService::class)->cobrar(
-                        $this->record,
-                        Filament::getTenant(),
-                        $datosVenta,
-                    );
-
-                    Notification::make()->title('Ticket cobrado')->success()->send();
-                    $this->refreshFormData(['estado_pago', 'venta_id']);
+                    try {
+                        app(TicketLavanderiaService::class)->cobrar(
+                            $this->record,
+                            Filament::getTenant(),
+                            $datosVenta,
+                        );
+                        Notification::make()->title('Ticket cobrado')->success()->send();
+                        $this->refreshFormData(['estado_pago', 'venta_id']);
+                    } catch (\RuntimeException $e) {
+                        Notification::make()->title($e->getMessage())->danger()->send();
+                    }
                 }),
 
             Action::make('entregar')
