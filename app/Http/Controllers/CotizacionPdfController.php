@@ -17,13 +17,20 @@ class CotizacionPdfController extends Controller
         abort_unless($user && $user->perteneceAEmpresa($cotizacion->empresa_id), 403);
         abort_unless($user->can('cotizaciones.exportar'), 403);
 
-        $cotizacion->load(['empresa', 'cliente', 'detalles.producto', 'user']);
+        $cotizacion->load(['empresa.configuracion', 'cliente', 'detalles.producto', 'user']);
+
+        $empresa = $cotizacion->empresa;
+        $config = $empresa->config();
 
         $pdf = Pdf::loadView('cotizaciones.pdf', [
             'cotizacion' => $cotizacion,
-            'empresa' => $cotizacion->empresa,
+            'empresa' => $empresa,
+            'colorPrimario' => $config->color_primario ?? '#00C9D7',
+            'colorSecundario' => $config->color_secundario ?? '#101820',
         ]);
 
-        return $pdf->stream("COT-{$cotizacion->numero}.pdf");
+        $pdf->setPaper('letter');
+
+        return $pdf->stream("Cotizacion_{$cotizacion->numero}.pdf");
     }
 }

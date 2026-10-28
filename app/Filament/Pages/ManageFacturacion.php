@@ -13,6 +13,7 @@ use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\CheckboxList;
+use Filament\Forms\Components\ColorPicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -66,6 +67,8 @@ class ManageFacturacion extends Page
             'devolucion_plazo_dias' => $config->devolucion_plazo_dias,
             'devolucion_reembolsos' => collect($config->reembolsosPermitidos())->map(fn (FormaReembolso $f) => $f->value)->all(),
             'devolucion_monto_supervisor' => $config->devolucion_monto_supervisor,
+            'color_primario' => $config->color_primario,
+            'color_secundario' => $config->color_secundario,
         ]);
     }
 
@@ -118,6 +121,20 @@ class ManageFacturacion extends Page
                         'USD' => 'USD — Dólar estadounidense',
                     ])
                     ->required(),
+
+                Section::make('Colores del PDF')
+                    ->description('Se aplican a cotizaciones y otros documentos PDF generados por el sistema.')
+                    ->columnSpanFull()
+                    ->columns(2)
+                    ->schema([
+                        ColorPicker::make('color_primario')
+                            ->label('Color primario (acento)')
+                            ->required(),
+
+                        ColorPicker::make('color_secundario')
+                            ->label('Color secundario (oscuro)')
+                            ->required(),
+                    ]),
 
                 Section::make('Costo y precios')
                     ->description('Cómo se calcula el costo de tus productos y cómo se redondea el precio sugerido por el porcentaje de ganancia.')

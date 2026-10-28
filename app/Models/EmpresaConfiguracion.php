@@ -48,6 +48,8 @@ class EmpresaConfiguracion extends Model
         'devolucion_plazo_dias',
         'devolucion_reembolsos',
         'devolucion_monto_supervisor',
+        'color_primario',
+        'color_secundario',
     ];
 
     protected $casts = [
@@ -85,6 +87,8 @@ class EmpresaConfiguracion extends Model
         'redondeo_precio' => 'ninguno',
         'permite_stock_negativo' => false,
         'acepta_devoluciones' => true,
+        'color_primario' => '#00C9D7',
+        'color_secundario' => '#101820',
     ];
 
     /**
