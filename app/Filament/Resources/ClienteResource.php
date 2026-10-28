@@ -103,6 +103,8 @@ class ClienteResource extends Resource
                 TextInput::make('telefono')
                     ->label('Teléfono')
                     ->tel()
+                    ->regex('/^[\d\s\+\-\(\)]+$/')
+                    ->validationMessages(['regex' => 'Solo dígitos, espacios, +, - y paréntesis.'])
                     ->maxLength(20),
 
                 TextInput::make('email')

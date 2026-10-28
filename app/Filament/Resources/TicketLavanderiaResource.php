@@ -86,6 +86,8 @@ class TicketLavanderiaResource extends Resource
                             TextInput::make('telefono')
                                 ->label('Teléfono')
                                 ->tel()
+                                ->regex('/^[\d\s\+\-\(\)]+$/')
+                                ->validationMessages(['regex' => 'Solo dígitos, espacios, +, - y paréntesis.'])
                                 ->maxLength(20),
                         ])
                         ->createOptionUsing(function (array $data) use ($empresaId): int {

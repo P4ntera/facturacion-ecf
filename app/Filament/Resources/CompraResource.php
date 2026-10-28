@@ -108,6 +108,8 @@ class CompraResource extends Resource
                                 ->maxLength(11)
                                 ->minLength(9)
                                 ->numeric()
+                                ->regex('/^\d{9}(\d{2})?$/')
+                                ->validationMessages(['regex' => 'Debe tener 9 dígitos (RNC) u 11 (Cédula).'])
                                 ->suffixAction(
                                     Action::make('buscar_dgii')
                                         ->label('Buscar en DGII')

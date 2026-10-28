@@ -90,14 +90,18 @@ class ManageEmpresa extends Page
                 TextInput::make('rnc')
                     ->label('RNC')
                     ->required()
+                    ->numeric()
                     ->regex('/^\d{9}(\d{2})?$/')
                     ->validationMessages(['regex' => 'El RNC debe tener 9 u 11 dígitos.'])
+                    ->minLength(9)
                     ->maxLength(11),
 
                 TextInput::make('telefono')
                     ->label('Teléfono')
                     ->tel()
-                    ->maxLength(50),
+                    ->regex('/^[\d\s\+\-\(\)]+$/')
+                    ->validationMessages(['regex' => 'Solo dígitos, espacios, +, - y paréntesis.'])
+                    ->maxLength(20),
 
                 TextInput::make('direccion')
                     ->label('Dirección')

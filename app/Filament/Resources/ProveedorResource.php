@@ -66,6 +66,8 @@ class ProveedorResource extends Resource
                         ->maxLength(11)
                         ->minLength(9)
                         ->numeric()
+                        ->regex('/^\d{9}(\d{2})?$/')
+                        ->validationMessages(['regex' => 'Debe tener 9 dígitos (RNC) u 11 (Cédula).'])
                         ->helperText('9 dígitos para RNC, 11 para Cédula. Sin guiones.')
                         ->suffixAction(
                             Action::make('buscar_dgii')
@@ -155,6 +157,8 @@ class ProveedorResource extends Resource
                     TextInput::make('telefono')
                         ->label('Teléfono')
                         ->tel()
+                        ->regex('/^[\d\s\+\-\(\)]+$/')
+                        ->validationMessages(['regex' => 'Solo dígitos, espacios, +, - y paréntesis.'])
                         ->maxLength(20),
 
                     TextInput::make('email')
