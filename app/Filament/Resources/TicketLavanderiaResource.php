@@ -63,10 +63,10 @@ class TicketLavanderiaResource extends Resource
     {
         $empresaId = Filament::getTenant()?->id;
 
-        return $schema->components([
+        return $schema->columns(5)->components([
             Section::make('Información del Ticket')
                 ->icon(Heroicon::OutlinedUser)
-                ->columns(2)
+                ->columnSpan(2)
                 ->schema([
                     Select::make('cliente_id')
                         ->label('Cliente')
@@ -120,6 +120,7 @@ class TicketLavanderiaResource extends Resource
 
             Section::make('Prendas')
                 ->icon(Heroicon::OutlinedShoppingBag)
+                ->columnSpan(3)
                 ->schema([
                     Repeater::make('detalles')
                         ->label('')
