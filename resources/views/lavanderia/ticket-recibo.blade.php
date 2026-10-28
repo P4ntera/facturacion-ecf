@@ -4,6 +4,24 @@
     <meta charset="utf-8">
     <title>Ticket {{ $ticket->numero }}</title>
     @include('impresoras._estilos-ticket', ['anchoPapel' => $anchoPapel])
+    <style>
+        /* Lavandería: fuente más legible y margen derecho anti-corte */
+        body { font-size: 13px; padding-right: 3mm; }
+        .detalle-tabla th {
+            font-weight: bold;
+            font-size: 12px;
+            border-bottom: 1px solid #000;
+            padding-bottom: 2px;
+            text-align: left;
+        }
+        .detalle-tabla th.derecha { text-align: right; }
+        .detalle-tabla td { padding: 1px 0; }
+        .detalle-servicio {
+            font-size: .85em;
+            padding-left: 1ch;
+            margin: 0 0 1px;
+        }
+    </style>
 </head>
 <body onload="window.print()">
     <div class="hoja">
@@ -43,19 +61,32 @@
         <div class="separador"></div>
 
         {{-- Detalle de prendas --}}
-        @foreach ($ticket->detalles as $detalle)
-            <p>{{ \Illuminate\Support\Str::limit($detalle->tipoPrenda->nombre, $anchoPapel->columnas()) }}</p>
-            <p style="font-size: .85em; padding-left: 2ch;">{{ \Illuminate\Support\Str::limit($detalle->servicioLavanderia->nombre, $anchoPapel->columnas() - 2) }}</p>
-            <table>
+        <table class="detalle-tabla">
+            <thead>
                 <tr>
-                    <td>{{ $detalle->cantidad }} x {{ number_format((float) $detalle->precio_unitario, 2) }}</td>
-                    <td class="derecha">{{ number_format((float) $detalle->subtotal, 2) }}</td>
+                    <th>Prenda</th>
+                    <th class="derecha">Cant.</th>
+                    <th class="derecha">Costo</th>
                 </tr>
-            </table>
-            @if ($detalle->observaciones)
-                <p style="font-size: .85em; padding-left: 2ch;">* {{ \Illuminate\Support\Str::limit($detalle->observaciones, $anchoPapel->columnas() - 4) }}</p>
-            @endif
-        @endforeach
+            </thead>
+            <tbody>
+                @foreach ($ticket->detalles as $detalle)
+                    <tr>
+                        <td>{{ \Illuminate\Support\Str::limit($detalle->tipoPrenda->nombre, $anchoPapel->columnas() - 16) }}</td>
+                        <td class="derecha">{{ $detalle->cantidad }}</td>
+                        <td class="derecha">{{ number_format((float) $detalle->subtotal, 2) }}</td>
+                    </tr>
+                    <tr>
+                        <td colspan="3" class="detalle-servicio">{{ \Illuminate\Support\Str::limit($detalle->servicioLavanderia->nombre, $anchoPapel->columnas() - 2) }} · {{ number_format((float) $detalle->precio_unitario, 2) }} c/u</td>
+                    </tr>
+                    @if ($detalle->observaciones)
+                        <tr>
+                            <td colspan="3" class="detalle-servicio">* {{ \Illuminate\Support\Str::limit($detalle->observaciones, $anchoPapel->columnas() - 4) }}</td>
+                        </tr>
+                    @endif
+                @endforeach
+            </tbody>
+        </table>
 
         <div class="separador"></div>
 
