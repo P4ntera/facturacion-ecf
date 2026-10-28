@@ -10,6 +10,7 @@
     </style>
 </head>
 <body onload="window.print()">
+<script>window.onafterprint = function() { window.close(); };</script>
     <div class="hoja">
         @if ($venta->estaAnulada())
             <p class="centro negrita">*** COMPROBANTE ANULADO ***</p>

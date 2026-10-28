@@ -59,6 +59,12 @@ class CreateTicketLavanderia extends CreateRecord
         }
     }
 
+    protected function afterCreate(): void
+    {
+        $url = route('lavanderia.ticket.recibo', $this->record);
+        $this->js("window.open('{$url}', '_blank', 'width=350,height=600')");
+    }
+
     protected function getRedirectUrl(): string
     {
         return $this->getResource()::getUrl('view', ['record' => $this->record]);

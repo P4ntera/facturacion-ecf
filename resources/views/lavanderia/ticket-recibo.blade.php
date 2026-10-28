@@ -59,6 +59,7 @@
     </style>
 </head>
 <body onload="window.print()">
+<script>window.onafterprint = function() { window.close(); };</script>
     <div class="hoja">
         {{-- Encabezado empresa --}}
         <p class="centro nombre-empresa">{{ $empresa->nombre_comercial ?: $empresa->razon_social }}</p>
