@@ -60,16 +60,13 @@ class PrecioLavanderiaResource extends Resource
                         ->label('Tipo de Prenda')
                         ->columnSpanFull()
                         ->searchable()
-                        ->preload()
                         ->required()
                         ->allowHtml()
                         ->live()
-                        ->getSearchResultsUsing(function (string $search) use ($empresaId) {
+                        ->options(function () use ($empresaId) {
                             return TipoPrenda::where('empresa_id', $empresaId)
                                 ->where('activo', true)
-                                ->when($search !== '', fn ($q) => $q->where('nombre', 'ilike', "%{$search}%"))
-                                ->when($search === '', fn ($q) => $q->inRandomOrder())
-                                ->limit(10)
+                                ->orderBy('nombre')
                                 ->get()
                                 ->mapWithKeys(fn (TipoPrenda $p) => [
                                     $p->id => '<div class="py-0.5">'
@@ -84,16 +81,13 @@ class PrecioLavanderiaResource extends Resource
                         ->label('Servicio')
                         ->columnSpanFull()
                         ->searchable()
-                        ->preload()
                         ->required()
                         ->allowHtml()
                         ->live()
-                        ->getSearchResultsUsing(function (string $search) use ($empresaId) {
+                        ->options(function () use ($empresaId) {
                             return ServicioLavanderia::where('empresa_id', $empresaId)
                                 ->where('activo', true)
-                                ->when($search !== '', fn ($q) => $q->where('nombre', 'ilike', "%{$search}%"))
-                                ->when($search === '', fn ($q) => $q->inRandomOrder())
-                                ->limit(10)
+                                ->orderBy('nombre')
                                 ->get()
                                 ->mapWithKeys(fn (ServicioLavanderia $s) => [
                                     $s->id => '<div class="py-0.5">'

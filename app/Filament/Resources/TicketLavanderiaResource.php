@@ -129,15 +129,12 @@ class TicketLavanderiaResource extends Resource
                                 ->columnSpan(3)
                                 ->placeholder('Buscar prenda...')
                                 ->searchable()
-                                ->preload()
                                 ->required()
                                 ->allowHtml()
-                                ->getSearchResultsUsing(function (string $search) use ($empresaId) {
+                                ->options(function () use ($empresaId) {
                                     return TipoPrenda::where('empresa_id', $empresaId)
                                         ->where('activo', true)
-                                        ->when($search !== '', fn ($q) => $q->where('nombre', 'ilike', "%{$search}%"))
-                                        ->when($search === '', fn ($q) => $q->inRandomOrder())
-                                        ->limit(10)
+                                        ->orderBy('nombre')
                                         ->get()
                                         ->mapWithKeys(fn (TipoPrenda $p) => [
                                             $p->id => '<div class="py-0.5">'
@@ -179,15 +176,12 @@ class TicketLavanderiaResource extends Resource
                                 ->columnSpan(3)
                                 ->placeholder('Buscar servicio...')
                                 ->searchable()
-                                ->preload()
                                 ->required()
                                 ->allowHtml()
-                                ->getSearchResultsUsing(function (string $search) use ($empresaId) {
+                                ->options(function () use ($empresaId) {
                                     return ServicioLavanderia::where('empresa_id', $empresaId)
                                         ->where('activo', true)
-                                        ->when($search !== '', fn ($q) => $q->where('nombre', 'ilike', "%{$search}%"))
-                                        ->when($search === '', fn ($q) => $q->inRandomOrder())
-                                        ->limit(10)
+                                        ->orderBy('nombre')
                                         ->get()
                                         ->mapWithKeys(fn (ServicioLavanderia $s) => [
                                             $s->id => '<div class="py-0.5">'
