@@ -22,7 +22,7 @@ class VentaTicketController extends Controller
         // BelongsToTenant de Filament), así que la pertenencia a la empresa se verifica a mano.
         abort_unless($request->user()->perteneceAEmpresa($venta->empresa_id), 403);
 
-        $venta->load('detalles.producto', 'cliente');
+        $venta->load('detalles.producto', 'cliente', 'user');
 
         return view('ventas.ticket', [
             'venta' => $venta,

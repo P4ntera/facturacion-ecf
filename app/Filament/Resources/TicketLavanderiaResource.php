@@ -524,11 +524,10 @@ class TicketLavanderiaResource extends Resource
                     ->label('Entregar')
                     ->icon('heroicon-o-check-circle')
                     ->color('success')
-                    ->visible(fn (TicketLavanderia $record): bool => $record->estado === EstadoTicketLavanderia::LISTO)
+                    ->visible(fn (TicketLavanderia $record): bool => $record->estado === EstadoTicketLavanderia::LISTO
+                        && $record->estado_pago === EstadoPagoTicket::PAGADO)
                     ->requiresConfirmation()
-                    ->modalDescription(fn (TicketLavanderia $record): string => $record->estado_pago === EstadoPagoTicket::PENDIENTE
-                        ? 'Se generará la factura y se marcará como entregado.'
-                        : 'Se marcará como entregado.')
+                    ->modalDescription('Se marcará como entregado.')
                     ->action(function (TicketLavanderia $record): void {
                         try {
                             app(TicketLavanderiaService::class)->entregar($record, Filament::getTenant());
@@ -577,7 +576,8 @@ class TicketLavanderiaResource extends Resource
                 ->formatStateUsing(fn (EstadoPagoTicket $state) => $state->etiqueta())
                 ->color(fn (EstadoPagoTicket $state) => $state->color()),
             \Filament\Infolists\Components\TextEntry::make('total')->label('Total')->money('DOP'),
-            \Filament\Infolists\Components\TextEntry::make('itbis')->label('ITBIS')->money('DOP'),
+            \Filament\Infolists\Components\TextEntry::make('itbis')->label('ITBIS')->money('DOP')
+                ->visible(fn (TicketLavanderia $record): bool => (float) $record->itbis > 0),
             \Filament\Infolists\Components\TextEntry::make('fecha_prometida')->label('Fecha Prometida')->dateTime('d/m/Y h:i A')->placeholder('—'),
             \Filament\Infolists\Components\TextEntry::make('observaciones')->label('Observaciones')->placeholder('—')->columnSpanFull(),
             \Filament\Infolists\Components\TextEntry::make('created_at')->label('Recibido')->dateTime('d/m/Y H:i'),

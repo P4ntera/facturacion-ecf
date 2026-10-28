@@ -1153,7 +1153,7 @@ class LavanderiaTest extends TestCase
         $this->assertEquals($ventaIdAntes, $ticket->venta_id); // No genera nueva venta
     }
 
-    public function test_flujo_crear_listo_entregar_auto_factura(): void
+    public function test_no_se_puede_entregar_sin_cobrar(): void
     {
         $service = app(TicketLavanderiaService::class);
         $ticket = $this->crearTicket();
@@ -1161,17 +1161,11 @@ class LavanderiaTest extends TestCase
         // RECIBIDO → LISTO
         $service->avanzarEstado($ticket);
         $ticket->refresh();
-        $this->assertNull($ticket->venta_id);
 
-        // Entregar sin haber cobrado → auto-factura
-        $service->entregar($ticket, $this->empresa, [
-            'user_id' => $this->admin->id,
-        ]);
-        $ticket->refresh();
-        $this->assertEquals(EstadoTicketLavanderia::ENTREGADO, $ticket->estado);
-        $this->assertEquals(EstadoPagoTicket::PAGADO, $ticket->estado_pago);
-        $this->assertNotNull($ticket->venta_id);
-        $this->assertNotNull($ticket->entregado_en);
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Debe cobrar el ticket antes de entregarlo');
+
+        $service->entregar($ticket, $this->empresa);
     }
 
     public function test_flujo_cancelar_ticket_recibido(): void
@@ -1225,9 +1219,14 @@ class LavanderiaTest extends TestCase
         $service->avanzarEstado($ticket);
         $ticket->refresh();
 
-        $service->entregar($ticket, $this->empresa, [
+        // Cobrar antes de entregar (ahora es obligatorio)
+        $service->cobrar($ticket, $this->empresa, [
+            'forma_pago' => \App\Enums\FormaPago::TARJETA,
             'user_id' => $this->admin->id,
         ]);
+        $ticket->refresh();
+
+        $service->entregar($ticket, $this->empresa);
         $ticket->refresh();
 
         $this->expectException(RuntimeException::class);

@@ -169,7 +169,7 @@ class TicketLavanderiaService
     /**
      * Entrega las prendas al cliente. Si el pago estaba pendiente, factura primero.
      */
-    public function entregar(TicketLavanderia $ticket, Empresa $empresa, array $datosVenta = []): void
+    public function entregar(TicketLavanderia $ticket, Empresa $empresa): void
     {
         if ($ticket->estado !== EstadoTicketLavanderia::LISTO) {
             throw new RuntimeException('Solo se pueden entregar tickets en estado Listo.');
@@ -179,7 +179,11 @@ class TicketLavanderiaService
             throw new RuntimeException('El ticket no pertenece a esta empresa.');
         }
 
-        DB::transaction(function () use ($ticket, $empresa, $datosVenta) {
+        if ($ticket->estado_pago !== EstadoPagoTicket::PAGADO) {
+            throw new RuntimeException('Debe cobrar el ticket antes de entregarlo.');
+        }
+
+        DB::transaction(function () use ($ticket) {
             $ticket->lockForUpdate();
             $ticket->refresh();
 
@@ -187,9 +191,8 @@ class TicketLavanderiaService
                 throw new RuntimeException('El estado del ticket cambió. Intente de nuevo.');
             }
 
-            // Si no ha pagado, facturar ahora
-            if ($ticket->estado_pago === EstadoPagoTicket::PENDIENTE) {
-                $this->facturar($ticket, $empresa, $datosVenta);
+            if ($ticket->estado_pago !== EstadoPagoTicket::PAGADO) {
+                throw new RuntimeException('Debe cobrar el ticket antes de entregarlo.');
             }
 
             $ticket->update([

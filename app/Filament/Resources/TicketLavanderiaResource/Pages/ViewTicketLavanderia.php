@@ -123,11 +123,10 @@ class ViewTicketLavanderia extends ViewRecord
                 ->label('Entregar al Cliente')
                 ->icon('heroicon-o-check-circle')
                 ->color('success')
-                ->visible(fn () => $this->record->estado === EstadoTicketLavanderia::LISTO)
+                ->visible(fn () => $this->record->estado === EstadoTicketLavanderia::LISTO
+                    && $this->record->estado_pago === EstadoPagoTicket::PAGADO)
                 ->requiresConfirmation()
-                ->modalDescription(fn () => $this->record->estado_pago === EstadoPagoTicket::PENDIENTE
-                    ? 'Se generará la factura y se marcará como entregado.'
-                    : 'Se marcará como entregado.')
+                ->modalDescription('Se marcará como entregado.')
                 ->action(function () {
                     app(TicketLavanderiaService::class)->entregar(
                         $this->record,

@@ -31,6 +31,7 @@ class TicketLavanderiaReciboPdfController extends Controller
             'recepcionista',
             'detalles.tipoPrenda',
             'detalles.servicioLavanderia',
+            'venta',
         ]);
 
         return view('lavanderia.ticket-recibo', [
