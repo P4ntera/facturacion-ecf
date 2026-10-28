@@ -74,6 +74,7 @@ class AppServiceProvider extends ServiceProvider
         // TODAS las páginas Create/Edit del panel. BasePage es la clase base de la que heredan
         // CreateRecord y EditRecord; al ser estático, un solo cambio aquí cubre todo el panel.
         BasePage::alignFormActionsEnd();
+        BasePage::stickyFormActions();
 
         // Densidad y formato por defecto de TODAS las tablas del panel (PASO 5): un solo lugar en
         // vez de repetir estas llamadas en cada Resource. 'es_DO' es lo que hace que ->money('DOP')
