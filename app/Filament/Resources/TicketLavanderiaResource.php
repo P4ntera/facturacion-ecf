@@ -99,9 +99,8 @@ class TicketLavanderiaResource extends Resource
 
                     DateTimePicker::make('fecha_prometida')
                         ->label('Fecha de Entrega')
-                        ->minDate(now()->startOfMinute()->addHours(2))
+                        ->minDate(now()->startOfDay())
                         ->seconds(false)
-                        ->minutesStep(15)
                         ->required(),
 
                     Textarea::make('observaciones')
