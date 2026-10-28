@@ -126,14 +126,26 @@ class TicketLavanderiaResource extends Resource
                         ->schema([
                             Select::make('tipo_prenda_id')
                                 ->label('Tipo de Prenda')
-                                ->columnSpan(3)
-                                ->placeholder('Prenda...')
-                                ->options(fn () => TipoPrenda::where('empresa_id', $empresaId)
-                                    ->where('activo', true)
-                                    ->pluck('nombre', 'id'))
-                                ->required()
+                                ->columnSpan(4)
+                                ->placeholder('Buscar prenda...')
                                 ->searchable()
-                                ->preload()
+                                ->required()
+                                ->allowHtml()
+                                ->getSearchResultsUsing(function (string $search) use ($empresaId) {
+                                    return TipoPrenda::where('empresa_id', $empresaId)
+                                        ->where('activo', true)
+                                        ->when($search !== '', fn ($q) => $q->where('nombre', 'ilike', "%{$search}%"))
+                                        ->when($search === '', fn ($q) => $q->inRandomOrder())
+                                        ->limit(10)
+                                        ->get()
+                                        ->mapWithKeys(fn (TipoPrenda $p) => [
+                                            $p->id => '<div class="py-0.5">'
+                                                .'<div class="font-medium">'.e($p->nombre).'</div>'
+                                                .($p->descripcion ? '<div class="text-xs text-gray-400 dark:text-gray-500">'.e($p->descripcion).'</div>' : '')
+                                                .'</div>',
+                                        ]);
+                                })
+                                ->getOptionLabelUsing(fn ($value) => TipoPrenda::find($value)?->nombre)
                                 ->createOptionForm([
                                     TextInput::make('nombre')
                                         ->label('Nombre')
@@ -164,13 +176,26 @@ class TicketLavanderiaResource extends Resource
                             Select::make('servicio_lavanderia_id')
                                 ->label('Servicio')
                                 ->columnSpan(3)
-                                ->placeholder('Servicio...')
-                                ->options(fn () => ServicioLavanderia::where('empresa_id', $empresaId)
-                                    ->where('activo', true)
-                                    ->pluck('nombre', 'id'))
-                                ->required()
+                                ->placeholder('Buscar servicio...')
                                 ->searchable()
-                                ->preload()
+                                ->required()
+                                ->allowHtml()
+                                ->getSearchResultsUsing(function (string $search) use ($empresaId) {
+                                    return ServicioLavanderia::where('empresa_id', $empresaId)
+                                        ->where('activo', true)
+                                        ->when($search !== '', fn ($q) => $q->where('nombre', 'ilike', "%{$search}%"))
+                                        ->when($search === '', fn ($q) => $q->inRandomOrder())
+                                        ->limit(10)
+                                        ->get()
+                                        ->mapWithKeys(fn (ServicioLavanderia $s) => [
+                                            $s->id => '<div class="py-0.5">'
+                                                .'<div class="font-medium">'.e($s->nombre).'</div>'
+                                                .($s->descripcion ? '<div class="text-xs text-gray-400 dark:text-gray-500">'.e($s->descripcion).'</div>' : '')
+                                                .'<div class="text-xs text-primary-600 dark:text-primary-400">RD$ '.number_format((float) $s->precio_base, 2).'</div>'
+                                                .'</div>',
+                                        ]);
+                                })
+                                ->getOptionLabelUsing(fn ($value) => ServicioLavanderia::find($value)?->nombre)
                                 ->createOptionForm([
                                     TextInput::make('nombre')
                                         ->label('Nombre')
@@ -218,7 +243,7 @@ class TicketLavanderiaResource extends Resource
 
                             TextInput::make('cantidad')
                                 ->label('Cant.')
-                                ->columnSpan(2)
+                                ->columnSpan(1)
                                 ->numeric()
                                 ->default(1)
                                 ->minValue(1)
