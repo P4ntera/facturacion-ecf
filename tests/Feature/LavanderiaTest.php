@@ -245,7 +245,7 @@ class LavanderiaTest extends TestCase
     //  Máquina de estados
     // ───────────────────────────────────────────────────────────────────
 
-    public function test_avanzar_estado_de_recibido_a_en_proceso(): void
+    public function test_avanzar_estado_de_recibido_a_listo(): void
     {
         $ticket = $this->crearTicket();
         $this->assertEquals(EstadoTicketLavanderia::RECIBIDO, $ticket->estado);
@@ -253,18 +253,17 @@ class LavanderiaTest extends TestCase
         app(TicketLavanderiaService::class)->avanzarEstado($ticket);
         $ticket->refresh();
 
-        $this->assertEquals(EstadoTicketLavanderia::EN_PROCESO, $ticket->estado);
+        $this->assertEquals(EstadoTicketLavanderia::LISTO, $ticket->estado);
     }
 
-    public function test_avanzar_estado_de_en_proceso_a_listo(): void
+    public function test_avanzar_estado_de_en_proceso_a_listo_compatibilidad(): void
     {
+        // Tickets antiguos que quedaron en EN_PROCESO deben poder avanzar a LISTO.
         $ticket = $this->crearTicket();
-        $service = app(TicketLavanderiaService::class);
-
-        $service->avanzarEstado($ticket); // RECIBIDO → EN_PROCESO
+        $ticket->update(['estado' => EstadoTicketLavanderia::EN_PROCESO]);
         $ticket->refresh();
 
-        $service->avanzarEstado($ticket); // EN_PROCESO → LISTO
+        app(TicketLavanderiaService::class)->avanzarEstado($ticket);
         $ticket->refresh();
 
         $this->assertEquals(EstadoTicketLavanderia::LISTO, $ticket->estado);
@@ -275,8 +274,6 @@ class LavanderiaTest extends TestCase
         $ticket = $this->crearTicket();
         $service = app(TicketLavanderiaService::class);
 
-        $service->avanzarEstado($ticket); // → EN_PROCESO
-        $ticket->refresh();
         $service->avanzarEstado($ticket); // → LISTO
         $ticket->refresh();
 
@@ -310,12 +307,12 @@ class LavanderiaTest extends TestCase
         $this->assertEquals(EstadoTicketLavanderia::CANCELADO, $ticket->estado);
     }
 
-    public function test_cancelar_ticket_en_proceso(): void
+    public function test_cancelar_ticket_listo(): void
     {
         $ticket = $this->crearTicket();
         $service = app(TicketLavanderiaService::class);
 
-        $service->avanzarEstado($ticket); // → EN_PROCESO
+        $service->avanzarEstado($ticket); // → LISTO
         $ticket->refresh();
 
         $service->cancelar($ticket);
@@ -374,6 +371,66 @@ class LavanderiaTest extends TestCase
         $this->expectExceptionMessage('no pertenece');
 
         app(TicketLavanderiaService::class)->entregar($ticket, $otraEmpresa);
+    }
+
+    // ───────────────────────────────────────────────────────────────────
+    //  Cobro (sin entrega)
+    // ───────────────────────────────────────────────────────────────────
+
+    public function test_cobrar_ticket_pendiente(): void
+    {
+        $ticket = $this->crearTicket();
+        $this->assertEquals(EstadoPagoTicket::PENDIENTE, $ticket->estado_pago);
+
+        $venta = app(TicketLavanderiaService::class)->cobrar($ticket, $this->empresa, [
+            'forma_pago' => \App\Enums\FormaPago::EFECTIVO,
+            'user_id' => $this->admin->id,
+        ]);
+
+        $ticket->refresh();
+        $this->assertEquals(EstadoPagoTicket::PAGADO, $ticket->estado_pago);
+        $this->assertNotNull($ticket->venta_id);
+        $this->assertEquals($venta->id, $ticket->venta_id);
+        // El estado de flujo NO cambia al cobrar.
+        $this->assertEquals(EstadoTicketLavanderia::RECIBIDO, $ticket->estado);
+    }
+
+    public function test_no_se_puede_cobrar_ticket_ya_pagado(): void
+    {
+        $ticket = $this->crearTicket();
+        app(TicketLavanderiaService::class)->cobrar($ticket, $this->empresa, [
+            'forma_pago' => \App\Enums\FormaPago::EFECTIVO,
+            'user_id' => $this->admin->id,
+        ]);
+        $ticket->refresh();
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('ya fue cobrado');
+
+        app(TicketLavanderiaService::class)->cobrar($ticket, $this->empresa);
+    }
+
+    public function test_no_se_puede_cobrar_ticket_cancelado(): void
+    {
+        $ticket = $this->crearTicket();
+        app(TicketLavanderiaService::class)->cancelar($ticket);
+        $ticket->refresh();
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('ticket cancelado');
+
+        app(TicketLavanderiaService::class)->cobrar($ticket, $this->empresa);
+    }
+
+    public function test_no_se_puede_cobrar_ticket_de_otra_empresa(): void
+    {
+        $otraEmpresa = Empresa::factory()->create();
+        $ticket = $this->crearTicket();
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('no pertenece');
+
+        app(TicketLavanderiaService::class)->cobrar($ticket, $otraEmpresa);
     }
 
     // ───────────────────────────────────────────────────────────────────
@@ -602,17 +659,12 @@ class LavanderiaTest extends TestCase
     //  Flujo completo de estados
     // ───────────────────────────────────────────────────────────────────
 
-    public function test_flujo_completo_recibido_a_entregado_pago_pendiente(): void
+    public function test_flujo_completo_recibido_a_listo_pago_pendiente(): void
     {
         $ticket = $this->crearTicket();
         $service = app(TicketLavanderiaService::class);
 
-        // RECIBIDO → EN_PROCESO
-        $service->avanzarEstado($ticket);
-        $ticket->refresh();
-        $this->assertEquals(EstadoTicketLavanderia::EN_PROCESO, $ticket->estado);
-
-        // EN_PROCESO → LISTO
+        // RECIBIDO → LISTO (flujo simplificado)
         $service->avanzarEstado($ticket);
         $ticket->refresh();
         $this->assertEquals(EstadoTicketLavanderia::LISTO, $ticket->estado);

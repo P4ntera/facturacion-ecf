@@ -121,12 +121,12 @@ class TicketLavanderiaService
 
     /**
      * Cambia el estado del ticket al siguiente en el flujo:
-     * RECIBIDO → EN_PROCESO → LISTO
+     * RECIBIDO → LISTO (EN_PROCESO se conserva por compatibilidad con tickets antiguos).
      */
     public function avanzarEstado(TicketLavanderia $ticket): void
     {
         $siguiente = match ($ticket->estado) {
-            EstadoTicketLavanderia::RECIBIDO => EstadoTicketLavanderia::EN_PROCESO,
+            EstadoTicketLavanderia::RECIBIDO,
             EstadoTicketLavanderia::EN_PROCESO => EstadoTicketLavanderia::LISTO,
             default => throw new RuntimeException("No se puede avanzar el ticket en estado {$ticket->estado->etiqueta()}."),
         };
@@ -135,12 +135,11 @@ class TicketLavanderiaService
             $ticket->lockForUpdate();
             $ticket->refresh();
 
-            // Revalidar el estado después del lock
-            if ($ticket->estado !== match ($siguiente) {
-                EstadoTicketLavanderia::EN_PROCESO => EstadoTicketLavanderia::RECIBIDO,
-                EstadoTicketLavanderia::LISTO => EstadoTicketLavanderia::EN_PROCESO,
-                default => $ticket->estado,
-            }) {
+            // Revalidar: solo avanzar si sigue en un estado que permite avance.
+            if (! in_array($ticket->estado, [
+                EstadoTicketLavanderia::RECIBIDO,
+                EstadoTicketLavanderia::EN_PROCESO,
+            ], true)) {
                 throw new RuntimeException('El estado del ticket cambió. Intente de nuevo.');
             }
 
@@ -178,6 +177,36 @@ class TicketLavanderiaService
                 'estado' => EstadoTicketLavanderia::ENTREGADO,
                 'entregado_en' => now(),
             ]);
+        });
+    }
+
+    /**
+     * Cobra un ticket pendiente de pago sin cambiar su estado de flujo.
+     * Se usa cuando el cliente paga antes de la entrega.
+     */
+    public function cobrar(TicketLavanderia $ticket, Empresa $empresa, array $datosVenta = []): Venta
+    {
+        if ($ticket->estado_pago === EstadoPagoTicket::PAGADO) {
+            throw new RuntimeException('Este ticket ya fue cobrado.');
+        }
+
+        if ($ticket->estado === EstadoTicketLavanderia::CANCELADO) {
+            throw new RuntimeException('No se puede cobrar un ticket cancelado.');
+        }
+
+        if ($ticket->empresa_id !== $empresa->id) {
+            throw new RuntimeException('El ticket no pertenece a esta empresa.');
+        }
+
+        return DB::transaction(function () use ($ticket, $empresa, $datosVenta) {
+            $ticket->lockForUpdate();
+            $ticket->refresh();
+
+            if ($ticket->estado_pago === EstadoPagoTicket::PAGADO) {
+                throw new RuntimeException('Este ticket ya fue cobrado.');
+            }
+
+            return $this->facturar($ticket, $empresa, $datosVenta);
         });
     }
 
@@ -227,7 +256,9 @@ class TicketLavanderiaService
         })->toArray();
 
         $venta = $this->ventaService->registrar(
-            array_merge($datosVenta, [
+            array_merge([
+                'sin_comprobante' => true,
+            ], $datosVenta, [
                 'lineas' => $lineas,
                 'cliente_id' => $ticket->cliente_id,
             ]),

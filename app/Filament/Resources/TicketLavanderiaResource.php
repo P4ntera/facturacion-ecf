@@ -6,6 +6,7 @@ namespace App\Filament\Resources;
 
 use App\Enums\EstadoPagoTicket;
 use App\Enums\EstadoTicketLavanderia;
+use App\Enums\FormaPago;
 use App\Enums\Modulo;
 use App\Filament\Concerns\RestringidoPorModulo;
 use App\Filament\Resources\TicketLavanderiaResource\Pages;
@@ -117,6 +118,55 @@ class TicketLavanderiaResource extends Resource
                         ->default(false)
                         ->dehydrated(false)
                         ->live(),
+
+                    Section::make('Cobro')
+                        ->icon(Heroicon::OutlinedBanknotes)
+                        ->visible(fn (Get $get): bool => (bool) $get('pagar_ahora'))
+                        ->columns(2)
+                        ->schema([
+                            Select::make('datos_venta.forma_pago')
+                                ->label('Forma de Pago')
+                                ->options(
+                                    collect(FormaPago::cases())
+                                        ->reject(fn (FormaPago $fp) => $fp === FormaPago::MIXTO)
+                                        ->mapWithKeys(fn (FormaPago $fp) => [$fp->value => $fp->etiqueta()])
+                                )
+                                ->default(FormaPago::EFECTIVO->value)
+                                ->required()
+                                ->live()
+                                ->columnSpanFull(),
+
+                            TextInput::make('datos_venta.monto_recibido')
+                                ->label('Monto Recibido')
+                                ->numeric()
+                                ->prefix('RD$')
+                                ->minValue(0)
+                                ->visible(fn (Get $get): bool => ($get('datos_venta.forma_pago') ?? FormaPago::EFECTIVO->value) === FormaPago::EFECTIVO->value)
+                                ->live(debounce: 500)
+                                ->afterStateUpdated(function (Get $get, Set $set) {
+                                    $recibido = (float) ($get('datos_venta.monto_recibido') ?? 0);
+                                    // Calcular total sumando detalles
+                                    $detalles = $get('detalles') ?? [];
+                                    $total = collect($detalles)->sum(fn ($d) => ((float) ($d['precio_unitario'] ?? 0)) * ((int) ($d['cantidad'] ?? 1)));
+                                    $vuelto = max(0, round($recibido - $total, 2));
+                                    $set('datos_venta.vuelto', $vuelto > 0 ? $vuelto : null);
+                                }),
+
+                            Placeholder::make('datos_venta.vuelto_display')
+                                ->label('Devuelta')
+                                ->visible(fn (Get $get): bool => ($get('datos_venta.forma_pago') ?? FormaPago::EFECTIVO->value) === FormaPago::EFECTIVO->value)
+                                ->content(function (Get $get): HtmlString {
+                                    $vuelto = (float) ($get('datos_venta.vuelto') ?? 0);
+
+                                    return new HtmlString(
+                                        '<span class="text-2xl font-bold text-success-600 dark:text-success-400">RD$ ' . number_format($vuelto, 2) . '</span>'
+                                    );
+                                }),
+
+                            TextInput::make('datos_venta.vuelto')
+                                ->hidden()
+                                ->dehydrated(),
+                        ]),
                 ]),
 
             Section::make('Prendas')

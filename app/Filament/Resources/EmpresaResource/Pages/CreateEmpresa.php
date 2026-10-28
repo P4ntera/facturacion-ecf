@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\EmpresaResource\Pages;
 
+use App\Enums\PerfilEmpresa;
 use App\Filament\Resources\EmpresaResource;
 use App\Models\Empresa;
 use App\Services\ModulosEmpresaService;
@@ -20,5 +21,10 @@ class CreateEmpresa extends CreateRecord
 
         app(RolesEmpresaService::class)->sembrarRolesBase($record);
         app(ModulosEmpresaService::class)->sembrarModulos($record);
+
+        // Lavandería siempre vende sin comprobante por defecto (el cliente lo pide si lo necesita).
+        if ($record->perfil === PerfilEmpresa::LAVANDERIA) {
+            $record->config()->update(['permite_ventas_sin_comprobante' => true]);
+        }
     }
 }

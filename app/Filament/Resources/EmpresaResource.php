@@ -65,13 +65,13 @@ class EmpresaResource extends Resource
 
                         TextInput::make('rnc')
                             ->label('RNC')
-                            ->required()
                             ->numeric()
                             ->regex('/^\d{9}(\d{2})?$/')
                             ->validationMessages(['regex' => 'El RNC debe tener 9 u 11 dígitos.'])
                             ->unique(ignoreRecord: true)
                             ->minLength(9)
-                            ->maxLength(11),
+                            ->maxLength(11)
+                            ->helperText('Opcional. 9 dígitos para RNC, 11 para Cédula.'),
 
                         TextInput::make('slug')
                             ->label('Slug (URL)')
