@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Models\User;
 use App\Policies\ActivityPolicy;
 use Filament\Events\TenantSet;
+use Filament\Pages\BasePage;
 use Filament\Schemas\Schema;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
@@ -68,6 +69,11 @@ class AppServiceProvider extends ServiceProvider
         // de forma transversal aquí. No ensucia los roles de cada empresa y es el único punto que
         // hay que tocar si algún día cambia cómo se identifica al super-admin.
         Gate::before(fn (User $user, string $ability) => $user->es_super_admin ? true : null);
+
+        // Botones de formulario (Crear, Crear y crear otro, Cancelar) alineados a la derecha en
+        // TODAS las páginas Create/Edit del panel. BasePage es la clase base de la que heredan
+        // CreateRecord y EditRecord; al ser estático, un solo cambio aquí cubre todo el panel.
+        BasePage::alignFormActionsEnd();
 
         // Densidad y formato por defecto de TODAS las tablas del panel (PASO 5): un solo lugar en
         // vez de repetir estas llamadas en cada Resource. 'es_DO' es lo que hace que ->money('DOP')
