@@ -14,9 +14,9 @@ class TicketLavanderiaReciboPdfController extends Controller
     public function __invoke(Request $request, TicketLavanderia $ticket): Response
     {
         // Tenancy check: fuera del panel de Filament, verificar a mano que el ticket
-        // pertenezca a la empresa del usuario autenticado.
+        // pertenezca a la empresa del usuario autenticado (super-admin pasa siempre).
         abort_unless(
-            $request->user()?->empresa_id === $ticket->empresa_id,
+            $request->user()?->perteneceAEmpresa($ticket->empresa_id),
             403,
             'No autorizado',
         );
