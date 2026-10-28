@@ -17,11 +17,13 @@ use App\Models\TipoPrenda;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Illuminate\Support\HtmlString;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Resources\Resource;
@@ -246,16 +248,30 @@ class TicketLavanderiaResource extends Resource
                                 ->disabled()
                                 ->dehydrated(false),
 
-                            TextInput::make('observaciones')
-                                ->label('Nota')
-                                ->columnSpan(1),
                         ])
-                        ->columns(12)
+                        ->columns(11)
                         ->minItems(1)
                         ->defaultItems(1)
                         ->required()
                         ->addActionLabel('Agregar prenda')
-                        ->reorderable(false),
+                        ->reorderable(false)
+                        ->live(),
+
+                    Placeholder::make('total_prendas')
+                        ->label('')
+                        ->content(function (Get $get): HtmlString {
+                            $total = 0;
+                            foreach ($get('detalles') ?? [] as $detalle) {
+                                $precio = (float) ($detalle['precio_unitario'] ?? 0);
+                                $cantidad = max(1, (int) ($detalle['cantidad'] ?? 1));
+                                $total += $precio * $cantidad;
+                            }
+
+                            return new HtmlString(
+                                '<div class="text-right"><span class="text-sm text-gray-500 dark:text-gray-400 me-2">Total</span>'
+                                .'<span class="text-lg font-bold">RD$ '.number_format($total, 2).'</span></div>'
+                            );
+                        }),
                 ]),
         ]);
     }
