@@ -76,7 +76,7 @@ class TicketLavanderiaResource extends Resource
                         ->searchable()
                         ->nullable()
                         ->preload()
-                        ->placeholder('Portador (sin cliente)')
+                        ->placeholder('Buscar cliente...')
                         ->helperText('Opcional — dejar vacío para venta al portador')
                         ->createOptionForm([
                             TextInput::make('nombre')
@@ -98,20 +98,21 @@ class TicketLavanderiaResource extends Resource
                         }),
 
                     DateTimePicker::make('fecha_prometida')
-                        ->label('Fecha Prometida de Entrega')
+                        ->label('Fecha de Entrega')
                         ->minDate(now()->startOfMinute()->addHours(2))
                         ->seconds(false)
                         ->minutesStep(15)
-                        ->helperText('Mínimo 2 horas a partir de ahora'),
+                        ->required(),
 
                     Textarea::make('observaciones')
-                        ->label('Observaciones Generales')
-                        ->rows(2)
+                        ->label('Observaciones')
+                        ->placeholder('Notas generales del ticket...')
+                        ->rows(3)
                         ->columnSpanFull(),
 
                     Toggle::make('pagar_ahora')
                         ->label('¿Paga ahora?')
-                        ->helperText('Si paga ahora se genera factura inmediatamente. De lo contrario recibe un ticket para pagar al retirar.')
+                        ->helperText('Cobrar al recibir las prendas')
                         ->default(false)
                         ->dehydrated(false)
                         ->live(),
@@ -126,6 +127,7 @@ class TicketLavanderiaResource extends Resource
                             Select::make('tipo_prenda_id')
                                 ->label('Tipo de Prenda')
                                 ->columnSpan(3)
+                                ->placeholder('Prenda...')
                                 ->options(fn () => TipoPrenda::where('empresa_id', $empresaId)
                                     ->where('activo', true)
                                     ->pluck('nombre', 'id'))
@@ -162,6 +164,7 @@ class TicketLavanderiaResource extends Resource
                             Select::make('servicio_lavanderia_id')
                                 ->label('Servicio')
                                 ->columnSpan(3)
+                                ->placeholder('Servicio...')
                                 ->options(fn () => ServicioLavanderia::where('empresa_id', $empresaId)
                                     ->where('activo', true)
                                     ->pluck('nombre', 'id'))
@@ -215,7 +218,7 @@ class TicketLavanderiaResource extends Resource
 
                             TextInput::make('cantidad')
                                 ->label('Cant.')
-                                ->columnSpan(1)
+                                ->columnSpan(2)
                                 ->numeric()
                                 ->default(1)
                                 ->minValue(1)
@@ -249,7 +252,7 @@ class TicketLavanderiaResource extends Resource
                                 ->dehydrated(false),
 
                         ])
-                        ->columns(11)
+                        ->columns(12)
                         ->minItems(1)
                         ->defaultItems(1)
                         ->required()
@@ -259,6 +262,7 @@ class TicketLavanderiaResource extends Resource
 
                     Placeholder::make('total_prendas')
                         ->label('')
+                        ->hiddenLabel()
                         ->content(function (Get $get): HtmlString {
                             $total = 0;
                             foreach ($get('detalles') ?? [] as $detalle) {
