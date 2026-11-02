@@ -39,17 +39,15 @@ class ReporteProduccionServicio extends ReportePage
     /**
      * Filament inyecta ORDER BY <modelo>.id para paginar; con GROUP BY en PostgreSQL
      * eso falla (42803). Solución: envolver la query agregada como subquery con un
-     * id sintético vía ROW_NUMBER(), para que Filament ordene/pagine por ese id sin
-     * romper el GROUP BY interno.
+     * id sintético vía ROW_NUMBER(), y usar un query builder crudo (DB::query) para
+     * que Filament NO intente cualificar columnas con el nombre de tabla del modelo.
+     * La paginación se desactiva porque es un reporte con pocas filas agregadas.
      */
     public function table(Table $table): Table
     {
         return $table
-            ->query(
-                fn () => DetalleTicketLavanderia::query()
-                    ->from(DB::raw('(' . $this->buildAggregateSubquery() . ') as detalle_tickets_lavanderia'))
-                    ->select('*')
-            )
+            ->query(fn () => $this->buildReportQuery())
+            ->paginated(false)
             ->columns([
                 TextColumn::make('servicio')
                     ->label('Servicio')
@@ -96,19 +94,18 @@ class ReporteProduccionServicio extends ReportePage
     }
 
     /**
-     * Construye el SQL de la subquery agregada con ROW_NUMBER() como id.
+     * Query agregada como subquery con ROW_NUMBER() como id sintético.
      *
      * Los valores se interpolan de forma segura: empresa_id es un int del tenant
-     * autenticado, y las fechas se generan internamente con Carbon — no hay entrada
-     * de usuario directa.
+     * autenticado, y las fechas se generan internamente con Carbon.
      */
-    protected function buildAggregateSubquery(): string
+    protected function buildReportQuery(): \Illuminate\Database\Eloquent\Builder
     {
         $empresaId = (int) Filament::getTenant()->id;
         $desde = $this->rangoDesde()->toDateTimeString();
         $hasta = $this->rangoHasta()->toDateTimeString();
 
-        return <<<SQL
+        $subSql = <<<SQL
             SELECT ROW_NUMBER() OVER (ORDER BY "servicios_lavanderia"."nombre", "tipos_prenda"."nombre") as id,
                    "servicios_lavanderia"."nombre" as servicio,
                    "tipos_prenda"."nombre" as tipo_prenda,
@@ -126,6 +123,10 @@ class ReporteProduccionServicio extends ReportePage
               AND "tickets_lavanderia"."estado" != 'cancelado'
             GROUP BY "servicios_lavanderia"."nombre", "tipos_prenda"."nombre"
         SQL;
+
+        return DetalleTicketLavanderia::query()
+            ->from(DB::raw("({$subSql}) as detalle_tickets_lavanderia"))
+            ->select('*');
     }
 
     protected function pdfRouteName(): string

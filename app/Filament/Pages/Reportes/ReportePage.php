@@ -8,6 +8,7 @@ use App\Filament\Clusters\Reportes;
 use Filament\Actions\Action;
 use Filament\Actions\ExportAction;
 use Filament\Actions\Exports\Exporter;
+use Filament\Facades\Filament;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\EmbeddedTable;
 use Filament\Schemas\Schema;
@@ -74,7 +75,10 @@ abstract class ReportePage extends Page implements HasTable
                 ->icon(Heroicon::OutlinedDocumentArrowDown)
                 ->color('gray')
                 ->visible($puedeExportar)
-                ->url(fn (): string => route($this->pdfRouteName(), $this->pdfRouteParams()), shouldOpenInNewTab: true),
+                ->url(fn (): string => route($this->pdfRouteName(), array_merge(
+                    $this->pdfRouteParams(),
+                    ['empresa' => Filament::getTenant()?->id],
+                )), shouldOpenInNewTab: true),
         ];
     }
 

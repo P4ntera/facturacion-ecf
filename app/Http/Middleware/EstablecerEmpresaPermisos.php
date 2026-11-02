@@ -39,7 +39,13 @@ class EstablecerEmpresaPermisos
         $usuario = $request->user();
 
         if ($usuario !== null) {
-            setPermissionsTeamId($usuario->empresa_id);
+            // Si la request trae ?empresa= (rutas PDF de reportes, generadas desde el panel
+            // con el tenant activo), usar esa empresa como contexto de permisos — permite que
+            // el super-admin (empresa_id null) pase la comprobación `can:` del middleware de
+            // ruta con el contexto correcto, y que el controller resuelva la empresa real.
+            $empresaId = (int) ($request->query('empresa') ?? 0) ?: $usuario->empresa_id;
+
+            setPermissionsTeamId($empresaId);
 
             // El objeto User puede traer roles/permissions ya cargados en memoria de un
             // contexto de empresa distinto (p. ej. en tests, que reutilizan la misma instancia

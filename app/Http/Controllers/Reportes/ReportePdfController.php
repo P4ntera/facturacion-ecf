@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Reportes;
 
 use App\Http\Controllers\Controller;
+use App\Models\Empresa;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -15,15 +16,36 @@ use Symfony\Component\HttpFoundation\Response;
 abstract class ReportePdfController extends Controller
 {
     /**
-     * empresa_id del usuario autenticado, para scopear los *Query() de ReporteService: estas
-     * rutas están fuera del panel de Filament, así que el scoping automático por tenant no
-     * aplica (ver BelongsToTenant de Filament) y hay que filtrar a mano. Corta en seco (403) en
-     * vez de devolver un reporte sin filtrar: el super-admin no tiene empresa propia y no debe
-     * poder exportar un reporte mezclando datos de todas las empresas por esta vía.
+     * Resuelve la empresa para el reporte:
+     *   1) Query param ?empresa= (viene del panel cuando el tenant ≠ la empresa del usuario)
+     *   2) empresa_id del usuario autenticado (caso normal: usuario regular en su empresa)
+     *
+     * El super-admin (empresa_id null) que navega un tenant manda ?empresa= desde el panel;
+     * sin ese param no se puede saber qué empresa exportar → 403.
+     *
+     * Valida que el usuario pertenezca a la empresa, o que sea super-admin, antes de devolver.
      */
     protected function empresaId(Request $request): int
     {
-        return $request->user()->empresa_id ?? abort(403);
+        $empresaId = (int) ($request->query('empresa') ?? $request->user()->empresa_id);
+
+        abort_unless($empresaId > 0, 403, 'No se pudo determinar la empresa.');
+
+        $usuario = $request->user();
+
+        // Super-admin puede acceder a cualquier empresa
+        if ($usuario->es_super_admin) {
+            // Fijar contexto de permisos a la empresa del reporte
+            setPermissionsTeamId($empresaId);
+            $usuario->unsetRelation('roles')->unsetRelation('permissions');
+
+            return $empresaId;
+        }
+
+        // Usuario regular: solo su propia empresa
+        abort_unless($usuario->empresa_id === $empresaId, 403);
+
+        return $empresaId;
     }
 
     protected function rangoDesde(Request $request): Carbon
@@ -66,9 +88,14 @@ abstract class ReportePdfController extends Controller
         ?Carbon $desde = null,
         ?Carbon $hasta = null,
     ): Response {
+        // Resolver la empresa: preferir el param ?empresa (tenant del panel),
+        // fallback a la empresa del usuario (caso normal).
+        $empresaId = $this->empresaId($request);
+        $empresa   = Empresa::findOrFail($empresaId);
+
         $pdf = Pdf::loadView('reportes.pdf', [
             'titulo' => $titulo,
-            'empresa' => $request->user()->empresa,
+            'empresa' => $empresa,
             'columnas' => $columnas,
             'filas' => $filas,
             'totales' => $totales,
