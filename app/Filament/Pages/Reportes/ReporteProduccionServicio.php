@@ -54,20 +54,21 @@ class ReporteProduccionServicio extends ReportePage
                         DB::raw('SUM(detalle_tickets_lavanderia.subtotal) as total_ingresos'),
                     )
                     ->groupBy('servicios_lavanderia.nombre', 'tipos_prenda.nombre')
+                    ->orderBy('servicio')
             )
             ->columns([
                 TextColumn::make('servicio')
                     ->label('Servicio')
-                    ->sortable(),
+                    ->sortable(query: fn (\Illuminate\Database\Eloquent\Builder $query, string $direction) => $query->reorder('servicio', $direction)),
 
                 TextColumn::make('tipo_prenda')
                     ->label('Tipo de Prenda')
-                    ->sortable(),
+                    ->sortable(query: fn (\Illuminate\Database\Eloquent\Builder $query, string $direction) => $query->reorder('tipo_prenda', $direction)),
 
                 TextColumn::make('total_prendas')
                     ->label('Total Prendas')
                     ->numeric()
-                    ->sortable()
+                    ->sortable(query: fn (\Illuminate\Database\Eloquent\Builder $query, string $direction) => $query->reorder('total_prendas', $direction))
                     ->summarize(
                         Summarizer::make()
                             ->label('Total')
@@ -78,7 +79,7 @@ class ReporteProduccionServicio extends ReportePage
                 TextColumn::make('total_ingresos')
                     ->label('Total Ingresos')
                     ->money('DOP')
-                    ->sortable()
+                    ->sortable(query: fn (\Illuminate\Database\Eloquent\Builder $query, string $direction) => $query->reorder('total_ingresos', $direction))
                     ->summarize(
                         Summarizer::make()
                             ->label('Total')
@@ -97,7 +98,7 @@ class ReporteProduccionServicio extends ReportePage
                             ->default(fn () => now()->endOfMonth()->toDateString()),
                     ]),
             ])
-            ->defaultSort('servicio', 'asc');
+            ->modifyQueryUsing(fn (\Illuminate\Database\Eloquent\Builder $query) => $query->reorder('servicio', 'asc'));
     }
 
     protected function pdfRouteName(): string
