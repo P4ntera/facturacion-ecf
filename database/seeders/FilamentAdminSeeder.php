@@ -14,8 +14,8 @@ class FilamentAdminSeeder extends Seeder
     public function run(): void
     {
         $admins = [
-            ['email' => 'admin@erp.local',   'name' => 'Super Admin'],
-            ['email' => 'admin2@erp.local',  'name' => 'Super Admin 2'],
+            ['email' => 'eugeniososa0925@gmail.com',   'name' => 'Super Admin'],
+            ['email' => 'fesrsoft25@gmail.com',  'name' => 'Super Admin 2'],
         ];
 
         foreach ($admins as $datos) {
