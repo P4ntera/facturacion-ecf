@@ -36,39 +36,33 @@ class ReporteProduccionServicio extends ReportePage
         return auth()->user()?->can('lavanderia.ver_reportes') ?? false;
     }
 
+    /**
+     * Filament inyecta ORDER BY <modelo>.id para paginar; con GROUP BY en PostgreSQL
+     * eso falla (42803). Solución: envolver la query agregada como subquery con un
+     * id sintético vía ROW_NUMBER(), para que Filament ordene/pagine por ese id sin
+     * romper el GROUP BY interno.
+     */
     public function table(Table $table): Table
     {
         return $table
             ->query(
                 fn () => DetalleTicketLavanderia::query()
-                    ->join('tickets_lavanderia', 'detalle_tickets_lavanderia.ticket_lavanderia_id', '=', 'tickets_lavanderia.id')
-                    ->join('servicios_lavanderia', 'detalle_tickets_lavanderia.servicio_lavanderia_id', '=', 'servicios_lavanderia.id')
-                    ->join('tipos_prenda', 'detalle_tickets_lavanderia.tipo_prenda_id', '=', 'tipos_prenda.id')
-                    ->where('tickets_lavanderia.empresa_id', Filament::getTenant()->id)
-                    ->whereBetween('tickets_lavanderia.created_at', [$this->rangoDesde(), $this->rangoHasta()])
-                    ->where('tickets_lavanderia.estado', '!=', 'cancelado')
-                    ->select(
-                        'servicios_lavanderia.nombre as servicio',
-                        'tipos_prenda.nombre as tipo_prenda',
-                        DB::raw('SUM(detalle_tickets_lavanderia.cantidad) as total_prendas'),
-                        DB::raw('SUM(detalle_tickets_lavanderia.subtotal) as total_ingresos'),
-                    )
-                    ->groupBy('servicios_lavanderia.nombre', 'tipos_prenda.nombre')
-                    ->orderBy('servicio')
+                    ->from(DB::raw('(' . $this->buildAggregateSubquery() . ') as detalle_tickets_lavanderia'))
+                    ->select('*')
             )
             ->columns([
                 TextColumn::make('servicio')
                     ->label('Servicio')
-                    ->sortable(query: fn (\Illuminate\Database\Eloquent\Builder $query, string $direction) => $query->reorder('servicio', $direction)),
+                    ->sortable(),
 
                 TextColumn::make('tipo_prenda')
                     ->label('Tipo de Prenda')
-                    ->sortable(query: fn (\Illuminate\Database\Eloquent\Builder $query, string $direction) => $query->reorder('tipo_prenda', $direction)),
+                    ->sortable(),
 
                 TextColumn::make('total_prendas')
                     ->label('Total Prendas')
                     ->numeric()
-                    ->sortable(query: fn (\Illuminate\Database\Eloquent\Builder $query, string $direction) => $query->reorder('total_prendas', $direction))
+                    ->sortable()
                     ->summarize(
                         Summarizer::make()
                             ->label('Total')
@@ -79,7 +73,7 @@ class ReporteProduccionServicio extends ReportePage
                 TextColumn::make('total_ingresos')
                     ->label('Total Ingresos')
                     ->money('DOP')
-                    ->sortable(query: fn (\Illuminate\Database\Eloquent\Builder $query, string $direction) => $query->reorder('total_ingresos', $direction))
+                    ->sortable()
                     ->summarize(
                         Summarizer::make()
                             ->label('Total')
@@ -98,7 +92,40 @@ class ReporteProduccionServicio extends ReportePage
                             ->default(fn () => now()->endOfMonth()->toDateString()),
                     ]),
             ])
-            ->modifyQueryUsing(fn (\Illuminate\Database\Eloquent\Builder $query) => $query->reorder('servicio', 'asc'));
+            ->defaultSort('servicio', 'asc');
+    }
+
+    /**
+     * Construye el SQL de la subquery agregada con ROW_NUMBER() como id.
+     *
+     * Los valores se interpolan de forma segura: empresa_id es un int del tenant
+     * autenticado, y las fechas se generan internamente con Carbon — no hay entrada
+     * de usuario directa.
+     */
+    protected function buildAggregateSubquery(): string
+    {
+        $empresaId = (int) Filament::getTenant()->id;
+        $desde = $this->rangoDesde()->toDateTimeString();
+        $hasta = $this->rangoHasta()->toDateTimeString();
+
+        return <<<SQL
+            SELECT ROW_NUMBER() OVER (ORDER BY "servicios_lavanderia"."nombre", "tipos_prenda"."nombre") as id,
+                   "servicios_lavanderia"."nombre" as servicio,
+                   "tipos_prenda"."nombre" as tipo_prenda,
+                   SUM("detalle_tickets_lavanderia"."cantidad") as total_prendas,
+                   SUM("detalle_tickets_lavanderia"."subtotal") as total_ingresos
+            FROM "detalle_tickets_lavanderia"
+            INNER JOIN "tickets_lavanderia"
+                ON "detalle_tickets_lavanderia"."ticket_lavanderia_id" = "tickets_lavanderia"."id"
+            INNER JOIN "servicios_lavanderia"
+                ON "detalle_tickets_lavanderia"."servicio_lavanderia_id" = "servicios_lavanderia"."id"
+            INNER JOIN "tipos_prenda"
+                ON "detalle_tickets_lavanderia"."tipo_prenda_id" = "tipos_prenda"."id"
+            WHERE "tickets_lavanderia"."empresa_id" = {$empresaId}
+              AND "tickets_lavanderia"."created_at" BETWEEN '{$desde}' AND '{$hasta}'
+              AND "tickets_lavanderia"."estado" != 'cancelado'
+            GROUP BY "servicios_lavanderia"."nombre", "tipos_prenda"."nombre"
+        SQL;
     }
 
     protected function pdfRouteName(): string
