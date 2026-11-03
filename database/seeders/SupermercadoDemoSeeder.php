@@ -283,18 +283,14 @@ class SupermercadoDemoSeeder extends Seeder
             ['rnc' => '130345678', 'nombre' => 'Bebidas del Caribe SRL', 'nombre_comercial' => 'BebiCaribe', 'tipo' => TipoProveedor::FORMAL, 'actividad' => 'Distribución de bebidas', 'telefono' => '809-555-7002', 'email' => 'pedidos@bebicaribe.test'],
             ['rnc' => '131678901', 'nombre' => 'Carnes y Embutidos del Cibao SRL', 'nombre_comercial' => 'CEC', 'tipo' => TipoProveedor::FORMAL, 'actividad' => 'Procesadora de carnes', 'telefono' => '809-555-7003', 'email' => 'ventas@cec.test'],
             ['rnc' => '101890123', 'nombre' => 'Productos de Limpieza Quisqueya CxA', 'nombre_comercial' => 'LimpiaQuisqueya', 'tipo' => TipoProveedor::FORMAL, 'actividad' => 'Fabricación de productos de limpieza', 'telefono' => '809-555-7004'],
-            ['rnc' => null, 'nombre' => 'Finca Los Mangos', 'nombre_comercial' => null, 'tipo' => TipoProveedor::INFORMAL, 'actividad' => 'Producción agrícola', 'telefono' => '829-555-7005'],
+            // Informal: se identifica con cédula (11 dígitos), requerida para el 606.
+            ['rnc' => '03100456781', 'nombre' => 'Finca Los Mangos', 'nombre_comercial' => null, 'tipo' => TipoProveedor::INFORMAL, 'actividad' => 'Producción agrícola', 'telefono' => '829-555-7005'],
         ];
 
         foreach ($proveedores as $p) {
-            $searchKey = $p['rnc']
-                ? ['rnc' => $p['rnc']]
-                : ['empresa_id' => $empresa->id, 'nombre' => $p['nombre']];
-
             Proveedor::firstOrCreate(
-                $searchKey,
+                ['empresa_id' => $empresa->id, 'rnc' => $p['rnc']],
                 [
-                    'empresa_id' => $empresa->id,
                     'tipo' => $p['tipo'],
                     'nombre' => $p['nombre'],
                     'nombre_comercial' => $p['nombre_comercial'],
