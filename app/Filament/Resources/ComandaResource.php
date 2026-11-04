@@ -148,6 +148,12 @@ class ComandaResource extends Resource
         ]);
     }
 
+
+    public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
+    {
+        return parent::getEloquentQuery()->with(['mesa', 'mesero']);
+    }
+
     public static function getPages(): array
     {
         return [

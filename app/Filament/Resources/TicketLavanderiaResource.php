@@ -598,6 +598,12 @@ class TicketLavanderiaResource extends Resource
         ]);
     }
 
+
+    public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
+    {
+        return parent::getEloquentQuery()->with(['cliente', 'recepcionista']);
+    }
+
     public static function getPages(): array
     {
         return [

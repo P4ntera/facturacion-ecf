@@ -167,6 +167,12 @@ class MovimientoInventarioResource extends Resource
             ->defaultSort('created_at', 'desc');
     }
 
+
+    public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
+    {
+        return parent::getEloquentQuery()->with(['producto', 'user']);
+    }
+
     public static function getPages(): array
     {
         return [

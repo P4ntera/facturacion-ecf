@@ -7,6 +7,7 @@ namespace App\Filament\Widgets;
 use App\Enums\EstadoFiscal;
 use App\Filament\Resources\VentaResource;
 use App\Models\Venta;
+use Filament\Facades\Filament;
 use Filament\Widgets\Widget;
 use Illuminate\Database\Eloquent\Collection;
 
@@ -27,6 +28,7 @@ class UltimasVentasWidget extends Widget
     public function getVentas(): Collection
     {
         return Venta::query()
+            ->where('empresa_id', Filament::getTenant()->id)
             ->with('cliente')
             ->latest('fecha')
             ->limit(5)

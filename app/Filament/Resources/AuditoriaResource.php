@@ -65,7 +65,7 @@ class AuditoriaResource extends Resource
      */
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()->whereHasMorph(
+        return parent::getEloquentQuery()->with(['causer'])->whereHasMorph(
             'causer',
             [User::class],
             fn (Builder $query) => $query->where('empresa_id', Filament::getTenant()?->id),

@@ -102,7 +102,8 @@ class AdminPanelProvider extends PanelProvider
             // docs/estilos.md (sección 6): mantener el panel y el POS solo en claro hasta que
             // exista una necesidad real de modo oscuro (que implicaría escribir esas variantes).
             ->darkMode(false)
-            ->databaseNotifications()
+            // databaseNotifications desactivado: no se envían notificaciones de BD en el sistema y
+            // el polling cada 30s genera tráfico innecesario al servidor.
             ->maxContentWidth(Width::Full)
             ->sidebarCollapsibleOnDesktop(false)
             ->renderHook(

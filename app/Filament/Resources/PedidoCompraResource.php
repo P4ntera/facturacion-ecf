@@ -418,6 +418,12 @@ class PedidoCompraResource extends Resource
         return $pedido->compras()->where('estado', '!=', EstadoCompra::ANULADA)->latest('id')->first();
     }
 
+
+    public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
+    {
+        return parent::getEloquentQuery()->with(['proveedor', 'user']);
+    }
+
     public static function getPages(): array
     {
         return [

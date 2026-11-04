@@ -121,6 +121,12 @@ class MesaResource extends Resource
             ->defaultSort('numero');
     }
 
+
+    public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
+    {
+        return parent::getEloquentQuery()->with(['area']);
+    }
+
     public static function getPages(): array
     {
         return [

@@ -181,6 +181,12 @@ class PrecioLavanderiaResource extends Resource
             ]);
     }
 
+
+    public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
+    {
+        return parent::getEloquentQuery()->with(['tipoPrenda', 'servicioLavanderia']);
+    }
+
     public static function getPages(): array
     {
         return [

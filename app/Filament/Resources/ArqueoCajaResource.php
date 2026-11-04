@@ -250,6 +250,12 @@ class ArqueoCajaResource extends Resource
             ->defaultSort('abierto_en', 'desc');
     }
 
+
+    public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
+    {
+        return parent::getEloquentQuery()->with(['user', 'caja']);
+    }
+
     public static function getPages(): array
     {
         return [

@@ -10,6 +10,7 @@ use Filament\Facades\Filament;
 use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Number;
 
 /**
@@ -41,8 +42,11 @@ class DashboardStatsWidget extends StatsOverviewWidget
     private function statVentasHoy(ReporteService $servicio): Stat
     {
         $empresaId = Filament::getTenant()->id;
-        $hoy = $servicio->ventasPorRango(Carbon::today(), Carbon::today(), $empresaId);
-        $ayer = $servicio->ventasPorRango(Carbon::yesterday(), Carbon::yesterday(), $empresaId);
+        $cacheKey = "dash_kpi_{$empresaId}_" . Carbon::today()->toDateString();
+        $ttl = 120; // 2 minutos
+
+        $hoy = Cache::remember("{$cacheKey}_hoy", $ttl, fn () => $servicio->ventasPorRango(Carbon::today(), Carbon::today(), $empresaId));
+        $ayer = Cache::remember("{$cacheKey}_ayer", $ttl, fn () => $servicio->ventasPorRango(Carbon::yesterday(), Carbon::yesterday(), $empresaId));
 
         $totalHoy = (float) $hoy['total_vendido'];
         $totalAyer = (float) $ayer['total_vendido'];
@@ -60,7 +64,9 @@ class DashboardStatsWidget extends StatsOverviewWidget
 
     private function statFacturasEmitidas(ReporteService $servicio): Stat
     {
-        $desglose = $servicio->desgloseComprobantes(Carbon::today(), Carbon::today(), Filament::getTenant()->id);
+        $empresaId = Filament::getTenant()->id;
+        $cacheKey = "dash_kpi_{$empresaId}_" . Carbon::today()->toDateString();
+        $desglose = Cache::remember("{$cacheKey}_desglose_hoy", 120, fn () => $servicio->desgloseComprobantes(Carbon::today(), Carbon::today(), $empresaId));
         $total = $desglose['electronicos'] + $desglose['fisicos'];
 
         return Stat::make('Facturas Emitidas', (string) $total)
