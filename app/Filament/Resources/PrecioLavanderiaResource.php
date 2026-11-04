@@ -63,6 +63,14 @@ class PrecioLavanderiaResource extends Resource
                         ->required()
                         ->allowHtml()
                         ->live()
+                        ->unique(
+                            table: 'precios_lavanderia',
+                            ignoreRecord: true,
+                            modifyRuleUsing: fn ($rule, Get $get) => $rule
+                                ->where('empresa_id', $empresaId)
+                                ->where('servicio_lavanderia_id', $get('servicio_lavanderia_id')),
+                        )
+                        ->validationMessages(['unique' => 'Ya existe un precio especial para esta combinación de prenda y servicio.'])
                         ->options(function () use ($empresaId) {
                             return TipoPrenda::where('empresa_id', $empresaId)
                                 ->where('activo', true)

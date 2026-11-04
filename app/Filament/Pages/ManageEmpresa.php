@@ -48,7 +48,32 @@ class ManageEmpresa extends Page
     public function mount(): void
     {
         $empresa = $this->empresa();
-        $config = $empresa->config();
+
+        try {
+            $config = $empresa->config();
+        } catch (\Throwable $e) {
+            report($e);
+
+            Notification::make()
+                ->title('Error al cargar la configuración')
+                ->body('No se pudo leer la configuración de la empresa. Puede haber migraciones pendientes (php artisan migrate) o un problema con la clave de cifrado (APP_KEY). Detalle: '.$this->mensajeAmigable($e))
+                ->danger()
+                ->persistent()
+                ->send();
+
+            // Llenar con datos mínimos para que la página no explote.
+            $this->form->fill([
+                'razon_social' => $empresa->razon_social,
+                'nombre_comercial' => $empresa->nombre_comercial,
+                'rnc' => $empresa->rnc,
+                'telefono' => $empresa->telefono,
+                'direccion' => $empresa->direccion,
+                'email' => $empresa->email,
+                'logo' => $empresa->logo,
+            ]);
+
+            return;
+        }
 
         $licenseState = EmpresaLicenseState::where('empresa_id', $empresa->id)->first();
 
@@ -217,37 +242,62 @@ class ManageEmpresa extends Page
 
         $empresa = $this->empresa();
 
-        $empresa->update([
-            'razon_social' => $data['razon_social'],
-            'nombre_comercial' => $data['nombre_comercial'],
-            'rnc' => $data['rnc'],
-            'telefono' => $data['telefono'],
-            'direccion' => $data['direccion'],
-            'email' => $data['email'],
-            'logo' => $data['logo'],
-        ]);
+        try {
+            $empresa->update([
+                'razon_social' => $data['razon_social'],
+                'nombre_comercial' => $data['nombre_comercial'],
+                'rnc' => $data['rnc'],
+                'telefono' => $data['telefono'],
+                'direccion' => $data['direccion'],
+                'email' => $data['email'],
+                'logo' => $data['logo'],
+            ]);
+        } catch (\Illuminate\Database\QueryException $e) {
+            $sqlState = $e->errorInfo[0] ?? '';
 
-        $config = $empresa->config();
-
-        $configData = [
-            'dgii_api_key' => $data['dgii_api_key'],
-            'dgii_ambiente' => $data['dgii_ambiente'],
-            'dgii_base_url' => $data['dgii_base_url'],
-        ];
-
-        if ($certificado !== null) {
-            $anterior = $config->certificado_path;
-
-            $configData['certificado_path'] = $certificado['path'];
-            $configData['certificado_password'] = $data['certificado_password'];
-            $configData['certificado_vence'] = $certificado['vence'];
-
-            if (filled($anterior) && $anterior !== $certificado['path']) {
-                Storage::disk('local')->delete($anterior);
+            if ($sqlState === '23505' && str_contains($e->errorInfo[2] ?? '', 'rnc')) {
+                Notification::make()->title('Ya existe otra empresa con ese RNC.')->danger()->send();
+            } else {
+                report($e);
+                Notification::make()->title('Error al guardar los datos de la empresa.')->body($this->mensajeAmigable($e))->danger()->send();
             }
+
+            return;
         }
 
-        $config->update($configData);
+        try {
+            $config = $empresa->config();
+
+            $configData = [
+                'dgii_api_key' => $data['dgii_api_key'],
+                'dgii_ambiente' => $data['dgii_ambiente'],
+                'dgii_base_url' => $data['dgii_base_url'],
+            ];
+
+            if ($certificado !== null) {
+                $anterior = $config->certificado_path;
+
+                $configData['certificado_path'] = $certificado['path'];
+                $configData['certificado_password'] = $data['certificado_password'];
+                $configData['certificado_vence'] = $certificado['vence'];
+
+                if (filled($anterior) && $anterior !== $certificado['path']) {
+                    Storage::disk('local')->delete($anterior);
+                }
+            }
+
+            $config->update($configData);
+        } catch (\Throwable $e) {
+            report($e);
+            Notification::make()
+                ->title('Los datos básicos se guardaron, pero falló la configuración avanzada')
+                ->body($this->mensajeAmigable($e))
+                ->warning()
+                ->persistent()
+                ->send();
+
+            return;
+        }
 
         // Guardar license_key si la validación de licencias está activada.
         if (app(LicenseService::class)->isEnabled()) {
@@ -335,6 +385,35 @@ class ManageEmpresa extends Page
         $reason = $state->last_reason ? " Motivo: {$state->last_reason}." : '';
 
         return "Licencia {$label}.{$reason}";
+    }
+
+    /**
+     * Convierte excepciones técnicas en mensajes legibles para el usuario.
+     */
+    private function mensajeAmigable(\Throwable $e): string
+    {
+        $mensaje = $e->getMessage();
+
+        // Error de cifrado (APP_KEY inválida o ausente)
+        if (str_contains($mensaje, 'decrypt') || str_contains($mensaje, 'cipher') || str_contains($mensaje, 'MAC')) {
+            return 'Error de cifrado. Verifica que APP_KEY esté configurada correctamente en el archivo .env.';
+        }
+
+        // Error de tabla no encontrada (migraciones pendientes)
+        if ($e instanceof \Illuminate\Database\QueryException) {
+            $sqlState = $e->errorInfo[0] ?? '';
+
+            if ($sqlState === '42P01') {
+                return 'La tabla no existe. Ejecuta las migraciones pendientes: php artisan migrate.';
+            }
+
+            if ($sqlState === '42703') {
+                return 'Columna no encontrada. Ejecuta las migraciones pendientes: php artisan migrate.';
+            }
+        }
+
+        // Mensaje genérico (no exponer SQL crudo)
+        return 'Contacta al administrador del sistema. Código: '.class_basename($e);
     }
 
     /**
