@@ -10,6 +10,7 @@ enum PerfilEmpresa: string
     case RESTAURANTE = 'restaurante';
     case RETAIL = 'retail';
     case LAVANDERIA = 'lavanderia';
+    case HELADERIA = 'heladeria';
 
     public function etiqueta(): string
     {
@@ -18,6 +19,7 @@ enum PerfilEmpresa: string
             self::RESTAURANTE => 'Restaurante',
             self::RETAIL => 'Retail',
             self::LAVANDERIA => 'Lavandería',
+            self::HELADERIA => 'Heladería',
         };
     }
 
@@ -28,6 +30,7 @@ enum PerfilEmpresa: string
             self::RESTAURANTE => 'Mesas, comandas, cocina + facturación',
             self::RETAIL => 'Punto de venta con inventario avanzado',
             self::LAVANDERIA => 'Tickets de lavandería, servicios por prenda + facturación',
+            self::HELADERIA => 'POS de helados con sabores, toppings, combos + productos directos',
         };
     }
 
@@ -86,6 +89,16 @@ enum PerfilEmpresa: string
                 Modulo::LAVANDERIA_SERVICIOS,
                 Modulo::LAVANDERIA_PRECIOS,
                 Modulo::LAVANDERIA_TICKETS,
+            ],
+            self::HELADERIA => [
+                ...$base,
+                Modulo::VENTAS_ARQUEO_CAJA,
+                Modulo::CUENTAS_POR_COBRAR,
+                Modulo::ECF_SECUENCIAS,
+                Modulo::HELADERIA_SABORES,
+                Modulo::HELADERIA_PRESENTACIONES,
+                Modulo::HELADERIA_TOPPINGS,
+                Modulo::HELADERIA_COMBOS,
             ],
         };
     }

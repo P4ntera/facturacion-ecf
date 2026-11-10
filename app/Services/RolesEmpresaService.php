@@ -135,6 +135,31 @@ class RolesEmpresaService
                 ]);
             }
 
+            if ($empresa->perfil === PerfilEmpresa::HELADERIA) {
+                $heladero = $this->rolSeguro([
+                    'empresa_id' => $empresa->id,
+                    'name' => 'Heladero',
+                    'guard_name' => 'web',
+                ]);
+                $heladero->syncPermissions([
+                    'pos.acceder',
+                    'ventas.ver',
+                    'ventas.imprimir',
+                    'gestionar_arqueo_caja',
+                    'productos.ver',
+                    'clientes.ver',
+                    'clientes.crear',
+                    'heladeria.sabores_ver',
+                    'heladeria.presentaciones_ver',
+                    'heladeria.toppings_ver',
+                    'heladeria.combos_ver',
+                    'cxc.ver',
+                    'cxc.cobrar',
+                    'reportes.ver',
+                    'reportes.exportar',
+                ]);
+            }
+
             if ($empresa->perfil === PerfilEmpresa::RESTAURANTE) {
                 $mesero = $this->rolSeguro([
                     'empresa_id' => $empresa->id,

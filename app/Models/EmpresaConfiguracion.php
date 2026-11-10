@@ -8,6 +8,7 @@ use App\Enums\AmbienteEcf;
 use App\Enums\FormaReembolso;
 use App\Enums\MetodoCosto;
 use App\Enums\ModoImpresionPos;
+use App\Enums\ModoPrecioHelado;
 use App\Enums\RedondeoPrecio;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -50,6 +51,10 @@ class EmpresaConfiguracion extends Model
         'devolucion_monto_supervisor',
         'color_primario',
         'color_secundario',
+        'modo_precio_helado',
+        'precio_scoop_normal',
+        'precio_scoop_premium',
+        'permitir_scoop_extra',
     ];
 
     protected $casts = [
@@ -68,6 +73,10 @@ class EmpresaConfiguracion extends Model
         'devolucion_plazo_dias' => 'integer',
         'devolucion_reembolsos' => 'array',
         'devolucion_monto_supervisor' => 'decimal:2',
+        'modo_precio_helado' => ModoPrecioHelado::class,
+        'precio_scoop_normal' => 'decimal:2',
+        'precio_scoop_premium' => 'decimal:2',
+        'permitir_scoop_extra' => 'boolean',
     ];
 
     // Reflejan los defaults de la columna en la migración: sin esto, un ::create()/firstOrCreate()
@@ -89,6 +98,10 @@ class EmpresaConfiguracion extends Model
         'acepta_devoluciones' => true,
         'color_primario' => '#00C9D7',
         'color_secundario' => '#101820',
+        'modo_precio_helado' => 'por_presentacion',
+        'precio_scoop_normal' => '0',
+        'precio_scoop_premium' => '0',
+        'permitir_scoop_extra' => true,
     ];
 
     /**

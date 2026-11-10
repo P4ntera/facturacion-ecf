@@ -50,6 +50,11 @@ enum Modulo: string
     case LAVANDERIA_PRECIOS = 'lavanderia_precios';
     case LAVANDERIA_TICKETS = 'lavanderia_tickets';
 
+    case HELADERIA_SABORES = 'heladeria_sabores';
+    case HELADERIA_PRESENTACIONES = 'heladeria_presentaciones';
+    case HELADERIA_TOPPINGS = 'heladeria_toppings';
+    case HELADERIA_COMBOS = 'heladeria_combos';
+
     case IMPRESORAS = 'impresoras';
     case AUDITORIA = 'auditoria';
 
@@ -84,6 +89,10 @@ enum Modulo: string
             self::LAVANDERIA_SERVICIOS => 'Servicios de Lavandería',
             self::LAVANDERIA_PRECIOS => 'Precios por Prenda',
             self::LAVANDERIA_TICKETS => 'Tickets de Lavandería',
+            self::HELADERIA_SABORES => 'Sabores de Helado',
+            self::HELADERIA_PRESENTACIONES => 'Presentaciones',
+            self::HELADERIA_TOPPINGS => 'Toppings',
+            self::HELADERIA_COMBOS => 'Combos de Helado',
             self::IMPRESORAS => 'Impresoras',
             self::AUDITORIA => 'Auditoría',
         };
@@ -118,6 +127,9 @@ enum Modulo: string
             self::LAVANDERIA_TIPOS_PRENDA, self::LAVANDERIA_SERVICIOS,
             self::LAVANDERIA_PRECIOS, self::LAVANDERIA_TICKETS => 'Lavandería',
 
+            self::HELADERIA_SABORES, self::HELADERIA_PRESENTACIONES,
+            self::HELADERIA_TOPPINGS, self::HELADERIA_COMBOS => 'Heladería',
+
             self::IMPRESORAS, self::AUDITORIA => 'Configuración',
         };
     }
@@ -151,6 +163,7 @@ enum Modulo: string
             self::RESTAURANTE_COCINA => [self::RESTAURANTE_COMANDAS],
             self::LAVANDERIA_PRECIOS => [self::LAVANDERIA_TIPOS_PRENDA, self::LAVANDERIA_SERVICIOS],
             self::LAVANDERIA_TICKETS => [self::LAVANDERIA_TIPOS_PRENDA, self::LAVANDERIA_SERVICIOS],
+            self::HELADERIA_COMBOS => [self::HELADERIA_SABORES, self::HELADERIA_PRESENTACIONES],
             default => [],
         };
     }
