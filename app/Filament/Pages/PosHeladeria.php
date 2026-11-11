@@ -431,7 +431,7 @@ class PosHeladeria extends Page
 
             Notification::make()
                 ->title('¡Venta registrada!')
-                ->body("Total: RD$ " . number_format($venta->total, 2))
+                ->body("Total: RD$ " . number_format((float) $venta->total, 2))
                 ->success()
                 ->send();
 

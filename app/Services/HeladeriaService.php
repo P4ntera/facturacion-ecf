@@ -124,10 +124,16 @@ class HeladeriaService
     public function facturar(array $items, Empresa $empresa, array $datosVenta = []): Venta
     {
         $lineas = collect($items)->map(function (array $item) use ($empresa) {
-            $producto = $this->obtenerProductoServicio($empresa, $item['descripcion'], $item['precio']);
+            // Productos directos ya existen en el catálogo — no crear bridge
+            if (($item['tipo'] ?? '') === 'directo' && ! empty($item['detalle']['producto_id'])) {
+                $productoId = $item['detalle']['producto_id'];
+            } else {
+                $producto = $this->obtenerProductoServicio($empresa, $item['descripcion'], $item['precio']);
+                $productoId = $producto->id;
+            }
 
             return [
-                'producto_id' => $producto->id,
+                'producto_id' => $productoId,
                 'cantidad' => $item['cantidad'] ?? 1,
                 'precio_unitario' => $item['precio'],
             ];
