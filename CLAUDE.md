@@ -76,6 +76,30 @@ Antes de dar por buena la tenancy de un feature nuevo, escribir (o extender)
 registros en el índice, no puede descargar/ver los de otra por URL, y crearlos los asocia
 automáticamente a la empresa activa.
 
+## e-CF (Comprobante Fiscal Electrónico)
+
+Flujo: `VentaService` → `VentaObserver` → `EnviarEcfJob` (cola `ecf`) →
+`EnvioEcfService` → `EcfBuilder` (JSON) → `DgiiGatewayInterface` (PAC).
+
+- `EcfBuilder` solo **mapea** montos ya calculados por `VentaService`/`ImpuestoStrategy` al formato
+  JSON del e-CF DGII; nunca recalcula. Solo soporta tipos 31, 32, 33, 34
+  (`TipoComprobante::soportadoPorEcfBuilder()`); los demás electrónicos (44, 45, 46) se rechazan
+  con `EcfInvalidoException`.
+- `DgiiGatewayFactory::make($empresa)` resuelve el gateway por empresa: `FakeGateway` en tests
+  (`DGII_FAKE_GATEWAY=true` en `phpunit.xml`), `EcfPlatformGateway` en producción.
+  `DGII_FORZAR_GATEWAY_REAL=true` permite usar el gateway real en local, pero SOLO para
+  `TesteCF` (nunca producción).
+- `EnvioEcfService` valida que `dgii_base_url` esté configurada antes de enviar; si falta,
+  rechaza con motivo claro sin intentar la conexión.
+- `TasaItbis::EXENTO` (`IndicadorFacturacion` = 4) es distinto de `TasaItbis::CERO`
+  (`IndicadorFacturacion` = 3): exento no graba ITBIS y va a `MontoExento`, no a `MontoGravadoI3`.
+- `IndicadorMontoGravado` (no `IndicadorServicioTodoIncluido`) se usa cuando
+  `precio_incluye_itbis` es `true`.
+- `CodigoModificacion` en NC: 1 = anulación total, 3 = corrección de montos (parcial o manual).
+- `ecf_fecha_firma` (datetime, nullable) se extrae de la respuesta del PAC y se muestra en el
+  comprobante impreso.
+- Comando de diagnóstico: `php artisan ecf:diagnostico {venta_id}` (solo lectura, no envía nada).
+
 ## Inventario (Kardex)
 
 `App\Services\InventarioService::registrarMovimiento()` es el único punto que mueve stock. Bloquea
