@@ -141,6 +141,7 @@ class Permisos
                 'heladeria.combos_editar' => 'Editar combos',
                 'heladeria.combos_desactivar' => 'Activar/Desactivar combos',
                 'heladeria.configurar' => 'Configurar modo de precios y opciones de heladería',
+                'heladeria.ver_reportes' => 'Ver reportes de heladería',
             ],
             'Lavandería' => [
                 'lavanderia.ver_tickets' => 'Ver tickets de lavandería',

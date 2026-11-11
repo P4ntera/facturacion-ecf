@@ -48,7 +48,7 @@ class ReporteService
             ->whereBetween('fecha', [$desde->copy()->startOfDay(), $hasta->copy()->endOfDay()])
             ->where('estado', '!=', EstadoVenta::ANULADA)
             ->whereNull('venta_modificada_id')
-            ->when($empresaId, fn (Builder $query, int $id) => $query->where('empresa_id', $id));
+            ->when($empresaId, fn (Builder $query, int $id) => $query->where('ventas.empresa_id', $id));
     }
 
     /**
@@ -62,7 +62,7 @@ class ReporteService
     {
         return Venta::query()
             ->whereBetween('fecha', [$desde->copy()->startOfDay(), $hasta->copy()->endOfDay()])
-            ->when($empresaId, fn (Builder $query, int $id) => $query->where('empresa_id', $id));
+            ->when($empresaId, fn (Builder $query, int $id) => $query->where('ventas.empresa_id', $id));
     }
 
     /**
@@ -791,5 +791,86 @@ class ReporteService
             ->selectRaw("COALESCE(SUM({$costoLinea}), 0) as costo_total")
             ->selectRaw("COALESCE(SUM(detalle_ventas.subtotal) - SUM({$costoLinea}), 0) as ganancia")
             ->selectRaw("CASE WHEN SUM(detalle_ventas.subtotal) > 0 THEN ROUND(((SUM(detalle_ventas.subtotal) - SUM({$costoLinea})) / SUM(detalle_ventas.subtotal)) * 100, 2) ELSE 0 END as margen_porcentaje");
+    }
+
+    // ──────────────────────────────────────────────────────────────────────
+    // Heladería
+    // ──────────────────────────────────────────────────────────────────────
+
+    /**
+     * Productos de heladería vendidos en el rango, agrupados por producto.
+     * Incluye productos con código HEL-% (armados/combos del POS) y productos
+     * directos vendidos a través del POS heladería (nombre "Heladería: %").
+     */
+    public function heladeriaProductosVendidosQuery(Carbon $desde, Carbon $hasta, ?int $empresaId = null): Builder
+    {
+        return Producto::query()
+            ->join('detalle_ventas', 'detalle_ventas.producto_id', '=', 'productos.id')
+            ->join('ventas', 'ventas.id', '=', 'detalle_ventas.venta_id')
+            ->whereBetween('ventas.fecha', [$desde->copy()->startOfDay(), $hasta->copy()->endOfDay()])
+            ->where('ventas.estado', '!=', EstadoVenta::ANULADA)
+            ->whereNull('ventas.venta_modificada_id')
+            ->when($empresaId, fn (Builder $query, int $id) => $query->where('ventas.empresa_id', $id))
+            ->where(fn (Builder $q) => $q
+                ->where('productos.codigo', 'LIKE', 'HEL-%')
+                ->orWhere('productos.nombre', 'LIKE', 'Heladería:%'))
+            ->groupBy('productos.id', 'productos.codigo', 'productos.nombre')
+            ->selectRaw('productos.id, productos.codigo, productos.nombre')
+            ->selectRaw('COALESCE(SUM(detalle_ventas.cantidad), 0) as cantidad_vendida')
+            ->selectRaw('COALESCE(SUM(detalle_ventas.subtotal), 0) as ingresos');
+    }
+
+    /**
+     * Ventas de heladería agrupadas por tipo (armado / combo / directo).
+     * Se infiere del código del producto: HEL-COMBO-% → combo, HEL-% → armado, resto → directo.
+     */
+    public function heladeriaVentasPorTipoQuery(Carbon $desde, Carbon $hasta, ?int $empresaId = null): Builder
+    {
+        $tipoCase = <<<'SQL'
+            CASE
+                WHEN productos.codigo LIKE 'HEL-COMBO-%' THEN 'Combo'
+                WHEN productos.codigo LIKE 'HEL-%' THEN 'Armado'
+                ELSE 'Directo'
+            END
+        SQL;
+
+        return Producto::query()
+            ->join('detalle_ventas', 'detalle_ventas.producto_id', '=', 'productos.id')
+            ->join('ventas', 'ventas.id', '=', 'detalle_ventas.venta_id')
+            ->whereBetween('ventas.fecha', [$desde->copy()->startOfDay(), $hasta->copy()->endOfDay()])
+            ->where('ventas.estado', '!=', EstadoVenta::ANULADA)
+            ->whereNull('ventas.venta_modificada_id')
+            ->when($empresaId, fn (Builder $query, int $id) => $query->where('ventas.empresa_id', $id))
+            ->where(fn (Builder $q) => $q
+                ->where('productos.codigo', 'LIKE', 'HEL-%')
+                ->orWhere('productos.nombre', 'LIKE', 'Heladería:%'))
+            ->groupByRaw($tipoCase)
+            ->selectRaw("ROW_NUMBER() OVER (ORDER BY ({$tipoCase})) as id")
+            ->selectRaw("{$tipoCase} as tipo")
+            ->selectRaw('COALESCE(SUM(detalle_ventas.cantidad), 0) as cantidad')
+            ->selectRaw('COALESCE(SUM(detalle_ventas.subtotal), 0) as ingresos');
+    }
+
+    /**
+     * Ventas diarias de heladería (productos HEL-% o Heladería:%) en el rango.
+     */
+    public function heladeriaVentasDiariasQuery(Carbon $desde, Carbon $hasta, ?int $empresaId = null): Builder
+    {
+        return Producto::query()
+            ->join('detalle_ventas', 'detalle_ventas.producto_id', '=', 'productos.id')
+            ->join('ventas', 'ventas.id', '=', 'detalle_ventas.venta_id')
+            ->whereBetween('ventas.fecha', [$desde->copy()->startOfDay(), $hasta->copy()->endOfDay()])
+            ->where('ventas.estado', '!=', EstadoVenta::ANULADA)
+            ->whereNull('ventas.venta_modificada_id')
+            ->when($empresaId, fn (Builder $query, int $id) => $query->where('ventas.empresa_id', $id))
+            ->where(fn (Builder $q) => $q
+                ->where('productos.codigo', 'LIKE', 'HEL-%')
+                ->orWhere('productos.nombre', 'LIKE', 'Heladería:%'))
+            ->groupByRaw("DATE(ventas.fecha)")
+            ->selectRaw("ROW_NUMBER() OVER (ORDER BY DATE(ventas.fecha)) as id")
+            ->selectRaw("DATE(ventas.fecha) as dia")
+            ->selectRaw('COALESCE(SUM(detalle_ventas.cantidad), 0) as unidades')
+            ->selectRaw('COUNT(DISTINCT ventas.id) as transacciones')
+            ->selectRaw('COALESCE(SUM(detalle_ventas.subtotal), 0) as ingresos');
     }
 }

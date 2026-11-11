@@ -17,6 +17,9 @@ use App\Http\Controllers\Reportes\ReporteKardexPdfController;
 use App\Http\Controllers\Reportes\ReporteMargenPdfController;
 use App\Http\Controllers\Reportes\ReporteTopProductosPdfController;
 use App\Http\Controllers\Reportes\ReporteProduccionServicioPdfController;
+use App\Http\Controllers\Reportes\ReporteHeladeriaTopProductosPdfController;
+use App\Http\Controllers\Reportes\ReporteHeladeriaVentasDiariasPdfController;
+use App\Http\Controllers\Reportes\ReporteHeladeriaVentasPorTipoPdfController;
 use App\Http\Controllers\Reportes\ReporteTicketsLavanderiaPdfController;
 use App\Http\Controllers\Reportes\ReporteVentasPdfController;
 use App\Http\Controllers\TicketLavanderiaReciboPdfController;
@@ -97,6 +100,9 @@ Route::middleware(['auth', EstablecerEmpresaPermisos::class])->group(function ()
         Route::get('/margen/pdf', ReporteMargenPdfController::class)->name('margen.pdf');
         Route::get('/tickets-lavanderia/pdf', ReporteTicketsLavanderiaPdfController::class)->name('tickets-lavanderia.pdf');
         Route::get('/produccion-servicio/pdf', ReporteProduccionServicioPdfController::class)->name('produccion-servicio.pdf');
+        Route::get('/heladeria-top-productos/pdf', ReporteHeladeriaTopProductosPdfController::class)->name('heladeria-top-productos.pdf');
+        Route::get('/heladeria-ventas-tipo/pdf', ReporteHeladeriaVentasPorTipoPdfController::class)->name('heladeria-ventas-tipo.pdf');
+        Route::get('/heladeria-ventas-diarias/pdf', ReporteHeladeriaVentasDiariasPdfController::class)->name('heladeria-ventas-diarias.pdf');
     });
 });
 

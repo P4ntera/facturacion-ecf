@@ -153,6 +153,7 @@ class RolesEmpresaService
                     'heladeria.presentaciones_ver',
                     'heladeria.toppings_ver',
                     'heladeria.combos_ver',
+                    'heladeria.ver_reportes',
                     'cxc.ver',
                     'cxc.cobrar',
                     'reportes.ver',
