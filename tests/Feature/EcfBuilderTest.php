@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\FormaPago;
 use App\Enums\TasaItbis;
 use App\Enums\TipoComprobante;
 use App\Enums\TipoPago;
@@ -432,5 +433,97 @@ class EcfBuilderTest extends TestCase
         $this->assertArrayNotHasKey('NCFModificado', $ecf['Encabezado']['IdDoc']);
         $this->assertArrayNotHasKey('IndicadorNotaCredito', $ecf['Encabezado']['IdDoc']);
         $this->assertArrayNotHasKey('InformacionReferencia', $ecf);
+    }
+
+    // ===================== FORMAS DE PAGO REALES =====================
+
+    public function test_solo_efectivo_usa_codigo_1(): void
+    {
+        $this->secuencia(TipoComprobante::FACTURA_CONSUMO, 'E32');
+
+        $producto = $this->producto('P-EF', TasaItbis::DIECIOCHO);
+        $cliente = Cliente::create(['nombre' => 'Consumidor', 'activo' => true]);
+
+        $venta = app(VentaService::class)->registrar([
+            'cliente_id' => $cliente->id,
+            'forma_pago' => FormaPago::EFECTIVO,
+            'monto_efectivo' => '118.00',
+            'vuelto' => '0.00',
+            'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
+        ], $this->empresaDefault)->refresh();
+
+        $formas = app(EcfBuilder::class)->construir($venta)['ECF']['Encabezado']['IdDoc']['TablaFormasPago']['FormaDetalle'];
+
+        $this->assertCount(1, $formas);
+        $this->assertSame('1', $formas[0]['FormaPago']);
+        $this->assertSame('118.00', $formas[0]['MontoPago']);
+    }
+
+    public function test_solo_tarjeta_usa_codigo_3(): void
+    {
+        $this->secuencia(TipoComprobante::FACTURA_CONSUMO, 'E32');
+
+        $producto = $this->producto('P-TAR', TasaItbis::DIECIOCHO);
+        $cliente = Cliente::create(['nombre' => 'Consumidor', 'activo' => true]);
+
+        $venta = app(VentaService::class)->registrar([
+            'cliente_id' => $cliente->id,
+            'forma_pago' => FormaPago::TARJETA,
+            'monto_tarjeta' => '118.00',
+            'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
+        ], $this->empresaDefault)->refresh();
+
+        $formas = app(EcfBuilder::class)->construir($venta)['ECF']['Encabezado']['IdDoc']['TablaFormasPago']['FormaDetalle'];
+
+        $this->assertCount(1, $formas);
+        $this->assertSame('3', $formas[0]['FormaPago']);
+        $this->assertSame('118.00', $formas[0]['MontoPago']);
+    }
+
+    public function test_mixto_efectivo_y_tarjeta_genera_dos_entradas(): void
+    {
+        $this->secuencia(TipoComprobante::FACTURA_CONSUMO, 'E32');
+
+        $producto = $this->producto('P-MIX', TasaItbis::DIECIOCHO);
+        $cliente = Cliente::create(['nombre' => 'Consumidor', 'activo' => true]);
+
+        $venta = app(VentaService::class)->registrar([
+            'cliente_id' => $cliente->id,
+            'forma_pago' => FormaPago::MIXTO,
+            'monto_efectivo' => '50.00',
+            'monto_tarjeta' => '68.00',
+            'vuelto' => '0.00',
+            'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
+        ], $this->empresaDefault)->refresh();
+
+        $formas = app(EcfBuilder::class)->construir($venta)['ECF']['Encabezado']['IdDoc']['TablaFormasPago']['FormaDetalle'];
+
+        $this->assertCount(2, $formas);
+        $this->assertSame('1', $formas[0]['FormaPago']);
+        $this->assertSame('50.00', $formas[0]['MontoPago']);
+        $this->assertSame('3', $formas[1]['FormaPago']);
+        $this->assertSame('68.00', $formas[1]['MontoPago']);
+    }
+
+    public function test_efectivo_con_vuelto_declara_neto(): void
+    {
+        $this->secuencia(TipoComprobante::FACTURA_CONSUMO, 'E32');
+
+        $producto = $this->producto('P-VTO', TasaItbis::DIECIOCHO);
+        $cliente = Cliente::create(['nombre' => 'Consumidor', 'activo' => true]);
+
+        $venta = app(VentaService::class)->registrar([
+            'cliente_id' => $cliente->id,
+            'forma_pago' => FormaPago::EFECTIVO,
+            'monto_efectivo' => '200.00',
+            'vuelto' => '82.00',
+            'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
+        ], $this->empresaDefault)->refresh();
+
+        $formas = app(EcfBuilder::class)->construir($venta)['ECF']['Encabezado']['IdDoc']['TablaFormasPago']['FormaDetalle'];
+
+        $this->assertCount(1, $formas);
+        $this->assertSame('1', $formas[0]['FormaPago']);
+        $this->assertSame('118.00', $formas[0]['MontoPago']);
     }
 }

@@ -201,13 +201,7 @@ class EcfBuilder
                 $idDoc['FechaLimitePago'] = $venta->fecha_limite_pago->format('d-m-Y');
             }
         } else {
-            // Contado: la forma de pago se conoce en el momento de la venta. A crédito no se
-            // declara aquí (se conoce cuando se cobra, en un comprobante complementario futuro).
-            $idDoc['TablaFormasPago'] = [
-                'FormaDetalle' => [
-                    ['FormaPago' => '1', 'MontoPago' => $this->monto($venta->total)],
-                ],
-            ];
+            $idDoc['TablaFormasPago'] = ['FormaDetalle' => $this->formasDetalle($venta)];
         }
 
         return $idDoc;
@@ -312,6 +306,36 @@ class EcfBuilder
         }
 
         return $item;
+    }
+
+    /** @return list<array{FormaPago: string, MontoPago: string}> */
+    private function formasDetalle(Venta $venta): array
+    {
+        if ($venta->forma_pago === null) {
+            return [['FormaPago' => '1', 'MontoPago' => $this->monto($venta->total)]];
+        }
+
+        $detalles = [];
+
+        $efectivoNeto = bcsub((string) $venta->monto_efectivo, (string) $venta->vuelto, 2);
+
+        if (bccomp($efectivoNeto, '0', 2) > 0) {
+            $detalles[] = ['FormaPago' => '1', 'MontoPago' => $this->monto($efectivoNeto)];
+        }
+
+        if ($this->esPositivo((string) $venta->monto_tarjeta)) {
+            $detalles[] = ['FormaPago' => '3', 'MontoPago' => $this->monto($venta->monto_tarjeta)];
+        }
+
+        if ($this->esPositivo((string) $venta->monto_transferencia)) {
+            $detalles[] = ['FormaPago' => '2', 'MontoPago' => $this->monto($venta->monto_transferencia)];
+        }
+
+        if ($detalles === []) {
+            $detalles[] = ['FormaPago' => $venta->forma_pago->codigoDgii(), 'MontoPago' => $this->monto($venta->total)];
+        }
+
+        return $detalles;
     }
 
     private function fechaVencimientoSecuencia(Venta $venta): string
