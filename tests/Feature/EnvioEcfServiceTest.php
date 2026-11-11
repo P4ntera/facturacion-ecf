@@ -217,6 +217,19 @@ class EnvioEcfServiceTest extends TestCase
         $this->assertSame('No se pudo conectar con el PAC.', $venta->ecf_respuesta['error']);
     }
 
+    public function test_sin_dgii_base_url_rechaza_con_motivo_claro(): void
+    {
+        $this->empresaDefault->config()->update(['dgii_base_url' => '']);
+
+        $venta = $this->crearVenta(documentoCliente: null);
+
+        $respuesta = app(EnvioEcfService::class)->enviar($venta);
+
+        $this->assertFalse($respuesta->exito);
+        $this->assertSame(EstadoFiscal::RECHAZADO, $venta->refresh()->estado_fiscal);
+        $this->assertStringContainsString('URL del PAC', $respuesta->errorMessage);
+    }
+
     public function test_falta_de_rnc_en_credito_fiscal_rechaza_sin_llamar_al_gateway(): void
     {
         // VentaService::registrar() ya exige RNC para el 31 al cobrar; se crea con uno válido y

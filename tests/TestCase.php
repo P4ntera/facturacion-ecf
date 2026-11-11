@@ -21,6 +21,7 @@ abstract class TestCase extends BaseTestCase
         }
 
         $this->empresaDefault = Empresa::factory()->create();
+        $this->empresaDefault->config()->update(['dgii_base_url' => 'https://pac.test/api/v1']);
         TenantDefaults::reiniciar($this->empresaDefault);
 
         // Sin esto, cualquier Livewire::test()/Livewire::actingAs() sobre un Resource o Page del

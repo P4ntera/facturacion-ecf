@@ -92,7 +92,7 @@ class EmpresaConfiguracion extends Model
         'modo_impresion_pos' => 'directa',
         'moneda' => 'DOP',
         'dgii_ambiente' => 'TesteCF',
-        'dgii_base_url' => 'https://sandbox.pac-ecf.example.do/api/v1',
+        'dgii_base_url' => '',
         'metodo_costo' => 'ultima_compra',
         'redondeo_precio' => 'ninguno',
         'permite_stock_negativo' => false,

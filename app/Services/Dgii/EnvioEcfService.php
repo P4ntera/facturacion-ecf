@@ -34,7 +34,16 @@ class EnvioEcfService
             return $this->rechazarPorDatosInvalidos($venta, $e);
         }
 
-        $respuesta = $this->gateway($venta)->enviar($ecf);
+        $gateway = $this->gateway($venta);
+
+        if (blank($venta->empresa->config()->dgii_base_url)) {
+            return $this->rechazarPorDatosInvalidos(
+                $venta,
+                new EcfInvalidoException('La empresa no tiene configurada la URL del PAC (dgii_base_url). Configúrela en Ajustes de la Empresa antes de enviar e-CF.'),
+            );
+        }
+
+        $respuesta = $gateway->enviar($ecf);
         $this->guardar($venta, $respuesta);
 
         return $respuesta;
