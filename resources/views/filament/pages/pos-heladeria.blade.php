@@ -555,7 +555,7 @@
           placeholder="0.00"
           inputmode="decimal"
           min="0"
-          x-on:keydown.enter="$wire.cobrar()"
+          x-on:keydown.enter="$wire.cobrar(parseFloat(recibido || '0'))"
         >
 
         <div style="display: flex; justify-content: space-between; margin-bottom: 1rem; font-size: 0.9rem;">
@@ -574,7 +574,7 @@
         <button class="hel-btn hel-btn-outline" x-on:click="cobrarAbierto = false; recibido = '';" style="flex: 1;">
           Cancelar
         </button>
-        <button class="hel-btn hel-btn-success" wire:click="cobrar" style="flex: 1;">
+        <button class="hel-btn hel-btn-success" x-on:click="$wire.cobrar(parseFloat(recibido || '0'))" style="flex: 1;">
           ✓ Confirmar
         </button>
       </div>

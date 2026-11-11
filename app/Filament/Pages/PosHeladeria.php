@@ -411,12 +411,29 @@ class PosHeladeria extends Page
 
     // ---------------------------------------------------------------- Cobrar
 
-    public function cobrar(): void
+    public function cobrar(?float $recibido = null): void
     {
         if (empty($this->carrito)) {
             Notification::make()->title('El carrito está vacío')->warning()->send();
 
             return;
+        }
+
+        $total = $this->totalCarrito();
+
+        // Validar que el efectivo recibido cubra el total
+        if ($this->formaPago === 'efectivo') {
+            $montoRecibido = $recibido ?? 0;
+
+            if ($montoRecibido < $total) {
+                Notification::make()
+                    ->title('Efectivo insuficiente')
+                    ->body('Faltan RD$ ' . number_format($total - $montoRecibido, 2))
+                    ->danger()
+                    ->send();
+
+                return;
+            }
         }
 
         try {
