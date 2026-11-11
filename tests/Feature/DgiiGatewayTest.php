@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Enums\AmbienteEcf;
 use App\Models\Empresa;
+use App\Services\Dgii\DgiiGatewayFactory;
 use App\Services\Dgii\DgiiGatewayInterface;
 use App\Services\Dgii\EcfPlatformGateway;
 use App\Services\Dgii\FakeGateway;
@@ -76,5 +78,38 @@ class DgiiGatewayTest extends TestCase
         $this->assertSame('PAC-123', $respuesta->pacId);
         $this->assertSame('Aceptado', $respuesta->estado);
         $this->assertTrue($respuesta->ambiente->esProduccion() === false);
+    }
+
+    public function test_forzar_real_en_local_usa_gateway_real_solo_con_testecf(): void
+    {
+        app()->detectEnvironment(fn () => 'local');
+        config(['dgii.fake' => false, 'dgii.forzar_real' => true]);
+
+        $empresa = $this->empresa(['dgii_ambiente' => AmbienteEcf::TESTECF]);
+        $factory = app(DgiiGatewayFactory::class);
+
+        $this->assertInstanceOf(EcfPlatformGateway::class, $factory->make($empresa));
+    }
+
+    public function test_forzar_real_en_local_con_ambiente_produccion_sigue_usando_fake(): void
+    {
+        app()->detectEnvironment(fn () => 'local');
+        config(['dgii.fake' => false, 'dgii.forzar_real' => true]);
+
+        $empresa = $this->empresa(['dgii_ambiente' => AmbienteEcf::ECF]);
+        $factory = app(DgiiGatewayFactory::class);
+
+        $this->assertInstanceOf(FakeGateway::class, $factory->make($empresa));
+    }
+
+    public function test_sin_forzar_real_en_local_siempre_usa_fake(): void
+    {
+        app()->detectEnvironment(fn () => 'local');
+        config(['dgii.fake' => false, 'dgii.forzar_real' => false]);
+
+        $empresa = $this->empresa(['dgii_ambiente' => AmbienteEcf::TESTECF]);
+        $factory = app(DgiiGatewayFactory::class);
+
+        $this->assertInstanceOf(FakeGateway::class, $factory->make($empresa));
     }
 }

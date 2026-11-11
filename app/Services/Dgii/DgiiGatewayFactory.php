@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Dgii;
 
+use App\Enums\AmbienteEcf;
 use App\Models\Empresa;
 use Illuminate\Contracts\Foundation\Application;
 
@@ -20,11 +21,15 @@ class DgiiGatewayFactory
 
     public function make(Empresa $empresa): DgiiGatewayInterface
     {
-        // Mismo criterio que antes en DgiiServiceProvider: en local (o forzado por config) nunca
-        // se dispara un envío real, sin importar la empresa. Se resuelve vía el contenedor (no
-        // "new FakeGateway()" directo) para que los tests que rebinden DgiiGatewayInterface con
-        // su propio stub (ver Tests\Support\GatewayStub) lo sigan pudiendo hacer.
-        if ($this->app->environment('local') || config('dgii.fake')) {
+        if (config('dgii.fake')) {
+            return $this->app->make(DgiiGatewayInterface::class);
+        }
+
+        if ($this->app->environment('local')) {
+            if (config('dgii.forzar_real') && $empresa->config()->dgii_ambiente === AmbienteEcf::TESTECF) {
+                return new EcfPlatformGateway($empresa);
+            }
+
             return $this->app->make(DgiiGatewayInterface::class);
         }
 
