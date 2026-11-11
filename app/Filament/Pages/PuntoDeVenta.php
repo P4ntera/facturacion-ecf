@@ -47,6 +47,9 @@ class PuntoDeVenta extends Page
      */
     public const SIN_COMPROBANTE = 'sin_comprobante';
 
+    /** Límite práctico para campos de monto de pago: cabe holgado en decimal(14,2). */
+    public const MAX_MONTO_PAGO = '99999999.99';
+
     use RestringidoPorModulo;
 
     protected string $view = 'filament.pages.punto-de-venta';
@@ -878,13 +881,22 @@ class PuntoDeVenta extends Page
             return;
         }
 
+        if ($this->montoExcedeMaximo()) {
+            Notification::make()
+                ->title('El monto ingresado excede el máximo permitido (RD$ '.number_format((float) self::MAX_MONTO_PAGO, 2, '.', ',').').')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
         try {
             $venta = app(VentaService::class)->registrar([
                 'cliente_id' => $this->clienteId,
                 'user_id' => auth()->id(),
                 'tipo_comprobante' => $this->esSinComprobante() ? null : $this->tipoComprobante,
                 'sin_comprobante' => $this->esSinComprobante(),
-                'descuento_global' => $this->descuentoGlobal,
+                'descuento_id' => filled($this->descuentoId) ? (int) $this->descuentoId : null,
                 'forma_pago' => $this->formaPago,
                 ...$this->datosDesglosePago(),
                 'arqueo_caja_id' => $this->arqueoAbierto()?->id,
@@ -1038,6 +1050,22 @@ class PuntoDeVenta extends Page
         return bccomp($vuelto, '0.00', 2) > 0 ? $vuelto : '0.00';
     }
 
+    /** Verifica si alguno de los montos de pago excede el límite de la columna decimal(14,2). */
+    protected function montoExcedeMaximo(): bool
+    {
+        $max = self::MAX_MONTO_PAGO;
+
+        if (filled($this->montoEfectivo) && bccomp($this->montoEfectivo, $max, 2) > 0) {
+            return true;
+        }
+
+        if (filled($this->montoTarjeta) && bccomp($this->montoTarjeta, $max, 2) > 0) {
+            return true;
+        }
+
+        return false;
+    }
+
     /**
      * Arma los datos de desglose de pago (montos por método y vuelto) que cobrar() mezcla en el
      * array que va a VentaService::registrar(). Los campos se llenan solo cuando tienen sentido
@@ -1094,32 +1122,17 @@ class PuntoDeVenta extends Page
         try {
             $lineas = $this->lineasParaService();
 
-            // El % del descuento seleccionado se aplica sobre el subtotal (ya con descuentos de
-            // línea aplicados, antes de ITBIS): primero se necesita ese subtotal sin descuento
-            // global para poder calcular el monto en pesos que se le pasa a VentaService, que
-            // sigue trabajando con un monto fijo (descuento_global), no con un porcentaje.
-            $sinDescuento = app(VentaService::class)->previsualizar(['descuento_global' => '0', 'lineas' => $lineas], $this->empresa());
-            $this->descuentoGlobal = $this->calcularMontoDescuento($sinDescuento['subtotal']);
-
+            // El servicio resuelve el descuento internamente a partir del descuento_id:
+            // valida que pertenezca a la empresa, que esté activo, y calcula el monto.
             $this->totales = app(VentaService::class)->previsualizar([
-                'descuento_global' => $this->descuentoGlobal,
+                'descuento_id' => filled($this->descuentoId) ? (int) $this->descuentoId : null,
                 'lineas' => $lineas,
             ], $this->empresa());
+            $this->descuentoGlobal = $this->totales['descuento'];
         } catch (VentaInvalidaException) {
             $this->totales = $this->totalesVacios();
             $this->descuentoGlobal = '0.00';
         }
-    }
-
-    private function calcularMontoDescuento(string $subtotal): string
-    {
-        $descuento = $this->descuentoSeleccionado();
-
-        if ($descuento === null) {
-            return '0.00';
-        }
-
-        return bcdiv(bcmul($subtotal, (string) $descuento->porcentaje, 4), '100', 2);
     }
 
     /** @return array<string, string> */

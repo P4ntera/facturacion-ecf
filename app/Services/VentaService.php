@@ -171,7 +171,7 @@ class VentaService
             $estrategia = $config->precio_incluye_itbis ? new ConItbisIncluido : new SinItbisIncluido;
             $permitePrecioCero = (bool) ($datos['permite_precio_cero'] ?? false);
 
-            [$detalles, $productosLineas, $acumulado, $descuentoGlobal] = $this->calcularLineas($datos, $lineas, $config, $estrategia, $empresa, $permitePrecioCero, $cliente);
+            [$detalles, $productosLineas, $acumulado, $descuentoGlobal, $descuentoId, $descuentoPorcentaje] = $this->calcularLineas($datos, $lineas, $config, $estrategia, $empresa, $permitePrecioCero, $cliente);
 
             $total = $this->calcularTotalFinal($acumulado, $descuentoGlobal);
 
@@ -225,6 +225,8 @@ class VentaService
                 'moneda' => $config->moneda,
                 'subtotal' => $acumulado['subtotal'],
                 'descuento' => $descuentoGlobal,
+                'descuento_id' => $descuentoId,
+                'descuento_porcentaje' => $descuentoPorcentaje,
                 'monto_gravado_18' => $acumulado['monto_gravado_18'],
                 'monto_gravado_16' => $acumulado['monto_gravado_16'],
                 'monto_gravado_0' => $acumulado['monto_gravado_0'],
@@ -304,7 +306,7 @@ class VentaService
             ? Cliente::where('empresa_id', $empresa->id)->find($datos['cliente_id'])
             : null;
 
-        [, , $acumulado, $descuentoGlobal] = $this->calcularLineas($datos, $lineas, $config, $estrategia, $empresa, $permitePrecioCero, $cliente);
+        [, , $acumulado, $descuentoGlobal, , ] = $this->calcularLineas($datos, $lineas, $config, $estrategia, $empresa, $permitePrecioCero, $cliente);
 
         return [
             ...$acumulado,
@@ -1062,7 +1064,10 @@ class VentaService
         unset($detalle);
 
         $subtotalBruto = $acumulado['subtotal'];
-        $descuentoGlobal = $this->resolverDescuentoGlobal($datos, $subtotalBruto, $empresa);
+        $resuelto = $this->resolverDescuentoGlobal($datos, $subtotalBruto, $empresa);
+        $descuentoGlobal = $resuelto['monto'];
+        $descuentoId = $resuelto['id'];
+        $descuentoPorcentaje = $resuelto['porcentaje'];
 
         // descuento_global viene de una propiedad pública del POS (client-controllable).
         if (bccomp($descuentoGlobal, '0', 2) < 0) {
@@ -1076,7 +1081,7 @@ class VentaService
         }
 
         if (bccomp($descuentoGlobal, '0', 2) === 0) {
-            return [$detalles, $productosLineas, $acumulado, '0.00'];
+            return [$detalles, $productosLineas, $acumulado, '0.00', $descuentoId, $descuentoPorcentaje];
         }
 
         $proporcion = bcdiv($descuentoGlobal, $subtotalBruto, 12);
@@ -1086,7 +1091,7 @@ class VentaService
         $descuentoReal = bcsub($subtotalBruto, $acumulado['subtotal'], 2);
         $acumulado['subtotal'] = $subtotalBruto;
 
-        return [$detalles, $productosLineas, $acumulado, $descuentoReal];
+        return [$detalles, $productosLineas, $acumulado, $descuentoReal, $descuentoId, $descuentoPorcentaje];
     }
 
     /**
@@ -1274,12 +1279,14 @@ class VentaService
      * client-controllable) y se calcula el monto a partir de su porcentaje sobre $subtotal. Si
      * no, se usa descuento_global tal cual (monto fijo, comportamiento previo).
      *
+     * @return array{monto: string, id: int|null, porcentaje: string|null}
+     *
      * @throws VentaInvalidaException
      */
-    private function resolverDescuentoGlobal(array $datos, string $subtotal, Empresa $empresa): string
+    private function resolverDescuentoGlobal(array $datos, string $subtotal, Empresa $empresa): array
     {
         if (blank($datos['descuento_id'] ?? null)) {
-            return $this->aMoneda($datos['descuento_global'] ?? '0');
+            return ['monto' => $this->aMoneda($datos['descuento_global'] ?? '0'), 'id' => null, 'porcentaje' => null];
         }
 
         $descuento = Descuento::where('empresa_id', $empresa->id)
@@ -1290,7 +1297,9 @@ class VentaService
             throw new VentaInvalidaException('El descuento indicado no existe, está inactivo, o no pertenece a esta empresa.');
         }
 
-        return bcdiv(bcmul($subtotal, (string) $descuento->porcentaje, 4), '100', 2);
+        $monto = bcdiv(bcmul($subtotal, (string) $descuento->porcentaje, 4), '100', 2);
+
+        return ['monto' => $monto, 'id' => $descuento->id, 'porcentaje' => (string) $descuento->porcentaje];
     }
 
     /** @param  array<string, string>  $acumulado */
