@@ -182,4 +182,18 @@ class VentaTicketControllerTest extends TestCase
             ->get(route('ventas.ticket', $venta))
             ->assertForbidden();
     }
+
+    /** Un e-CF que la DGII aún no aceptó se imprime con el aviso y sin QR. */
+    public function test_el_ticket_de_un_ecf_no_aceptado_avisa_que_esta_pendiente_y_no_muestra_qr(): void
+    {
+        $usuario = $this->usuarioConPermiso();
+        $venta = $this->crearVentaConDetalle();
+        $venta->update(['estado_fiscal' => EstadoFiscal::PENDIENTE, 'dgii_url' => 'https://dgii.test/timbre/1']);
+
+        $this->actingAs($usuario)
+            ->get(route('ventas.ticket', $venta))
+            ->assertOk()
+            ->assertSee('PENDIENTE DE VALIDACIÓN')
+            ->assertDontSee('QR del timbre fiscal');
+    }
 }

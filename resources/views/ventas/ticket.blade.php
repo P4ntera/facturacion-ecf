@@ -75,6 +75,12 @@
                 <td>Subtotal</td>
                 <td class="derecha">{{ number_format((float) $venta->subtotalNeto(), 2) }}</td>
             </tr>
+            @if ((float) $venta->monto_exento > 0)
+                <tr>
+                    <td>Exento</td>
+                    <td class="derecha">{{ number_format((float) $venta->monto_exento, 2) }}</td>
+                </tr>
+            @endif
             @if ((float) $venta->total_itbis > 0)
                 <tr>
                     <td>ITBIS</td>
@@ -118,6 +124,12 @@
             @if ((float) ($venta->vuelto ?? 0) > 0)
                 <p>Vuelto: {{ $venta->moneda }} {{ number_format((float) $venta->vuelto, 2) }}</p>
             @endif
+        @endif
+
+        @if ($venta->esElectronica() && ! $venta->estado_fiscal?->esAceptado())
+            <div class="separador"></div>
+            <p class="centro negrita">e-CF PENDIENTE DE VALIDACIÓN DGII</p>
+            <p class="centro">Sin validez fiscal hasta su aceptación.</p>
         @endif
 
         @if ($qrTimbre)

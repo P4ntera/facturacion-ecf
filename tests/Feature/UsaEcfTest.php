@@ -249,4 +249,27 @@ class UsaEcfTest extends TestCase
 
         $this->assertFalse($this->empresaDefault->fresh()->usa_ecf);
     }
+
+    /** Un electrónico de venta que EcfBuilder no soporta (44) no se ofrece aunque tenga secuencia. */
+    public function test_tipos_electronicos_sin_soporte_en_el_builder_no_se_ofrecen(): void
+    {
+        $this->empresaDefault->update(['usa_ecf' => true]);
+        $this->secuenciaCreditoFiscalElectronica();
+
+        SecuenciaNcf::create([
+            'empresa_id' => $this->empresaDefault->id,
+            'tipo_comprobante' => TipoComprobante::REGIMENES_ESPECIALES,
+            'prefijo' => 'E44',
+            'secuencia_desde' => 1,
+            'secuencia_hasta' => 100,
+            'secuencia_actual' => 0,
+            'vencimiento' => now()->addYear(),
+            'activa' => true,
+        ]);
+
+        $tipos = app(SecuenciaNcfService::class)->tiposDisponibles($this->empresaDefault);
+
+        $this->assertContains(TipoComprobante::FACTURA_CREDITO_FISCAL, $tipos);
+        $this->assertNotContains(TipoComprobante::REGIMENES_ESPECIALES, $tipos);
+    }
 }

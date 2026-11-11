@@ -154,6 +154,10 @@ class ManageEmpresa extends Page
                             ->label('API Key del PAC')
                             ->password()
                             ->revealable()
+                            // Credenciales del PAC: las dos o ninguna. No se exigen siempre porque una
+                            // empresa debe poder guardar sus datos antes de contratar el PAC;
+                            // EnvioEcfService bloquea el envío con un motivo claro si faltan.
+                            ->requiredWith('dgii_base_url')
                             ->maxLength(255)
                             ->helperText('Se guarda cifrada; nunca se muestra en reportes ni registros del sistema.')
                             ->columnSpanFull(),
@@ -169,7 +173,7 @@ class ManageEmpresa extends Page
                             ->label('Base URL del PAC')
                             ->helperText('Avanzado: solo cámbiala si el PAC te asignó una URL distinta.')
                             ->url()
-                            ->required()
+                            ->requiredWith('dgii_api_key')
                             ->maxLength(255),
                     ]),
 

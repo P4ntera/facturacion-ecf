@@ -292,4 +292,17 @@ class EnvioEcfServiceTest extends TestCase
         $this->assertSame(EstadoFiscal::RECHAZADO, $venta->estado_fiscal);
         $this->assertStringContainsString('RNC', $venta->ecf_respuesta['error']);
     }
+
+    public function test_sin_api_key_del_pac_rechaza_con_motivo_claro(): void
+    {
+        $this->empresaDefault->config()->update(['dgii_api_key' => null]);
+
+        $venta = $this->crearVenta(documentoCliente: null);
+
+        $respuesta = app(EnvioEcfService::class)->enviar($venta);
+
+        $this->assertFalse($respuesta->exito);
+        $this->assertSame(EstadoFiscal::RECHAZADO, $venta->refresh()->estado_fiscal);
+        $this->assertStringContainsString('API Key del PAC', $respuesta->errorMessage);
+    }
 }

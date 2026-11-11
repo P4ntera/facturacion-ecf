@@ -89,15 +89,20 @@ Flujo: `VentaService` → `VentaObserver` → `EnviarEcfJob` (cola `ecf`) →
   (`DGII_FAKE_GATEWAY=true` en `phpunit.xml`), `EcfPlatformGateway` en producción.
   `DGII_FORZAR_GATEWAY_REAL=true` permite usar el gateway real en local, pero SOLO para
   `TesteCF` (nunca producción).
-- `EnvioEcfService` valida que `dgii_base_url` esté configurada antes de enviar; si falta,
-  rechaza con motivo claro sin intentar la conexión.
+- `EnvioEcfService` valida que `dgii_base_url` y `dgii_api_key` estén configuradas antes de
+  enviar; si falta alguna, rechaza con motivo claro sin intentar la conexión. En el formulario de
+  empresa son "las dos o ninguna" (`requiredWith`), no obligatorias siempre.
+- `SecuenciaNcfService::tiposDisponibles()` no ofrece al POS electrónicos de venta sin soporte en
+  el builder (44, 45, 46), aunque tengan secuencia cargada.
 - `TasaItbis::EXENTO` (`IndicadorFacturacion` = 4) es distinto de `TasaItbis::CERO`
   (`IndicadorFacturacion` = 3): exento no graba ITBIS y va a `MontoExento`, no a `MontoGravadoI3`.
 - `IndicadorMontoGravado` (no `IndicadorServicioTodoIncluido`) se usa cuando
   `precio_incluye_itbis` es `true`.
 - `CodigoModificacion` en NC: 1 = anulación total, 3 = corrección de montos (parcial o manual).
-- `ecf_fecha_firma` (datetime, nullable) se extrae de la respuesta del PAC y se muestra en el
-  comprobante impreso.
+- `ecf_fecha_firma` (datetime, nullable) se extrae de la respuesta del PAC; si no viene y el
+  e-CF quedó aceptado, se lee `FechaHoraFirma` del XML firmado. Se muestra en PDF y ticket.
+- Impresos: el QR solo sale con el e-CF aceptado; mientras no lo esté, PDF y ticket llevan el
+  aviso "pendiente de validación". El monto exento se muestra en su propia línea.
 - Comando de diagnóstico: `php artisan ecf:diagnostico {venta_id}` (solo lectura, no envía nada).
 
 ## Inventario (Kardex)

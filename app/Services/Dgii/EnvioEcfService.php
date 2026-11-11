@@ -8,8 +8,10 @@ use App\Exceptions\EcfInvalidoException;
 use App\Models\Venta;
 use App\Services\NotificacionService;
 use Filament\Notifications\Notification;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Throwable;
 
 /**
  * Orquesta el envío de un e-CF ya registrado: construye el JSON (EcfBuilder), lo manda al PAC
@@ -36,10 +38,14 @@ class EnvioEcfService
 
         $gateway = $this->gateway($venta);
 
-        if (blank($venta->empresa->config()->dgii_base_url)) {
+        $config = $venta->empresa->config();
+
+        if (blank($config->dgii_base_url) || blank($config->dgii_api_key)) {
+            $faltante = blank($config->dgii_base_url) ? 'la URL del PAC' : 'la API Key del PAC';
+
             return $this->rechazarPorDatosInvalidos(
                 $venta,
-                new EcfInvalidoException('La empresa no tiene configurada la URL del PAC (dgii_base_url). Configúrela en Ajustes de la Empresa antes de enviar e-CF.'),
+                new EcfInvalidoException("La empresa no tiene configurada {$faltante}. Configúrela en Ajustes de la Empresa antes de enviar e-CF."),
             );
         }
 
@@ -144,9 +150,35 @@ class EnvioEcfService
             'xml_url' => $respuesta->xmlUrl ?? $venta->xml_url,
             'ambiente' => $respuesta->ambiente ?? $venta->ambiente,
             'ecf_enviado_en' => now(),
-            'ecf_fecha_firma' => $respuesta->fechaFirma ?? $venta->ecf_fecha_firma,
+            'ecf_fecha_firma' => $respuesta->fechaFirma ?? $venta->ecf_fecha_firma ?? $this->fechaFirmaDesdeXml($venta, $respuesta),
             'ecf_respuesta' => $respuesta->responseJson,
         ];
+    }
+
+    /**
+     * Respaldo cuando el PAC no devuelve la fecha de firma en su respuesta: se lee FechaHoraFirma
+     * (dd-MM-yyyy HH:mm:ss) del XML firmado. Solo con el e-CF ya aceptado, y nunca lanza: la
+     * fecha de firma es un dato del impreso, no puede tumbar el guardado del estado fiscal.
+     */
+    private function fechaFirmaDesdeXml(Venta $venta, RespuestaEcf $respuesta): ?Carbon
+    {
+        $pacId = $respuesta->pacId ?? $venta->pac_id;
+
+        if ($pacId === null || ! $this->mapearEstado($respuesta)->esAceptado()) {
+            return null;
+        }
+
+        try {
+            $xml = $this->gateway($venta)->descargarXml($pacId);
+
+            if (! preg_match('/<FechaHoraFirma>\s*([^<]+?)\s*<\/FechaHoraFirma>/', $xml, $coincidencia)) {
+                return null;
+            }
+
+            return Carbon::createFromFormat('d-m-Y H:i:s', $coincidencia[1]) ?: null;
+        } catch (Throwable) {
+            return null;
+        }
     }
 
     private function mapearEstado(RespuestaEcf $respuesta): EstadoFiscal

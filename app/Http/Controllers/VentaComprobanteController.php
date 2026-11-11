@@ -27,7 +27,7 @@ class VentaComprobanteController extends Controller
             'venta' => $venta,
             'empresa' => $venta->empresa,
             // PNG en base64: dompdf renderiza <img> embebido de forma más confiable que SVG inline.
-            'qrTimbre' => $venta->dgii_url !== null
+            'qrTimbre' => $venta->dgii_url !== null && $venta->estado_fiscal?->esAceptado()
                 ? base64_encode((string) QrCode::format('png')->size(120)->generate($venta->dgii_url))
                 : null,
         ]);
