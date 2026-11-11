@@ -16,6 +16,7 @@ use App\Models\ServicioLavanderia;
 use App\Models\TicketLavanderia;
 use App\Models\TipoPrenda;
 use App\Services\TicketLavanderiaService;
+use App\Support\ComprobanteVenta;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\DatePicker;
@@ -139,6 +140,9 @@ class TicketLavanderiaResource extends Resource
                                 ->live()
                                 ->columnSpanFull(),
 
+                            self::selectComprobante('datos_venta.comprobante')
+                                ->columnSpanFull(),
+
                             TextInput::make('datos_venta.monto_recibido')
                                 ->label('Monto Recibido')
                                 ->numeric()
@@ -149,9 +153,8 @@ class TicketLavanderiaResource extends Resource
                                 ->live(debounce: 500)
                                 ->afterStateUpdated(function (Get $get, Set $set) {
                                     $recibido = (float) ($get('datos_venta.monto_recibido') ?? 0);
-                                    // Calcular total sumando detalles
-                                    $detalles = $get('detalles') ?? [];
-                                    $total = collect($detalles)->sum(fn ($d) => ((float) ($d['precio_unitario'] ?? 0)) * ((int) ($d['cantidad'] ?? 1)));
+                                    // Total real (con ITBIS según la configuración de la empresa).
+                                    $total = (float) self::totalesFormulario($get('detalles') ?? [])['total'];
                                     $vuelto = max(0, round($recibido - $total, 2));
                                     $set('datos_venta.vuelto', $vuelto > 0 ? $vuelto : null);
                                 }),
@@ -342,16 +345,15 @@ class TicketLavanderiaResource extends Resource
                         ->label('')
                         ->hiddenLabel()
                         ->content(function (Get $get): HtmlString {
-                            $total = 0;
-                            foreach ($get('detalles') ?? [] as $detalle) {
-                                $precio = (float) ($detalle['precio_unitario'] ?? 0);
-                                $cantidad = max(1, (int) ($detalle['cantidad'] ?? 1));
-                                $total += $precio * $cantidad;
-                            }
+                            $totales = self::totalesFormulario($get('detalles') ?? []);
+                            $itbis = (float) $totales['itbis'] > 0
+                                ? '<span class="text-sm text-gray-500 dark:text-gray-400 me-4">ITBIS RD$ '.number_format((float) $totales['itbis'], 2).'</span>'
+                                : '';
 
                             return new HtmlString(
-                                '<div class="text-right"><span class="text-sm text-gray-500 dark:text-gray-400 me-2">Total</span>'
-                                .'<span class="text-lg font-bold">RD$ '.number_format($total, 2).'</span></div>'
+                                '<div class="text-right">'.$itbis
+                                .'<span class="text-sm text-gray-500 dark:text-gray-400 me-2">Total</span>'
+                                .'<span class="text-lg font-bold">RD$ '.number_format((float) $totales['total'], 2).'</span></div>'
                             );
                         }),
                 ]),
@@ -468,6 +470,8 @@ class TicketLavanderiaResource extends Resource
                             ->required()
                             ->live(),
 
+                        self::selectComprobante('comprobante'),
+
                         TextInput::make('monto_recibido')
                             ->label('Monto Recibido')
                             ->numeric()
@@ -504,6 +508,7 @@ class TicketLavanderiaResource extends Resource
                         $datosVenta = [
                             'forma_pago' => $formaPago,
                             'user_id' => auth()->id(),
+                            'comprobante' => $data['comprobante'] ?? null,
                         ];
 
                         if ($formaPago === FormaPago::EFECTIVO) {
@@ -611,5 +616,42 @@ class TicketLavanderiaResource extends Resource
             'create' => Pages\CreateTicketLavanderia::route('/create'),
             'view' => Pages\ViewTicketLavanderia::route('/{record}'),
         ];
+    }
+
+    /**
+     * Selector de comprobante según la configuración de la empresa (sin comprobante si lo tiene
+     * habilitado, tipos B con secuencia, e-CF solo si usa e-CF). Con una sola opción se oculta:
+     * no hay nada que elegir y TicketLavanderiaService aplica esa misma.
+     */
+    public static function selectComprobante(string $nombre): Select
+    {
+        return Select::make($nombre)
+            ->label('Comprobante')
+            ->options(fn (): array => ComprobanteVenta::opciones(Filament::getTenant()))
+            ->default(fn (): ?string => ComprobanteVenta::porDefecto(Filament::getTenant()))
+            ->visible(fn (): bool => count(ComprobanteVenta::opciones(Filament::getTenant())) > 1)
+            ->selectablePlaceholder(false)
+            ->helperText('Crédito fiscal requiere que el ticket tenga un cliente con RNC o cédula.');
+    }
+
+    /**
+     * Totales del formulario con la misma regla de impuestos del servicio (y de la factura).
+     *
+     * @param  array<int|string, array<string, mixed>>  $detalles
+     * @return array{subtotal: string, itbis: string, total: string}
+     */
+    public static function totalesFormulario(array $detalles): array
+    {
+        $lineas = collect($detalles)
+            ->filter(fn ($d) => filled($d['servicio_lavanderia_id'] ?? null))
+            ->map(fn ($d) => [
+                'servicio_lavanderia_id' => (int) $d['servicio_lavanderia_id'],
+                'precio_unitario' => $d['precio_unitario'] ?? null,
+                'cantidad' => $d['cantidad'] ?? 1,
+            ])
+            ->values()
+            ->all();
+
+        return app(TicketLavanderiaService::class)->calcularTotales(Filament::getTenant(), $lineas);
     }
 }

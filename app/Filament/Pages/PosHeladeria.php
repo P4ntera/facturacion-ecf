@@ -8,6 +8,7 @@ use App\Enums\FormaPago;
 use App\Enums\ModoPrecioHelado;
 use App\Enums\Modulo;
 use App\Filament\Concerns\RestringidoPorModulo;
+use App\Models\Cliente;
 use App\Models\ComboHelado;
 use App\Models\Empresa;
 use App\Models\PresentacionHelado;
@@ -15,6 +16,7 @@ use App\Models\Producto;
 use App\Models\SaborHelado;
 use App\Models\ToppingHelado;
 use App\Services\HeladeriaService;
+use App\Support\ComprobanteVenta;
 use BackedEnum;
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
@@ -78,9 +80,67 @@ class PosHeladeria extends Page
     /** Color accent del POS (hex) */
     public string $colorAccent = '#e85d9a';
 
+    /** Comprobante elegido para el cobro (valor de ComprobanteVenta::opciones()). */
+    public string $comprobante = '';
+
+    /** Cliente del comprobante (obligatorio para crédito fiscal); null = venta al portador. */
+    public ?int $clienteId = null;
+
+    public string $buscarCliente = '';
+
     public function mount(): void
     {
         $this->colorAccent = $this->config()->color_accent_pos ?? '#e85d9a';
+        $this->comprobante = ComprobanteVenta::porDefecto($this->empresa()) ?? '';
+    }
+
+    // ---------------------------------------------------------------- Comprobante y cliente
+
+    /** @return array<string, string> */
+    public function opcionesComprobante(): array
+    {
+        return ComprobanteVenta::opciones($this->empresa());
+    }
+
+    public function conComprobante(): bool
+    {
+        return $this->comprobante !== '' && $this->comprobante !== ComprobanteVenta::SIN_COMPROBANTE;
+    }
+
+    /** Hasta 5 coincidencias por nombre o RNC/cédula, solo de esta empresa. */
+    public function clientesEncontrados(): Collection
+    {
+        $termino = trim($this->buscarCliente);
+
+        if (mb_strlen($termino) < 2) {
+            return collect();
+        }
+
+        return Cliente::where('empresa_id', $this->empresa()->id)
+            ->where('activo', true)
+            ->where(fn ($q) => $q->where('nombre', 'ilike', "%{$termino}%")->orWhere('documento', 'like', "%{$termino}%"))
+            ->orderBy('nombre')
+            ->limit(5)
+            ->get(['id', 'nombre', 'documento']);
+    }
+
+    public function seleccionarCliente(int $id): void
+    {
+        // Client-controllable: se revalida que sea de esta empresa.
+        $this->clienteId = Cliente::where('empresa_id', $this->empresa()->id)->where('activo', true)->whereKey($id)->value('id');
+        $this->buscarCliente = '';
+    }
+
+    public function quitarCliente(): void
+    {
+        $this->clienteId = null;
+    }
+
+    public function clienteSeleccionado(): ?Cliente
+    {
+        return $this->clienteId === null
+            ? null
+            : Cliente::where('empresa_id', $this->empresa()->id)->find($this->clienteId);
     }
 
     public static function modulo(): Modulo
@@ -369,9 +429,19 @@ class PosHeladeria extends Page
         }
     }
 
+    /**
+     * Total que realmente se cobra y se factura: incluye el ITBIS cuando la empresa lo cobra
+     * aparte del precio (misma regla que VentaService).
+     */
     public function totalCarrito(): float
     {
-        return collect($this->carrito)->sum(fn ($item) => $item['precio'] * $item['cantidad']);
+        return (float) $this->totalesCarrito()['total'];
+    }
+
+    /** @return array{subtotal: string, itbis: string, total: string} */
+    public function totalesCarrito(): array
+    {
+        return app(HeladeriaService::class)->calcularTotales($this->carrito, $this->empresa());
     }
 
     public function vaciarCarrito(): void
@@ -438,12 +508,23 @@ class PosHeladeria extends Page
 
         try {
             $service = app(HeladeriaService::class);
-            $venta = $service->facturar($this->carrito, $this->empresa(), [
+            $datosVenta = [
                 'forma_pago' => FormaPago::from($this->formaPago),
-            ]);
+                'comprobante' => $this->comprobante,
+                'cliente_id' => $this->conComprobante() ? $this->clienteId : null,
+            ];
+
+            if ($this->formaPago === 'efectivo' && ($recibido ?? 0) > 0) {
+                $datosVenta['monto_efectivo'] = $recibido;
+            }
+
+            $venta = $service->facturar($this->carrito, $this->empresa(), $datosVenta);
 
             $this->carrito = [];
             $this->formaPago = 'efectivo';
+            $this->comprobante = ComprobanteVenta::porDefecto($this->empresa()) ?? '';
+            $this->clienteId = null;
+            $this->buscarCliente = '';
             $this->resetBuilder();
 
             Notification::make()
@@ -452,7 +533,9 @@ class PosHeladeria extends Page
                 ->success()
                 ->send();
 
-            $this->dispatch('venta-cobrada');
+            // Con comprobante fiscal se abre el ticket para imprimirlo (representación impresa
+            // con e-NCF y QR); el cobro rápido sin comprobante sigue sin imprimir.
+            $this->dispatch('venta-cobrada', ticketUrl: $venta->ncf !== null ? route('ventas.ticket', $venta) : null);
         } catch (\Exception $e) {
             Notification::make()
                 ->title('Error al registrar la venta')

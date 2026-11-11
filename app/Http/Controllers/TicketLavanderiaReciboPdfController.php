@@ -8,6 +8,7 @@ use App\Enums\AnchoPapel;
 use App\Models\TicketLavanderia;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
+use SimpleSoftwareIO\QrCode\Facades\QrCode;
 
 /**
  * Ticket térmico (80mm/58mm) del recibo de lavandería: vista HTML con window.print().
@@ -31,12 +32,19 @@ class TicketLavanderiaReciboPdfController extends Controller
             'recepcionista',
             'detalles.tipoPrenda',
             'detalles.servicioLavanderia',
-            'venta',
+            'venta.cliente',
         ]);
+
+        // Timbre fiscal: solo con el e-CF ya aceptado (igual que el ticket de venta).
+        $venta = $ticket->venta;
+        $qrTimbre = $venta !== null && $venta->dgii_url !== null && $venta->estado_fiscal?->esAceptado()
+            ? base64_encode((string) QrCode::format('png')->size(120)->generate($venta->dgii_url))
+            : null;
 
         return view('lavanderia.ticket-recibo', [
             'ticket' => $ticket,
             'empresa' => $ticket->empresa,
+            'qrTimbre' => $qrTimbre,
             'anchoPapel' => AnchoPapel::tryFrom((string) $request->query('ancho')) ?? AnchoPapel::MM80,
         ]);
     }

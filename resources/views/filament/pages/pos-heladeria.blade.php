@@ -30,7 +30,7 @@
     },
   }"
   x-on:item-agregado.window="feedback()"
-  x-on:venta-cobrada.window="cobrarAbierto = false; recibido = ''"
+  x-on:venta-cobrada.window="cobrarAbierto = false; recibido = ''; if ($event.detail?.ticketUrl) { window.open($event.detail.ticketUrl, '_blank'); }"
   x-on:color-actualizado.window="colorPickerAbierto = false"
 >
   <style>
@@ -489,6 +489,15 @@
       </div>
 
       <div class="hel-cart-footer">
+        @php($totalesCarrito = $this->totalesCarrito())
+        @if((float) $totalesCarrito['itbis'] > 0)
+          <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--hel-text-muted);">
+            <span>Subtotal</span><span>RD$ {{ number_format((float) $totalesCarrito['subtotal'], 2) }}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--hel-text-muted); margin-bottom: 0.25rem;">
+            <span>ITBIS</span><span>RD$ {{ number_format((float) $totalesCarrito['itbis'], 2) }}</span>
+          </div>
+        @endif
         <div class="hel-cart-total">
           <span>Total</span>
           <span style="color: var(--hel-primary);">RD$ {{ number_format($this->totalCarrito(), 2) }}</span>
@@ -523,6 +532,45 @@
           RD$ {{ number_format($this->totalCarrito(), 2) }}
         </div>
       </div>
+
+      {{-- Comprobante: solo si la empresa tiene más de una opción (configuración fiscal) --}}
+      @if(count($this->opcionesComprobante()) > 1)
+        <label style="font-size: 0.85rem; color: var(--hel-text-muted); display: block; margin-bottom: 0.25rem;">
+          Comprobante
+        </label>
+        <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+          @foreach($this->opcionesComprobante() as $valor => $etiqueta)
+            <button
+              class="hel-chip {{ $comprobante === (string) $valor ? 'active' : '' }}"
+              wire:click="$set('comprobante', '{{ $valor }}')"
+              style="flex: 1 1 45%; text-align: center; padding: 0.5rem; font-size: 0.8rem;"
+            >{{ $etiqueta }}</button>
+          @endforeach
+        </div>
+      @endif
+
+      {{-- Cliente: opcional en consumo, obligatorio en crédito fiscal --}}
+      @if($this->conComprobante())
+        <label style="font-size: 0.85rem; color: var(--hel-text-muted); display: block; margin-bottom: 0.25rem;">
+          Cliente (RNC/Cédula) — obligatorio para crédito fiscal
+        </label>
+        @if($cliente = $this->clienteSeleccionado())
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; font-size: 0.9rem;">
+            <span><strong>{{ $cliente->nombre }}</strong> · {{ $cliente->documento ?: 'sin documento' }}</span>
+            <button class="hel-chip" wire:click="quitarCliente" style="padding: 0.25rem 0.6rem;">Quitar</button>
+          </div>
+        @else
+          <input type="text" class="hel-input" wire:model.live.debounce.400ms="buscarCliente" placeholder="Buscar por nombre o RNC/cédula">
+          <div style="margin-bottom: 0.75rem;">
+            @foreach($this->clientesEncontrados() as $encontrado)
+              <button class="hel-chip" wire:click="seleccionarCliente({{ $encontrado->id }})"
+                      style="display: block; width: 100%; text-align: left; padding: 0.4rem 0.6rem; margin-top: 0.25rem; font-size: 0.85rem;">
+                {{ $encontrado->nombre }} · {{ $encontrado->documento ?: 'sin documento' }}
+              </button>
+            @endforeach
+          </div>
+        @endif
+      @endif
 
       {{-- Forma de pago --}}
       <label style="font-size: 0.85rem; color: var(--hel-text-muted); display: block; margin-bottom: 0.25rem;">

@@ -40,6 +40,8 @@ class LavanderiaTest extends TestCase
 
         $this->empresa = Empresa::factory()->create(['perfil' => PerfilEmpresa::LAVANDERIA]);
         app(RolesEmpresaService::class)->sembrarRolesBase($this->empresa);
+        // Igual que CreateEmpresa para el perfil lavandería: cobro rápido sin comprobante.
+        $this->empresa->config()->update(['permite_ventas_sin_comprobante' => true]);
 
         Filament::setTenant($this->empresa, isQuiet: true);
         setPermissionsTeamId($this->empresa->id);

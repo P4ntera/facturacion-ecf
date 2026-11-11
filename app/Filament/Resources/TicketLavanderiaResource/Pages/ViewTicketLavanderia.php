@@ -62,6 +62,8 @@ class ViewTicketLavanderia extends ViewRecord
                         ->required()
                         ->live(),
 
+                    TicketLavanderiaResource::selectComprobante('comprobante'),
+
                     TextInput::make('monto_recibido')
                         ->label('Monto Recibido')
                         ->numeric()
@@ -98,6 +100,7 @@ class ViewTicketLavanderia extends ViewRecord
                     $datosVenta = [
                         'forma_pago' => $formaPago,
                         'user_id' => auth()->id(),
+                        'comprobante' => $data['comprobante'] ?? null,
                     ];
 
                     if ($formaPago === FormaPago::EFECTIVO) {

@@ -31,6 +31,7 @@ class CreateTicketLavanderia extends CreateRecord
             $data['datos_venta'] = [
                 'forma_pago' => $formaPago,
                 'user_id' => auth()->id(),
+                'comprobante' => $datosVenta['comprobante'] ?? null,
             ];
 
             // Para efectivo: registrar montos y vuelto.

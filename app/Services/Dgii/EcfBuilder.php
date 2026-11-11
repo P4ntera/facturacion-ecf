@@ -296,7 +296,8 @@ class EcfBuilder
                 TasaItbis::CERO => '3',
                 TasaItbis::EXENTO => '4',
             },
-            'NombreItem' => $detalle->descripcion,
+            // El formato e-CF limita NombreItem a 80 caracteres.
+            'NombreItem' => mb_substr((string) $detalle->descripcion, 0, 80),
             'IndicadorBienoServicio' => $detalle->producto->tipo === TipoProducto::SERVICIO ? '2' : '1',
             'CantidadItem' => (string) $detalle->cantidad,
             'UnidadMedida' => $detalle->producto->tipo === TipoProducto::SERVICIO ? '1' : '43',
@@ -325,7 +326,20 @@ class EcfBuilder
 
         $detalles = [];
 
-        $efectivoNeto = bcsub((string) $venta->monto_efectivo, (string) $venta->vuelto, 2);
+        // bcmath rechaza '' (ValueError): los montos nulos (pago con tarjeta no trae efectivo ni
+        // vuelto) se normalizan a 0 antes de operar.
+        $n = fn ($valor): string => $valor === null || $valor === '' ? '0' : (string) $valor;
+
+        $efectivoNeto = bcsub($n($venta->monto_efectivo), $n($venta->vuelto), 2);
+
+        // Lo declarado como pagado no puede superar el total: si se guardó lo recibido sin su
+        // vuelto (o con un vuelto mal calculado), el efectivo se topa en lo que faltaba por cubrir.
+        $otros = bcadd($n($venta->monto_tarjeta), $n($venta->monto_transferencia), 2);
+        $maximoEfectivo = bcsub((string) $venta->total, $otros, 2);
+
+        if (bccomp($efectivoNeto, $maximoEfectivo, 2) > 0) {
+            $efectivoNeto = $maximoEfectivo;
+        }
 
         if (bccomp($efectivoNeto, '0', 2) > 0) {
             $detalles[] = ['FormaPago' => '1', 'MontoPago' => $this->monto($efectivoNeto)];

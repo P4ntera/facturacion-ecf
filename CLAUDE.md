@@ -103,6 +103,12 @@ Flujo: `VentaService` → `VentaObserver` → `EnviarEcfJob` (cola `ecf`) →
   e-CF quedó aceptado, se lee `FechaHoraFirma` del XML firmado. Se muestra en PDF y ticket.
 - Impresos: el QR solo sale con el e-CF aceptado; mientras no lo esté, PDF y ticket llevan el
   aviso "pendiente de validación". El monto exento se muestra en su propia línea.
+- Módulos verticales (lavandería, heladería): NO asumen "sin comprobante". Ofrecen lo que da
+  `App\Support\ComprobanteVenta::opciones($empresa)` (sin comprobante si está habilitado, tipos B
+  con secuencia, e-CF solo con `usa_ecf`) y sus totales salen de `calcularTotales()` de cada
+  servicio, que usa la misma `ImpuestoStrategy` que `VentaService` (`aplica_itbis`,
+  `precio_incluye_itbis`). El vuelto se calcula en el servicio, no en el formulario.
+- `EcfBuilder` recorta `NombreItem` a 80 caracteres y nunca declara en efectivo más que el total.
 - Comando de diagnóstico: `php artisan ecf:diagnostico {venta_id}` (solo lectura, no envía nada).
 
 ## Inventario (Kardex)

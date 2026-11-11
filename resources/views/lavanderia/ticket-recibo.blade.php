@@ -132,7 +132,8 @@
         <table class="totales">
             <tr>
                 <td>Subtotal</td>
-                <td class="derecha">{{ number_format((float) $ticket->detalles->sum(fn ($d) => (float) $d->subtotal), 2) }}</td>
+                {{-- Base sin ITBIS: total − ITBIS, para que cuadre también cuando el precio ya lo incluye. --}}
+                <td class="derecha">{{ number_format((float) $ticket->total - (float) $ticket->itbis, 2) }}</td>
             </tr>
             @if ((float) $ticket->itbis > 0)
                 <tr>
@@ -160,6 +161,32 @@
                 @if ((float) ($ticket->venta->vuelto ?? 0) > 0)
                     <p style="font-size: 12px;">Vuelto: RD$ {{ number_format((float) $ticket->venta->vuelto, 2) }}</p>
                 @endif
+            @endif
+        @endif
+
+        {{-- Datos fiscales: solo si el cobro generó un comprobante (NCF físico o e-CF). --}}
+        @if ($ticket->venta?->ncf)
+            @php($venta = $ticket->venta)
+            <div class="separador"></div>
+            <p class="centro negrita" style="font-size: 12px;">{{ $venta->tipo_comprobante?->etiqueta() }}</p>
+            <p class="centro" style="font-size: 12px;">{{ $venta->esElectronica() ? 'e-NCF' : 'NCF' }}: <span class="negrita">{{ $venta->ncf }}</span></p>
+            <p class="centro" style="font-size: 12px;">Fecha: {{ $venta->fecha?->format('d/m/Y') ?? $venta->created_at->format('d/m/Y') }}</p>
+            @if ($venta->cliente?->documento)
+                <p style="font-size: 12px;">Cliente: {{ $venta->cliente->nombre }}</p>
+                <p style="font-size: 12px;">RNC/Cédula: {{ $venta->cliente->documento }}</p>
+            @endif
+
+            @if ($venta->esElectronica() && ! $venta->estado_fiscal?->esAceptado())
+                <p class="centro negrita" style="font-size: 12px;">e-CF PENDIENTE DE VALIDACIÓN DGII</p>
+                <p class="centro" style="font-size: 12px;">Sin validez fiscal hasta su aceptación.</p>
+            @endif
+
+            @if ($qrTimbre ?? null)
+                <p class="centro"><img src="data:image/png;base64,{{ $qrTimbre }}" style="width: 120px; height: 120px;" alt="QR del timbre fiscal"></p>
+                @if ($venta->ecf_fecha_firma)
+                    <p class="centro" style="font-size: 12px;">Fecha de firma digital: {{ $venta->ecf_fecha_firma->format('d/m/Y H:i:s') }}</p>
+                @endif
+                <p class="centro" style="font-size: 12px;">Código de seguridad: <span class="negrita">{{ $venta->codigo_seguridad }}</span></p>
             @endif
         @endif
 
