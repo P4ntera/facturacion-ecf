@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Pages;
 
+use App\Enums\FormaPago;
 use App\Enums\ModoPrecioHelado;
 use App\Enums\Modulo;
 use App\Filament\Concerns\RestringidoPorModulo;
@@ -70,6 +71,9 @@ class PosHeladeria extends Page
 
     /** Filtro de categoría de sabor */
     public ?string $filtroCategoria = null;
+
+    /** Forma de pago seleccionada */
+    public string $formaPago = 'efectivo';
 
     public static function modulo(): Modulo
     {
@@ -384,9 +388,12 @@ class PosHeladeria extends Page
 
         try {
             $service = app(HeladeriaService::class);
-            $venta = $service->facturar($this->carrito, $this->empresa());
+            $venta = $service->facturar($this->carrito, $this->empresa(), [
+                'forma_pago' => FormaPago::from($this->formaPago),
+            ]);
 
             $this->carrito = [];
+            $this->formaPago = 'efectivo';
             $this->resetBuilder();
 
             Notification::make()

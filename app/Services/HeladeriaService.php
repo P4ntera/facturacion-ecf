@@ -84,6 +84,18 @@ class HeladeriaService
             $descripcion .= ': ' . $nombresSabores;
         }
 
+        // Incluir toppings en la descripción
+        if (! empty($toppingsIds)) {
+            $nombresToppings = ToppingHelado::where('empresa_id', $empresa->id)
+                ->whereIn('id', $toppingsIds)
+                ->pluck('nombre')
+                ->implode(', ');
+
+            if ($nombresToppings) {
+                $descripcion .= ' + ' . $nombresToppings;
+            }
+        }
+
         return [
             'total' => round($total, 2),
             'precio_base' => $precioBase,

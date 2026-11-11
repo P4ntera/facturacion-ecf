@@ -2,7 +2,6 @@
   $empresa = $this->empresa();
   $config = $this->config();
   $presentacionActual = $this->presentacionActual();
-  $total = $this->totalCarrito();
 @endphp
 
 <div
@@ -461,7 +460,7 @@
       <div class="hel-cart-footer">
         <div class="hel-cart-total">
           <span>Total</span>
-          <span style="color: var(--hel-primary);">RD$ {{ number_format($total, 2) }}</span>
+          <span style="color: var(--hel-primary);">RD$ {{ number_format($this->totalCarrito(), 2) }}</span>
         </div>
 
         @if(!empty($carrito))
@@ -487,28 +486,55 @@
         <div style="text-align: center; margin-bottom: 1rem;">
           <div style="font-size: 0.85rem; color: var(--hel-text-muted);">Total a cobrar</div>
           <div style="font-size: 2rem; font-weight: 800; color: var(--hel-primary);">
-            RD$ {{ number_format($total, 2) }}
+            RD$ {{ number_format($this->totalCarrito(), 2) }}
           </div>
         </div>
 
+        {{-- Forma de pago --}}
         <label style="font-size: 0.85rem; color: var(--hel-text-muted); display: block; margin-bottom: 0.25rem;">
-          Efectivo recibido
+          Forma de pago
         </label>
-        <input
-          type="number"
-          class="hel-input"
-          x-model="recibido"
-          placeholder="0.00"
-          inputmode="decimal"
-          x-on:keydown.enter="$wire.cobrar()"
-        >
-
-        <div style="display: flex; justify-content: space-between; margin-bottom: 1rem; font-size: 0.9rem;">
-          <span style="color: var(--hel-text-muted);">Cambio:</span>
-          <span style="font-weight: 700; color: var(--hel-success);">
-            RD$ <span x-text="cambio({{ $total }}).toFixed(2)"></span>
-          </span>
+        <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem;">
+          @foreach(\App\Enums\FormaPago::cases() as $fp)
+            @if($fp !== \App\Enums\FormaPago::MIXTO)
+              <button
+                class="hel-chip {{ $formaPago === $fp->value ? 'active' : '' }}"
+                wire:click="$set('formaPago', '{{ $fp->value }}')"
+                style="flex: 1; text-align: center; padding: 0.5rem;"
+              >
+                @if($fp === \App\Enums\FormaPago::EFECTIVO) 💵 @elseif($fp === \App\Enums\FormaPago::TARJETA) 💳 @else 🏦 @endif
+                {{ $fp->etiqueta() }}
+              </button>
+            @endif
+          @endforeach
         </div>
+
+        {{-- Efectivo recibido (solo si es efectivo) --}}
+        @if($formaPago === 'efectivo')
+          <label style="font-size: 0.85rem; color: var(--hel-text-muted); display: block; margin-bottom: 0.25rem;">
+            Efectivo recibido
+          </label>
+          <input
+            type="number"
+            class="hel-input"
+            x-model="recibido"
+            placeholder="0.00"
+            inputmode="decimal"
+            min="0"
+            x-on:keydown.enter="$wire.cobrar()"
+          >
+
+          <div style="display: flex; justify-content: space-between; margin-bottom: 1rem; font-size: 0.9rem;">
+            <span style="color: var(--hel-text-muted);">Cambio:</span>
+            <span style="font-weight: 700; color: var(--hel-success);">
+              RD$ <span x-text="cambio({{ $this->totalCarrito() }}).toFixed(2)"></span>
+            </span>
+          </div>
+        @else
+          <div style="text-align: center; padding: 1rem 0; margin-bottom: 0.75rem; color: var(--hel-text-muted); font-size: 0.9rem;">
+            @if($formaPago === 'tarjeta') 💳 Pago con tarjeta @else 🏦 Pago por transferencia @endif
+          </div>
+        @endif
 
         <div style="display: flex; gap: 0.5rem;">
           <button class="hel-btn hel-btn-outline" x-on:click="cobrarAbierto = false; recibido = '';" style="flex: 1;">
