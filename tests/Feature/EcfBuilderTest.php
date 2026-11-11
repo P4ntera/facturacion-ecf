@@ -567,6 +567,46 @@ class EcfBuilderTest extends TestCase
         $this->assertSame($totales['MontoTotal'], $esperado);
     }
 
+    // ===================== INDICADOR MONTO GRAVADO =====================
+
+    public function test_precio_incluye_itbis_genera_indicador_monto_gravado(): void
+    {
+        $this->secuencia(TipoComprobante::FACTURA_CONSUMO, 'E32');
+
+        $this->empresaDefault->config()->update(['precio_incluye_itbis' => true]);
+
+        $producto = $this->producto('P-IMG', TasaItbis::DIECIOCHO);
+        $cliente = Cliente::create(['nombre' => 'Consumidor', 'activo' => true]);
+
+        $venta = app(VentaService::class)->registrar([
+            'cliente_id' => $cliente->id,
+            'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
+        ], $this->empresaDefault)->refresh();
+
+        $idDoc = app(EcfBuilder::class)->construir($venta)['ECF']['Encabezado']['IdDoc'];
+
+        $this->assertSame('1', $idDoc['IndicadorMontoGravado']);
+        $this->assertArrayNotHasKey('IndicadorServicioTodoIncluido', $idDoc);
+    }
+
+    public function test_sin_precio_incluye_itbis_no_lleva_indicador_monto_gravado(): void
+    {
+        $this->secuencia(TipoComprobante::FACTURA_CONSUMO, 'E32');
+
+        $producto = $this->producto('P-NMG', TasaItbis::DIECIOCHO);
+        $cliente = Cliente::create(['nombre' => 'Consumidor', 'activo' => true]);
+
+        $venta = app(VentaService::class)->registrar([
+            'cliente_id' => $cliente->id,
+            'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
+        ], $this->empresaDefault)->refresh();
+
+        $idDoc = app(EcfBuilder::class)->construir($venta)['ECF']['Encabezado']['IdDoc'];
+
+        $this->assertArrayNotHasKey('IndicadorMontoGravado', $idDoc);
+        $this->assertArrayNotHasKey('IndicadorServicioTodoIncluido', $idDoc);
+    }
+
     public function test_efectivo_con_vuelto_declara_neto(): void
     {
         $this->secuencia(TipoComprobante::FACTURA_CONSUMO, 'E32');

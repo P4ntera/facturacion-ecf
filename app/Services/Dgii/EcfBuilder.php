@@ -186,7 +186,7 @@ class EcfBuilder
         }
 
         if ($venta->empresa->config()->precio_incluye_itbis) {
-            $idDoc['IndicadorServicioTodoIncluido'] = '1';
+            $idDoc['IndicadorMontoGravado'] = '1';
         }
 
         if (! in_array($venta->tipo_comprobante, [TipoComprobante::FACTURA_CONSUMO, TipoComprobante::NOTA_CREDITO], true)) {
