@@ -154,6 +154,9 @@ class SecuenciaNcfService
             })
             ->map(fn (SecuenciaNcf $s) => $s->tipo_comprobante)
             ->filter(fn (TipoComprobante $tipo) => $tipo->esFisico() || $empresa->usaEcf())
+            // Electrónicos de venta sin soporte en EcfBuilder (44, 45, 46): no se ofrecen, porque
+            // el e-CF quedaría rechazado localmente después de consumir el e-NCF.
+            ->filter(fn (TipoComprobante $tipo) => $tipo->esFisico() || ! $tipo->esDeVenta() || $tipo->soportadoPorEcfBuilder())
             ->unique()
             ->values()
             ->all();

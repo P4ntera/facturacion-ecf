@@ -136,6 +136,12 @@
             <td>Subtotal</td>
             <td class="text-right">{{ $venta->moneda }} {{ number_format((float) $venta->subtotalNeto(), 2) }}</td>
         </tr>
+        @if ((float) $venta->monto_exento > 0)
+            <tr>
+                <td>Monto exento</td>
+                <td class="text-right">{{ $venta->moneda }} {{ number_format((float) $venta->monto_exento, 2) }}</td>
+            </tr>
+        @endif
         @if ((float) $venta->itbis_18 > 0)
             <tr>
                 <td>ITBIS 18%</td>
@@ -174,6 +180,13 @@
 
     <div class="clear"></div>
 
+    @if ($venta->esElectronica() && ! $venta->estado_fiscal?->esAceptado())
+        <p style="margin-top: 12px; border: 1px solid #999; padding: 6px; text-align: center;">
+            <strong>e-CF pendiente de validación por la DGII.</strong>
+            Este documento aún no tiene validez fiscal; solicite el comprobante definitivo.
+        </p>
+    @endif
+
     @if ($qrTimbre)
         <table class="timbre">
             <tr>
@@ -183,7 +196,7 @@
                 <td class="datos">
                     <p><strong>Comprobante fiscal electrónico válido.</strong></p>
                     @if ($venta->ecf_fecha_firma)
-                        <p>Fecha de firma: {{ $venta->ecf_fecha_firma->format('d/m/Y H:i:s') }}</p>
+                        <p>Fecha de firma digital: {{ $venta->ecf_fecha_firma->format('d/m/Y H:i:s') }}</p>
                     @endif
                     @if ($venta->codigo_seguridad)
                         <p>Código de seguridad: {{ $venta->codigo_seguridad }}</p>
