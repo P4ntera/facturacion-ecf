@@ -36,7 +36,7 @@ class Venta extends Model
         'itbis_18', 'itbis_16', 'total_itbis', 'total',
         'estado', 'estado_fiscal', 'ecf_track_id',
         'pac_id', 'codigo_seguridad', 'dgii_url', 'xml_url', 'ambiente',
-        'ecf_enviado_en', 'ecf_respuesta',
+        'ecf_enviado_en', 'ecf_fecha_firma', 'ecf_respuesta',
         'motivo_anulacion', 'anulada_en', 'tipo_anulacion_608',
         // Devolución (la nota de crédito): cómo y cuánto se reembolsó, y cuánto se rebajó de la CxC.
         'forma_reembolso', 'monto_reembolso', 'monto_rebaja_cxc',
@@ -56,6 +56,7 @@ class Venta extends Model
         'fecha_limite_pago' => 'date',
         'fecha' => 'datetime',
         'ecf_enviado_en' => 'datetime',
+        'ecf_fecha_firma' => 'datetime',
         'anulada_en' => 'datetime',
         'ecf_respuesta' => 'array',
         'tasa_cambio' => 'decimal:4',

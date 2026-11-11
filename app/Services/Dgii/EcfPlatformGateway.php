@@ -151,9 +151,21 @@ final class EcfPlatformGateway implements DgiiGatewayInterface
             dgiiUrl: $json['dgiiUrl'] ?? null,
             xmlUrl: $json['xmlUrl'] ?? null,
             ambiente: isset($json['ambiente']) ? AmbienteEcf::tryFrom($json['ambiente']) : $this->configuracion->dgii_ambiente,
+            fechaFirma: $json['fechaFirma'] ?? $this->extraerFechaFirmaDeEventos($json),
             errorMessage: $response->successful() ? null : ($json['error'] ?? 'El PAC de DGII rechazó la solicitud.'),
             responseJson: $json,
         );
+    }
+
+    private function extraerFechaFirmaDeEventos(array $json): ?string
+    {
+        foreach ($json['eventos'] ?? [] as $evento) {
+            if (($evento['status'] ?? '') === 'DOCUMENTO_FIRMADO' && isset($evento['timestamp'])) {
+                return $evento['timestamp'];
+            }
+        }
+
+        return null;
     }
 
     /** Nunca registra la API Key: solo el nombre de la operación y la clase de la excepción. */

@@ -148,6 +148,25 @@ class EnvioEcfServiceTest extends TestCase
         $this->assertNotNull($venta->ecf_enviado_en);
     }
 
+    public function test_respuesta_aceptada_guarda_fecha_firma(): void
+    {
+        $venta = $this->crearVenta(documentoCliente: null);
+
+        $this->conGateway(new RespuestaEcf(
+            exito: true,
+            pacId: 'PAC-FF',
+            estado: 'Aceptado',
+            fechaFirma: '2026-11-11T10:30:00-04:00',
+            responseJson: ['estado' => 'Aceptado'],
+        ));
+
+        app(EnvioEcfService::class)->enviar($venta);
+        $venta->refresh();
+
+        $this->assertNotNull($venta->ecf_fecha_firma);
+        $this->assertSame('11/11/2026', $venta->ecf_fecha_firma->format('d/m/Y'));
+    }
+
     public function test_respuesta_rechazada_del_pac_marca_la_venta_como_rechazada(): void
     {
         $venta = $this->crearVenta(documentoCliente: null);

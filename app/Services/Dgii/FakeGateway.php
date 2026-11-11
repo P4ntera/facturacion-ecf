@@ -94,6 +94,7 @@ final class FakeGateway implements DgiiGatewayInterface
             dgiiUrl: "https://ecf.dgii.gov.do/fake/{$pacId}",
             xmlUrl: "https://ecf.dgii.gov.do/fake/{$pacId}/xml",
             ambiente: AmbienteEcf::TESTECF,
+            fechaFirma: $ahora->copy()->subSeconds(2)->toIso8601String(),
             responseJson: ['estado' => 'Aceptado', 'pacId' => $pacId, 'eventos' => $eventos],
         );
     }

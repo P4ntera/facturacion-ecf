@@ -123,6 +123,9 @@
         @if ($qrTimbre)
             <div class="separador"></div>
             <img src="data:image/png;base64,{{ $qrTimbre }}" class="qr" alt="QR del timbre fiscal">
+            @if ($venta->ecf_fecha_firma)
+                <p class="centro">Firma: {{ $venta->ecf_fecha_firma->format('d/m/Y H:i:s') }}</p>
+            @endif
             <p class="centro">Código de seguridad:</p>
             <p class="centro negrita">{{ $venta->codigo_seguridad }}</p>
         @endif

@@ -135,6 +135,7 @@ class EnvioEcfService
             'xml_url' => $respuesta->xmlUrl ?? $venta->xml_url,
             'ambiente' => $respuesta->ambiente ?? $venta->ambiente,
             'ecf_enviado_en' => now(),
+            'ecf_fecha_firma' => $respuesta->fechaFirma ?? $venta->ecf_fecha_firma,
             'ecf_respuesta' => $respuesta->responseJson,
         ];
     }

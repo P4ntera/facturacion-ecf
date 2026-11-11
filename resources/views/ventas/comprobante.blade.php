@@ -182,6 +182,9 @@
                 </td>
                 <td class="datos">
                     <p><strong>Comprobante fiscal electrónico válido.</strong></p>
+                    @if ($venta->ecf_fecha_firma)
+                        <p>Fecha de firma: {{ $venta->ecf_fecha_firma->format('d/m/Y H:i:s') }}</p>
+                    @endif
                     @if ($venta->codigo_seguridad)
                         <p>Código de seguridad: {{ $venta->codigo_seguridad }}</p>
                     @endif

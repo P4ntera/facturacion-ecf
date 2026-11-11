@@ -23,6 +23,7 @@ final readonly class RespuestaEcf
         public ?string $dgiiUrl = null,
         public ?string $xmlUrl = null,
         public ?AmbienteEcf $ambiente = null,
+        public ?string $fechaFirma = null,
         public ?string $errorMessage = null,
         public array $responseJson = [],
     ) {}
