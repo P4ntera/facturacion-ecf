@@ -111,6 +111,16 @@ Flujo: `VentaService` → `VentaObserver` → `EnviarEcfJob` (cola `ecf`) →
 - `EcfBuilder` recorta `NombreItem` a 80 caracteres y nunca declara en efectivo más que el total.
 - Comando de diagnóstico: `php artisan ecf:diagnostico {venta_id}` (solo lectura, no envía nada).
 
+## Datos demo (seeders)
+
+`DatabaseSeeder` = `FilamentAdminSeeder` + `RolePermissionSeeder` + `LavanderiaDemoSeeder` +
+`HeladeriaSeeder` + `VeterinariaDemoSeeder`. Cada vertical crea TRES empresas (slugs
+`demo-{vertical}-informal|tipo-b|ecf`) con la base común `Database\Seeders\Concerns\SiembraEmpresaDemo`:
+informal (sin ITBIS, solo sin comprobante), tipo B (ITBIS incluido, B01/B02/B04) y e-CF (ITBIS
+aparte, E31–E34, sin "sin comprobante"). Son idempotentes y abortan en producción.
+`tests/Feature/SeedersDemoTest.php` los corre dos veces y valida totales y aislamiento. Prefijo
+de secuencia = serie + tipo (`E31`, `B02`): el servicio agrega el secuencial.
+
 ## Inventario (Kardex)
 
 `App\Services\InventarioService::registrarMovimiento()` es el único punto que mueve stock. Bloquea

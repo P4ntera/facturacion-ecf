@@ -344,4 +344,27 @@ class VerticalesComprobanteTest extends TestCase
         $this->assertSame('5.00', (string) $venta->vuelto);
         $pagina->assertDispatched('venta-cobrada', ticketUrl: route('ventas.ticket', $venta));
     }
+
+    /** Mismo servicio en dos prendas con precios distintos: cada línea conserva su precio. */
+    public function test_lavanderia_mismo_servicio_con_precios_distintos_no_se_consolida_al_primer_precio(): void
+    {
+        $this->preparar();
+        $camisa = TipoPrenda::create(['empresa_id' => $this->empresa->id, 'nombre' => 'Camisa', 'activo' => true]);
+        $pantalon = TipoPrenda::create(['empresa_id' => $this->empresa->id, 'nombre' => 'Pantalón', 'activo' => true]);
+        $servicio = ServicioLavanderia::create(['empresa_id' => $this->empresa->id, 'nombre' => 'Lavado y planchado', 'precio_base' => 250, 'aplica_itbis' => true, 'activo' => true]);
+
+        $ticket = app(TicketLavanderiaService::class)->crear($this->empresa, $this->usuario, [
+            'pagar_ahora' => true,
+            'datos_venta' => ['forma_pago' => FormaPago::TARJETA],
+            'detalles' => [
+                ['tipo_prenda_id' => $camisa->id, 'servicio_lavanderia_id' => $servicio->id, 'cantidad' => 10, 'precio_unitario' => 150],
+                ['tipo_prenda_id' => $pantalon->id, 'servicio_lavanderia_id' => $servicio->id, 'cantidad' => 10, 'precio_unitario' => 180],
+            ],
+        ]);
+
+        // (1500 + 1800) + 18 % = 3894.
+        $this->assertSame('3894.00', (string) $ticket->total);
+        $this->assertSame('3894.00', (string) $ticket->venta->total);
+        $this->assertCount(2, $ticket->venta->detalles);
+    }
 }

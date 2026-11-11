@@ -1101,11 +1101,15 @@ class VentaService
      */
     private function procesarLineas(array $lineas, EmpresaConfiguracion $config, ImpuestoStrategy $estrategia, Empresa $empresa, bool $permitePrecioCero = false, string $proporcionDescuentoGlobal = '0'): array
     {
-        // Consolidar líneas duplicadas del mismo producto+presentación: el POS puede mandar
-        // varias líneas del mismo ítem; sumar cantidades y descuentos evita detalles repetidos.
+        // Consolidar líneas duplicadas del mismo producto+presentación+precio: el POS puede
+        // mandar varias líneas del mismo ítem; sumar cantidades y descuentos evita detalles
+        // repetidos. El precio va en la clave: lavandería manda el mismo producto puente con
+        // precios distintos por prenda (camisa 200, pantalón 220) y, sin esto, toda la cantidad
+        // se facturaba al precio de la primera línea.
         $consolidadas = [];
         foreach ($lineas as $linea) {
-            $key = ($linea['producto_id'] ?? '') . '_' . ($linea['presentacion_id'] ?? '');
+            $precio = filled($linea['precio_unitario'] ?? null) ? $this->aMoneda($linea['precio_unitario']) : '';
+            $key = ($linea['producto_id'] ?? '') . '_' . ($linea['presentacion_id'] ?? '') . '_' . $precio;
             if (isset($consolidadas[$key])) {
                 $consolidadas[$key]['cantidad'] = bcadd(
                     (string) ($consolidadas[$key]['cantidad'] ?? '0'),

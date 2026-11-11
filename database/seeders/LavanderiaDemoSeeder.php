@@ -4,135 +4,128 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
-use App\Enums\EstadoPagoTicket;
-use App\Enums\EstadoTicketLavanderia;
 use App\Enums\FormaPago;
 use App\Enums\PerfilEmpresa;
-use App\Enums\TipoDocumentoCliente;
 use App\Models\Cliente;
 use App\Models\Empresa;
 use App\Models\PrecioLavanderia;
 use App\Models\ServicioLavanderia;
+use App\Models\TicketLavanderia;
 use App\Models\TipoPrenda;
 use App\Models\User;
-use App\Services\ModulosEmpresaService;
-use App\Services\RolesEmpresaService;
 use App\Services\TicketLavanderiaService;
+use App\Support\ComprobanteVenta;
+use Database\Seeders\Concerns\SiembraEmpresaDemo;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Collection;
 
 /**
- * Seeder demo para el módulo de lavandería:
- * - Crea una empresa con perfil LAVANDERIA (activa roles Recepcionista/Operador)
- * - Siembra catálogos: 6 tipos de prenda, 4 servicios, 12 precios en matriz
- * - Crea 12 tickets con variaciones: con/sin cliente, pagado/pendiente,
- *   distintos estados, múltiples prendas, distintas formas de pago
+ * Lavandería demo en tres escenarios fiscales (ver SiembraEmpresaDemo):
+ *
+ *  - Lavandería Doña Rosa  (informal) — sin RNC, sin ITBIS, solo sin comprobante.
+ *  - Lavandería Express    (tipo B)   — ITBIS incluido en precio, B01/B02 + sin comprobante.
+ *  - Lavandería Premium    (e-CF)     — ITBIS aparte, E31/E32, toda venta lleva e-NCF.
+ *
+ * Cada una con catálogo (6 prendas, 5 servicios — uno sin ITBIS —, matriz de precios), tres
+ * usuarios (admin, recepcionista, operador), tres clientes (RNC, cédula, sin documento) y
+ * tickets que recorren todos los estados y formas de pago, con el comprobante que corresponde
+ * a cada escenario.
+ *
+ *   sail artisan db:seed --class=LavanderiaDemoSeeder
  */
 class LavanderiaDemoSeeder extends Seeder
 {
+    use SiembraEmpresaDemo;
+
     public function run(): void
     {
-        $service = app(TicketLavanderiaService::class);
+        $this->abortarEnProduccion();
 
-        // ── Empresa con perfil lavandería ────────────────────────────
-        $empresa = Empresa::firstOrCreate(
-            ['rnc' => '131999001'],
-            [
-                'razon_social' => 'Lavandería Express Demo SRL',
-                'perfil' => PerfilEmpresa::LAVANDERIA,
-                'usa_ecf' => false,
-                'activa' => true,
-            ],
-        );
+        $this->command->info('Lavandería demo:');
 
-        // Forzar perfil si la empresa ya existía con otro perfil
-        if ($empresa->perfil !== PerfilEmpresa::LAVANDERIA) {
-            $empresa->update(['perfil' => PerfilEmpresa::LAVANDERIA]);
+        $this->sembrarEscenario(self::ESCENARIO_INFORMAL, [
+            'razon_social' => 'Lavandería Doña Rosa',
+            'nombre_comercial' => 'Lavandería Doña Rosa',
+            'rnc' => null,
+            'slug' => 'demo-lavanderia-informal',
+            'email_admin' => 'admin@lav-informal.test',
+        ], 'lav-informal', '0000101');
+
+        $this->sembrarEscenario(self::ESCENARIO_TIPO_B, [
+            'razon_social' => 'Lavandería Express RD SRL',
+            'nombre_comercial' => 'Lavandería Express',
+            'rnc' => '131900101',
+            'slug' => 'demo-lavanderia-tipo-b',
+            'email_admin' => 'admin@lav-tipob.test',
+        ], 'lav-tipob', '0000102');
+
+        $this->sembrarEscenario(self::ESCENARIO_ECF, [
+            'razon_social' => 'Lavandería Premium Dry Clean SRL',
+            'nombre_comercial' => 'Lavandería Premium',
+            'rnc' => '131900102',
+            'slug' => 'demo-lavanderia-ecf',
+            'email_admin' => 'admin@lav-ecf.test',
+        ], 'lav-ecf', '0000103');
+    }
+
+    /** @param  array<string, ?string>  $datos */
+    private function sembrarEscenario(string $escenario, array $datos, string $dominio, string $sufijoRnc): void
+    {
+        [$empresa, $admin] = $this->crearEmpresaDemo(PerfilEmpresa::LAVANDERIA, $escenario, $datos);
+
+        $recepcionista = $this->crearUsuarioDemo($empresa, 'María Recepción', "recepcion@{$dominio}.test", 'Recepcionista Lavandería');
+        $this->crearUsuarioDemo($empresa, 'Juan Operador', "operador@{$dominio}.test", 'Operador Lavandería');
+
+        $prendas = $this->sembrarPrendas($empresa);
+        $servicios = $this->sembrarServicios($empresa);
+        $this->sembrarMatriz($empresa, $prendas, $servicios);
+        $clientes = $this->sembrarClientesDemo($empresa, $sufijoRnc);
+
+        if (! TicketLavanderia::where('empresa_id', $empresa->id)->exists()) {
+            $this->sembrarTickets($empresa, $escenario, $recepcionista, $prendas, $servicios, $clientes);
         }
 
-        // Habilitar ventas sin comprobante (config vive en empresa_configuracion)
-        $empresa->config()->update(['permite_ventas_sin_comprobante' => true]);
+        $this->resumenEmpresa($empresa, $escenario, [
+            $admin->email, "recepcion@{$dominio}.test", "operador@{$dominio}.test",
+        ]);
+    }
 
-        // Roles base + roles de lavandería (Recepcionista + Operador)
-        app(RolesEmpresaService::class)->sembrarRolesBase($empresa);
-        app(ModulosEmpresaService::class)->sembrarModulos($empresa);
-
-        // ── Admin ────────────────────────────────────────────────────
-        $admin = User::firstOrCreate(
-            ['email' => 'admin@lavanderia-demo.test'],
-            [
-                'empresa_id' => $empresa->id,
-                'name' => 'Admin Lavandería',
-                'password' => bcrypt('password123'),
-                'email_verified_at' => now(),
-            ],
-        );
-        app(RolesEmpresaService::class)->asignarAdministrador($admin, $empresa);
-
-        // ── Recepcionista (usuario con rol específico de lavandería) ─
-        $recepcionista = User::firstOrCreate(
-            ['email' => 'recepcion@lavanderia-demo.test'],
-            [
-                'empresa_id' => $empresa->id,
-                'name' => 'María Recepcionista',
-                'password' => bcrypt('password123'),
-                'email_verified_at' => now(),
-            ],
-        );
-
-        setPermissionsTeamId($empresa->id);
-        if (! $recepcionista->hasRole('Recepcionista Lavandería')) {
-            $recepcionista->assignRole('Recepcionista Lavandería');
-        }
-
-        // ── Operador (usuario con rol específico de lavandería) ──────
-        $operador = User::firstOrCreate(
-            ['email' => 'operador@lavanderia-demo.test'],
-            [
-                'empresa_id' => $empresa->id,
-                'name' => 'Juan Operador',
-                'password' => bcrypt('password123'),
-                'email_verified_at' => now(),
-            ],
-        );
-
-        if (! $operador->hasRole('Operador Lavandería')) {
-            $operador->assignRole('Operador Lavandería');
-        }
-
-        // ── Catálogo: Tipos de prenda ────────────────────────────────
-        $prendas = collect([
-            'Camisa',
-            'Pantalón',
-            'Vestido',
-            'Sábana',
-            'Traje completo',
-            'Cortina',
-        ])->mapWithKeys(fn (string $nombre) => [
-            $nombre => TipoPrenda::firstOrCreate(
+    /** @return Collection<string, TipoPrenda> */
+    private function sembrarPrendas(Empresa $empresa): Collection
+    {
+        return collect(['Camisa', 'Pantalón', 'Vestido', 'Sábana', 'Traje completo', 'Cortina'])
+            ->mapWithKeys(fn (string $nombre) => [$nombre => TipoPrenda::firstOrCreate(
                 ['empresa_id' => $empresa->id, 'nombre' => $nombre],
                 ['activo' => true],
-            ),
-        ]);
+            )]);
+    }
 
-        // ── Catálogo: Servicios ──────────────────────────────────────
-        $serviciosDatos = [
-            ['nombre' => 'Lavado regular', 'precio_base' => 150.00, 'aplica_itbis' => true],
-            ['nombre' => 'Lavado y planchado', 'precio_base' => 250.00, 'aplica_itbis' => true],
-            ['nombre' => 'Planchado solo', 'precio_base' => 100.00, 'aplica_itbis' => true],
-            ['nombre' => 'Lavado en seco', 'precio_base' => 400.00, 'aplica_itbis' => true],
+    /** @return Collection<string, ServicioLavanderia> */
+    private function sembrarServicios(Empresa $empresa): Collection
+    {
+        $datos = [
+            ['Lavado regular', 150.00, true],
+            ['Lavado y planchado', 250.00, true],
+            ['Planchado solo', 100.00, true],
+            ['Lavado en seco', 400.00, true],
+            // Servicio sin ITBIS: en las empresas que sí lo cobran, prueba la factura mixta
+            // (líneas gravadas + líneas sin ITBIS en el mismo comprobante).
+            ['Remiendo / costura', 75.00, false],
         ];
 
-        $servicios = collect();
-        foreach ($serviciosDatos as $dato) {
-            $servicios[$dato['nombre']] = ServicioLavanderia::firstOrCreate(
-                ['empresa_id' => $empresa->id, 'nombre' => $dato['nombre']],
-                ['precio_base' => $dato['precio_base'], 'aplica_itbis' => $dato['aplica_itbis'], 'activo' => true],
-            );
-        }
+        return collect($datos)->mapWithKeys(fn (array $d) => [$d[0] => ServicioLavanderia::firstOrCreate(
+            ['empresa_id' => $empresa->id, 'nombre' => $d[0]],
+            ['precio_base' => $d[1], 'aplica_itbis' => $d[2], 'activo' => true],
+        )]);
+    }
 
-        // ── Matriz de precios (prenda × servicio) ────────────────────
-        $matrizPrecios = [
-            // [tipo_prenda, servicio, precio_especial]
+    /**
+     * Matriz prenda × servicio: los pares que no están aquí usan el precio base del servicio,
+     * así se prueban los tres niveles de precio (manual > matriz > base).
+     */
+    private function sembrarMatriz(Empresa $empresa, Collection $prendas, Collection $servicios): void
+    {
+        $matriz = [
             ['Camisa', 'Lavado regular', 120.00],
             ['Camisa', 'Lavado y planchado', 200.00],
             ['Camisa', 'Planchado solo', 80.00],
@@ -147,7 +140,7 @@ class LavanderiaDemoSeeder extends Seeder
             ['Cortina', 'Lavado en seco', 550.00],
         ];
 
-        foreach ($matrizPrecios as [$prenda, $servicio, $precio]) {
+        foreach ($matriz as [$prenda, $servicio, $precio]) {
             PrecioLavanderia::firstOrCreate(
                 [
                     'empresa_id' => $empresa->id,
@@ -157,242 +150,122 @@ class LavanderiaDemoSeeder extends Seeder
                 ['precio' => $precio],
             );
         }
+    }
 
-        // ── Clientes ────────────────────────────────────────────────
-        $clienteRegular = Cliente::firstOrCreate(
-            ['empresa_id' => $empresa->id, 'documento' => '00100500001'],
-            [
-                'tipo_documento' => TipoDocumentoCliente::CEDULA,
-                'nombre' => 'Ana García (Cliente Regular)',
-                'telefono' => '809-555-0001',
-                'activo' => true,
-            ],
-        );
+    /**
+     * Tickets que cubren: con/sin cliente, pago inmediato/diferido, efectivo con vuelto, tarjeta,
+     * transferencia, precio manual, línea sin ITBIS, todos los estados (recibido, listo,
+     * entregado, cancelado) y el comprobante de cada escenario (sin comprobante, B02, B01, E32,
+     * E31 con RNC).
+     *
+     * @param  array{rnc: Cliente, cedula: Cliente, sin_documento: Cliente}  $clientes
+     */
+    private function sembrarTickets(Empresa $empresa, string $escenario, User $recepcionista, Collection $prendas, Collection $servicios, array $clientes): void
+    {
+        $servicio = app(TicketLavanderiaService::class);
+        $manana = now()->addDay()->toDateTimeString();
+        $linea = fn (string $prenda, string $serv, int $cantidad, ?float $precio = null) => array_filter([
+            'tipo_prenda_id' => $prendas[$prenda]->id,
+            'servicio_lavanderia_id' => $servicios[$serv]->id,
+            'cantidad' => $cantidad,
+            'precio_unitario' => $precio,
+        ], fn ($v) => $v !== null);
 
-        $clienteVip = Cliente::firstOrCreate(
-            ['empresa_id' => $empresa->id, 'documento' => '00100500002'],
-            [
-                'tipo_documento' => TipoDocumentoCliente::CEDULA,
-                'nombre' => 'Carlos Méndez (VIP)',
-                'telefono' => '809-555-0002',
-                'activo' => true,
-            ],
-        );
+        // Comprobantes del escenario: consumo y crédito fiscal (null = el que diga la empresa).
+        [$consumo, $credito] = match ($escenario) {
+            self::ESCENARIO_INFORMAL => [ComprobanteVenta::SIN_COMPROBANTE, null],
+            self::ESCENARIO_TIPO_B => ['B02', 'B01'],
+            self::ESCENARIO_ECF => ['32', '31'],
+        };
 
-        $clienteOcasional = Cliente::firstOrCreate(
-            ['empresa_id' => $empresa->id, 'documento' => '00100500003'],
-            [
-                'tipo_documento' => TipoDocumentoCliente::CEDULA,
-                'nombre' => 'Laura Pérez (Ocasional)',
-                'telefono' => '809-555-0003',
-                'activo' => true,
-            ],
-        );
+        $crear = fn (array $datos) => $servicio->crear($empresa, $recepcionista, $datos + ['fecha_prometida' => $manana]);
 
-        // ── 12 Tickets de prueba ─────────────────────────────────────
-        $this->command->info('Creando tickets de lavandería...');
-
-        $fechaFutura = now()->addHours(24)->toDateTimeString();
-
-        // TICKET 1: Simple — 1 prenda, pago inmediato efectivo, con cliente
-        $t1 = $service->crear($empresa, $recepcionista, [
-            'cliente_id' => $clienteRegular->id,
-            'observaciones' => 'Mancha de café en el frente',
-            'fecha_prometida' => $fechaFutura,
+        // 1. Cobro rápido al portador, efectivo con vuelto (sin comprobante si la empresa lo permite).
+        $crear([
             'pagar_ahora' => true,
-            'datos_venta' => [
-                'forma_pago' => FormaPago::EFECTIVO,
-                'monto_efectivo' => 500.00,
-            ],
-            'detalles' => [
-                ['tipo_prenda_id' => $prendas['Camisa']->id, 'servicio_lavanderia_id' => $servicios['Lavado regular']->id, 'cantidad' => 1],
-            ],
+            'datos_venta' => ['forma_pago' => FormaPago::EFECTIVO, 'monto_efectivo' => 1000],
+            'detalles' => [$linea('Camisa', 'Lavado regular', 2)],
         ]);
-        $this->command->info("  TK1: {$t1->numero} — 1 camisa lavado regular, pagado efectivo (RD$ {$t1->total})");
 
-        // TICKET 2: Múltiples prendas misma persona, pago diferido (pendiente)
-        $t2 = $service->crear($empresa, $recepcionista, [
-            'cliente_id' => $clienteVip->id,
-            'observaciones' => 'Ropa para evento del sábado — prioridad',
-            'fecha_prometida' => $fechaFutura,
-            'detalles' => [
-                ['tipo_prenda_id' => $prendas['Traje completo']->id, 'servicio_lavanderia_id' => $servicios['Lavado en seco']->id, 'cantidad' => 1],
-                ['tipo_prenda_id' => $prendas['Camisa']->id, 'servicio_lavanderia_id' => $servicios['Lavado y planchado']->id, 'cantidad' => 3],
-                ['tipo_prenda_id' => $prendas['Pantalón']->id, 'servicio_lavanderia_id' => $servicios['Lavado y planchado']->id, 'cantidad' => 2],
-            ],
-        ]);
-        $this->command->info("  TK2: {$t2->numero} — traje + 3 camisas + 2 pantalones, pago pendiente (RD$ {$t2->total})");
-
-        // TICKET 3: Al portador (sin cliente), pago inmediato tarjeta
-        $t3 = $service->crear($empresa, $recepcionista, [
-            'observaciones' => null,
-            'fecha_prometida' => $fechaFutura,
+        // 2. Consumo con cliente con cédula, tarjeta, varias prendas.
+        $crear([
+            'cliente_id' => $clientes['cedula']->id,
             'pagar_ahora' => true,
-            'datos_venta' => [
-                'forma_pago' => FormaPago::TARJETA,
-            ],
+            'datos_venta' => ['forma_pago' => FormaPago::TARJETA, 'comprobante' => $consumo],
             'detalles' => [
-                ['tipo_prenda_id' => $prendas['Sábana']->id, 'servicio_lavanderia_id' => $servicios['Lavado regular']->id, 'cantidad' => 4],
+                $linea('Pantalón', 'Lavado y planchado', 2),
+                $linea('Vestido', 'Lavado en seco', 1),
             ],
         ]);
-        $this->command->info("  TK3: {$t3->numero} — 4 sábanas al portador, pagado tarjeta (RD$ {$t3->total})");
 
-        // TICKET 4: Solo planchado, precio de matriz
-        $t4 = $service->crear($empresa, $recepcionista, [
-            'cliente_id' => $clienteOcasional->id,
-            'fecha_prometida' => $fechaFutura,
-            'detalles' => [
-                ['tipo_prenda_id' => $prendas['Camisa']->id, 'servicio_lavanderia_id' => $servicios['Planchado solo']->id, 'cantidad' => 5],
-            ],
-        ]);
-        $this->command->info("  TK4: {$t4->numero} — 5 camisas planchado solo, pendiente (RD$ {$t4->total})");
-
-        // TICKET 5: Vestidos lavado en seco (precio alto), pago transferencia
-        $t5 = $service->crear($empresa, $recepcionista, [
-            'cliente_id' => $clienteVip->id,
-            'observaciones' => 'Vestidos de fiesta — cuidado especial',
-            'fecha_prometida' => $fechaFutura,
+        // 3. Factura mixta: servicio con ITBIS + servicio sin ITBIS, transferencia.
+        $crear([
+            'cliente_id' => $clientes['sin_documento']->id,
+            'observaciones' => 'Coser botón y lavar',
             'pagar_ahora' => true,
-            'datos_venta' => [
-                'forma_pago' => FormaPago::TRANSFERENCIA,
-            ],
+            'datos_venta' => ['forma_pago' => FormaPago::TRANSFERENCIA, 'comprobante' => $consumo],
             'detalles' => [
-                ['tipo_prenda_id' => $prendas['Vestido']->id, 'servicio_lavanderia_id' => $servicios['Lavado en seco']->id, 'cantidad' => 2],
+                $linea('Camisa', 'Lavado y planchado', 1),
+                $linea('Camisa', 'Remiendo / costura', 1),
             ],
         ]);
-        $this->command->info("  TK5: {$t5->numero} — 2 vestidos lavado en seco, pagado transferencia (RD$ {$t5->total})");
 
-        // TICKET 6: Cortinas grandes, pago pendiente
-        $t6 = $service->crear($empresa, $recepcionista, [
-            'cliente_id' => $clienteRegular->id,
-            'observaciones' => 'Cortinas del salón — las recogemos el viernes',
-            'fecha_prometida' => now()->addHours(72)->toDateTimeString(),
+        // 4. Crédito fiscal a cliente con RNC (solo donde hay secuencia de crédito fiscal).
+        if ($credito !== null) {
+            $crear([
+                'cliente_id' => $clientes['rnc']->id,
+                'observaciones' => 'Uniformes de la empresa',
+                'pagar_ahora' => true,
+                'datos_venta' => ['forma_pago' => FormaPago::TRANSFERENCIA, 'comprobante' => $credito],
+                'detalles' => [
+                    $linea('Camisa', 'Lavado y planchado', 10, 150.00), // precio manual por volumen
+                    $linea('Pantalón', 'Lavado y planchado', 10, 180.00),
+                ],
+            ]);
+        }
+
+        // 5. Pago diferido: recibido, sin cobrar.
+        $crear([
+            'cliente_id' => $clientes['cedula']->id,
+            'observaciones' => 'Cortinas del salón',
             'detalles' => [
-                ['tipo_prenda_id' => $prendas['Cortina']->id, 'servicio_lavanderia_id' => $servicios['Lavado regular']->id, 'cantidad' => 3],
-                ['tipo_prenda_id' => $prendas['Cortina']->id, 'servicio_lavanderia_id' => $servicios['Lavado en seco']->id, 'cantidad' => 1],
+                $linea('Cortina', 'Lavado regular', 3),
+                $linea('Cortina', 'Lavado en seco', 1),
             ],
         ]);
-        $this->command->info("  TK6: {$t6->numero} — 3 cortinas lavado + 1 seco, pendiente (RD$ {$t6->total})");
 
-        // TICKET 7: Precio manual (override de la matriz)
-        $t7 = $service->crear($empresa, $recepcionista, [
-            'cliente_id' => $clienteVip->id,
-            'observaciones' => 'Precio especial por volumen',
-            'fecha_prometida' => $fechaFutura,
+        // 6. Listo, pendiente de cobro (para probar el cobro al retirar con selector de comprobante).
+        $t6 = $crear([
+            'cliente_id' => $clientes['rnc']->id,
+            'detalles' => [$linea('Traje completo', 'Lavado en seco', 2)],
+        ]);
+        $servicio->avanzarEstado($t6);
+
+        // 7. Flujo completo: listo → cobrado → entregado.
+        $t7 = $crear([
+            'cliente_id' => $clientes['cedula']->id,
             'detalles' => [
-                ['tipo_prenda_id' => $prendas['Camisa']->id, 'servicio_lavanderia_id' => $servicios['Lavado y planchado']->id, 'cantidad' => 10, 'precio_unitario' => 150.00],
-                ['tipo_prenda_id' => $prendas['Pantalón']->id, 'servicio_lavanderia_id' => $servicios['Lavado y planchado']->id, 'cantidad' => 10, 'precio_unitario' => 180.00],
+                $linea('Pantalón', 'Lavado regular', 2),
+                $linea('Camisa', 'Planchado solo', 1),
             ],
         ]);
-        $this->command->info("  TK7: {$t7->numero} — 20 prendas precio manual por volumen, pendiente (RD$ {$t7->total})");
+        $servicio->avanzarEstado($t7);
+        $servicio->cobrar($t7, $empresa, ['forma_pago' => FormaPago::EFECTIVO, 'monto_efectivo' => 1000, 'comprobante' => $consumo]);
+        $servicio->entregar($t7->refresh(), $empresa);
 
-        // TICKET 8: Al portador, mix de servicios, pagado efectivo
-        $t8 = $service->crear($empresa, $recepcionista, [
-            'fecha_prometida' => $fechaFutura,
+        // 8. Cobrado por adelantado, listo, esperando retiro.
+        $t8 = $crear([
             'pagar_ahora' => true,
-            'datos_venta' => [
-                'forma_pago' => FormaPago::EFECTIVO,
-                'monto_efectivo' => 2000.00,
-            ],
-            'detalles' => [
-                ['tipo_prenda_id' => $prendas['Camisa']->id, 'servicio_lavanderia_id' => $servicios['Lavado regular']->id, 'cantidad' => 2],
-                ['tipo_prenda_id' => $prendas['Pantalón']->id, 'servicio_lavanderia_id' => $servicios['Planchado solo']->id, 'cantidad' => 3],
-                ['tipo_prenda_id' => $prendas['Vestido']->id, 'servicio_lavanderia_id' => $servicios['Lavado y planchado']->id, 'cantidad' => 1],
-            ],
+            'datos_venta' => ['forma_pago' => FormaPago::TARJETA, 'comprobante' => $consumo],
+            'detalles' => [$linea('Sábana', 'Lavado regular', 4)],
         ]);
-        $this->command->info("  TK8: {$t8->numero} — mix 3 prendas al portador, pagado efectivo (RD$ {$t8->total})");
+        $servicio->avanzarEstado($t8);
 
-        // TICKET 9: Para avanzar a LISTO
-        $t9 = $service->crear($empresa, $recepcionista, [
-            'cliente_id' => $clienteRegular->id,
-            'fecha_prometida' => $fechaFutura,
-            'detalles' => [
-                ['tipo_prenda_id' => $prendas['Camisa']->id, 'servicio_lavanderia_id' => $servicios['Lavado y planchado']->id, 'cantidad' => 2],
-            ],
-        ]);
-        // Avanzar a LISTO
-        $service->avanzarEstado($t9);
-        $t9->refresh();
-        $this->command->info("  TK9: {$t9->numero} — avanzado a LISTO, pago pendiente (RD$ {$t9->total})");
-
-        // TICKET 10: Flujo completo → LISTO → cobrar → ENTREGADO
-        $t10 = $service->crear($empresa, $recepcionista, [
-            'cliente_id' => $clienteOcasional->id,
-            'observaciones' => 'Entrega urgente',
-            'fecha_prometida' => $fechaFutura,
-            'detalles' => [
-                ['tipo_prenda_id' => $prendas['Pantalón']->id, 'servicio_lavanderia_id' => $servicios['Lavado regular']->id, 'cantidad' => 2],
-                ['tipo_prenda_id' => $prendas['Camisa']->id, 'servicio_lavanderia_id' => $servicios['Planchado solo']->id, 'cantidad' => 1],
-            ],
-        ]);
-        $service->avanzarEstado($t10);
-        $service->cobrar($t10, $empresa, [
-            'forma_pago' => FormaPago::EFECTIVO,
-            'monto_efectivo' => 1000.00,
-        ]);
-        $t10->refresh();
-        $service->entregar($t10, $empresa);
-        $t10->refresh();
-        $this->command->info("  TK10: {$t10->numero} — flujo completo ENTREGADO (RD$ {$t10->total})");
-
-        // TICKET 11: Para cancelar
-        $t11 = $service->crear($empresa, $recepcionista, [
+        // 9. Cancelado sin cobrar.
+        $t9 = $crear([
             'observaciones' => 'Cliente cambió de opinión',
-            'fecha_prometida' => $fechaFutura,
-            'detalles' => [
-                ['tipo_prenda_id' => $prendas['Sábana']->id, 'servicio_lavanderia_id' => $servicios['Lavado regular']->id, 'cantidad' => 2],
-            ],
+            'detalles' => [$linea('Sábana', 'Lavado regular', 2)],
         ]);
-        $service->cancelar($t11);
-        $t11->refresh();
-        $this->command->info("  TK11: {$t11->numero} — CANCELADO (RD$ {$t11->total})");
-
-        // TICKET 12: Listo + cobrado pero NO entregado (esperando retiro)
-        $t12 = $service->crear($empresa, $recepcionista, [
-            'cliente_id' => $clienteVip->id,
-            'observaciones' => 'Cobrado por adelantado, pendiente de retirar',
-            'fecha_prometida' => $fechaFutura,
-            'detalles' => [
-                ['tipo_prenda_id' => $prendas['Traje completo']->id, 'servicio_lavanderia_id' => $servicios['Lavado y planchado']->id, 'cantidad' => 1],
-                ['tipo_prenda_id' => $prendas['Camisa']->id, 'servicio_lavanderia_id' => $servicios['Lavado y planchado']->id, 'cantidad' => 2],
-            ],
-        ]);
-        $service->avanzarEstado($t12);
-        $service->cobrar($t12, $empresa, [
-            'forma_pago' => FormaPago::TARJETA,
-        ]);
-        $t12->refresh();
-        $this->command->info("  TK12: {$t12->numero} — LISTO + cobrado, esperando retiro (RD$ {$t12->total})");
-
-        // ── Resumen ──────────────────────────────────────────────────
-        $this->command->newLine();
-        $this->command->info('╔══════════════════════════════════════════════════════╗');
-        $this->command->info('║  Lavandería Demo sembrada exitosamente              ║');
-        $this->command->info('╠══════════════════════════════════════════════════════╣');
-        $this->command->info("║  Empresa:    {$empresa->razon_social}");
-        $this->command->info("║  RNC:        {$empresa->rnc}");
-        $this->command->info('║                                                      ');
-        $this->command->info('║  Usuarios:                                           ');
-        $this->command->info("║    Admin:        admin@lavanderia-demo.test           ");
-        $this->command->info("║    Recepcionista: recepcion@lavanderia-demo.test      ");
-        $this->command->info("║    Operador:     operador@lavanderia-demo.test        ");
-        $this->command->info('║    (password: password123 para todos)                 ');
-        $this->command->info('║                                                      ');
-        $this->command->info('║  Roles de lavandería:                                ');
-        $this->command->info('║    • Administrador (todos los permisos)               ');
-        $this->command->info('║    • Recepcionista Lavandería (tickets + cobros)      ');
-        $this->command->info('║    • Operador Lavandería (solo ver + cambiar estado)  ');
-        $this->command->info('║    • Vendedor (POS + facturación)                     ');
-        $this->command->info('║    • Almacenista (inventario + compras)               ');
-        $this->command->info('║                                                      ');
-        $this->command->info('║  Catálogos: 6 prendas, 4 servicios, 12 precios       ');
-        $this->command->info("║  Tickets:   12 creados                               ");
-        $this->command->info('║    • 4 pagados inmediato (efectivo/tarjeta/transf.)   ');
-        $this->command->info('║    • 4 pendientes de pago                            ');
-        $this->command->info('║    • 1 listo para entrega (pago pendiente)            ');
-        $this->command->info('║    • 1 entregado (flujo completo)                    ');
-        $this->command->info('║    • 1 cancelado                                     ');
-        $this->command->info('║    • 1 listo + cobrado (esperando retiro)             ');
-        $this->command->info('╚══════════════════════════════════════════════════════╝');
+        $servicio->cancelar($t9);
     }
 }
