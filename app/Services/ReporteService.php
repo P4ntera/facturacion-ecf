@@ -20,6 +20,7 @@ use App\Models\Venta;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Agregaciones para el dashboard y los reportes de gestión. Todos los métodos que miden
@@ -834,7 +835,7 @@ class ReporteService
             END
         SQL;
 
-        return Producto::query()
+        $sub = Producto::query()
             ->join('detalle_ventas', 'detalle_ventas.producto_id', '=', 'productos.id')
             ->join('ventas', 'ventas.id', '=', 'detalle_ventas.venta_id')
             ->whereBetween('ventas.fecha', [$desde->copy()->startOfDay(), $hasta->copy()->endOfDay()])
@@ -849,6 +850,12 @@ class ReporteService
             ->selectRaw("{$tipoCase} as tipo")
             ->selectRaw('COALESCE(SUM(detalle_ventas.cantidad), 0) as cantidad')
             ->selectRaw('COALESCE(SUM(detalle_ventas.subtotal), 0) as ingresos');
+
+        // Envolver como subquery para que Filament ordene por el "id" sintético (ROW_NUMBER),
+        // no por productos.id que no está en el GROUP BY (evita error 42803).
+        return Producto::query()->setQuery(
+            DB::query()->fromSub($sub->toBase(), 'productos')
+        );
     }
 
     /**
@@ -856,7 +863,7 @@ class ReporteService
      */
     public function heladeriaVentasDiariasQuery(Carbon $desde, Carbon $hasta, ?int $empresaId = null): Builder
     {
-        return Producto::query()
+        $sub = Producto::query()
             ->join('detalle_ventas', 'detalle_ventas.producto_id', '=', 'productos.id')
             ->join('ventas', 'ventas.id', '=', 'detalle_ventas.venta_id')
             ->whereBetween('ventas.fecha', [$desde->copy()->startOfDay(), $hasta->copy()->endOfDay()])
@@ -872,5 +879,9 @@ class ReporteService
             ->selectRaw('COALESCE(SUM(detalle_ventas.cantidad), 0) as unidades')
             ->selectRaw('COUNT(DISTINCT ventas.id) as transacciones')
             ->selectRaw('COALESCE(SUM(detalle_ventas.subtotal), 0) as ingresos');
+
+        return Producto::query()->setQuery(
+            DB::query()->fromSub($sub->toBase(), 'productos')
+        );
     }
 }
