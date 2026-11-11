@@ -100,6 +100,15 @@ enum TipoComprobante: string
         return ! $this->esElectronico();
     }
 
+    public function soportadoPorEcfBuilder(): bool
+    {
+        return match ($this) {
+            self::FACTURA_CREDITO_FISCAL, self::FACTURA_CONSUMO,
+            self::NOTA_DEBITO, self::NOTA_CREDITO => true,
+            default => false,
+        };
+    }
+
     public function esNotaCredito(): bool
     {
         return $this === self::NOTA_CREDITO || $this === self::NOTA_CREDITO_FISICA;

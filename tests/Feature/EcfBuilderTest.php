@@ -607,6 +607,27 @@ class EcfBuilderTest extends TestCase
         $this->assertArrayNotHasKey('IndicadorServicioTodoIncluido', $idDoc);
     }
 
+    // ===================== TIPOS NO SOPORTADOS =====================
+
+    public function test_tipo_electronico_no_soportado_rechaza_con_excepcion(): void
+    {
+        $this->secuencia(TipoComprobante::REGIMENES_ESPECIALES, 'E44');
+
+        $producto = $this->producto('P-RE', TasaItbis::DIECIOCHO);
+        $cliente = Cliente::create(['nombre' => 'Consumidor', 'activo' => true]);
+
+        $venta = app(VentaService::class)->registrar([
+            'cliente_id' => $cliente->id,
+            'tipo_comprobante' => TipoComprobante::REGIMENES_ESPECIALES->value,
+            'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
+        ], $this->empresaDefault)->refresh();
+
+        $this->expectException(EcfInvalidoException::class);
+        $this->expectExceptionMessage('no está soportado');
+
+        app(EcfBuilder::class)->construir($venta);
+    }
+
     public function test_efectivo_con_vuelto_declara_neto(): void
     {
         $this->secuencia(TipoComprobante::FACTURA_CONSUMO, 'E32');

@@ -129,6 +129,10 @@ class EcfBuilder
             throw new EcfInvalidoException("La venta #{$venta->id} no tiene un comprobante electrónico: no se envía a la DGII.");
         }
 
+        if (! $tipo->soportadoPorEcfBuilder()) {
+            throw new EcfInvalidoException("El tipo de comprobante {$tipo->value} ({$tipo->etiqueta()}) aún no está soportado por el builder de e-CF.");
+        }
+
         if (! preg_match('/^E'.preg_quote($tipo->value, '/').'\d{10}$/', (string) $venta->ncf)) {
             throw new EcfInvalidoException("El e-NCF «{$venta->ncf}» de la venta #{$venta->id} no tiene el formato de un e-CF tipo {$tipo->value} (E{$tipo->value} + 10 dígitos).");
         }
