@@ -55,6 +55,7 @@ class EmpresaConfiguracion extends Model
         'precio_scoop_normal',
         'precio_scoop_premium',
         'permitir_scoop_extra',
+        'color_accent_pos',
     ];
 
     protected $casts = [
@@ -102,6 +103,7 @@ class EmpresaConfiguracion extends Model
         'precio_scoop_normal' => '0',
         'precio_scoop_premium' => '0',
         'permitir_scoop_extra' => true,
+        'color_accent_pos' => '#e85d9a',
     ];
 
     /**

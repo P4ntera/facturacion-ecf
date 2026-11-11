@@ -5,6 +5,7 @@ namespace App\Filament\Pages;
 use App\Enums\FormaReembolso;
 use App\Enums\MetodoCosto;
 use App\Enums\ModoImpresionPos;
+use App\Enums\ModoPrecioHelado;
 use App\Enums\RedondeoPrecio;
 use App\Enums\TasaItbis;
 use App\Enums\TipoComprobante;
@@ -69,6 +70,11 @@ class ManageFacturacion extends Page
             'devolucion_monto_supervisor' => $config->devolucion_monto_supervisor,
             'color_primario' => $config->color_primario,
             'color_secundario' => $config->color_secundario,
+            'modo_precio_helado' => $config->modo_precio_helado?->value,
+            'precio_scoop_normal' => $config->precio_scoop_normal,
+            'precio_scoop_premium' => $config->precio_scoop_premium,
+            'permitir_scoop_extra' => $config->permitir_scoop_extra,
+            'color_accent_pos' => $config->color_accent_pos,
         ]);
     }
 
@@ -197,6 +203,41 @@ class ManageFacturacion extends Page
                             ->helperText('Si la venta fue a crédito, primero se rebaja lo que el cliente debe; solo el resto se reembolsa.')
                             ->required(fn (Get $get): bool => (bool) $get('acepta_devoluciones'))
                             ->visible(fn (Get $get): bool => (bool) $get('acepta_devoluciones'))
+                            ->columnSpanFull(),
+                    ]),
+
+                Section::make('Heladería')
+                    ->description('Configuración del módulo de heladería y POS.')
+                    ->columnSpanFull()
+                    ->columns(2)
+                    ->visible(fn () => $this->empresa()->moduloActivo(\App\Enums\Modulo::HELADERIA_SABORES))
+                    ->schema([
+                        Select::make('modo_precio_helado')
+                            ->label('Modo de precio')
+                            ->options(collect(ModoPrecioHelado::cases())->mapWithKeys(fn (ModoPrecioHelado $m) => [$m->value => $m->etiqueta()]))
+                            ->helperText('Por presentación: precio fijo por presentación. Por scoop: el precio se calcula según la cantidad de scoops.')
+                            ->required(),
+
+                        Toggle::make('permitir_scoop_extra')
+                            ->label('Permitir scoops extra')
+                            ->helperText('Si está activo, el cliente puede agregar más scoops de los incluidos en la presentación (se cobran aparte).')
+                            ->columnSpanFull(),
+
+                        TextInput::make('precio_scoop_normal')
+                            ->label('Precio scoop normal')
+                            ->numeric()
+                            ->prefix('RD$')
+                            ->minValue(0),
+
+                        TextInput::make('precio_scoop_premium')
+                            ->label('Precio scoop premium')
+                            ->numeric()
+                            ->prefix('RD$')
+                            ->minValue(0),
+
+                        ColorPicker::make('color_accent_pos')
+                            ->label('Color accent del POS')
+                            ->helperText('Color principal que se usa en el POS de heladería (botones, tabs, badges).')
                             ->columnSpanFull(),
                     ]),
             ]);

@@ -9,6 +9,8 @@
   x-data="{
     cobrarAbierto: false,
     recibido: '',
+    colorPickerAbierto: false,
+    colorTemp: @js($colorAccent),
     feedback() {
       navigator.vibrate?.(35);
       try {
@@ -29,10 +31,11 @@
   }"
   x-on:item-agregado.window="feedback()"
   x-on:venta-cobrada.window="cobrarAbierto = false; recibido = ''"
+  x-on:color-actualizado.window="colorPickerAbierto = false"
 >
   <style>
     .pos-heladeria {
-      --hel-primary: #e85d9a;
+      --hel-primary: {{ $colorAccent }};
       --hel-bg: #1a1a2e;
       --hel-surface: #16213e;
       --hel-surface-hover: #1f3056;
@@ -249,6 +252,32 @@
       <div class="hel-toolbar">
         <div class="hel-toolbar-title">🍦 POS Heladería</div>
         <div class="hel-toolbar-actions">
+          @can('heladeria.configurar')
+            <div style="position: relative;">
+              <button class="hel-toolbar-btn" x-on:click="colorPickerAbierto = !colorPickerAbierto" title="Color del POS">
+                <span style="display:inline-block;width:1rem;height:1rem;border-radius:50%;background:var(--hel-primary);border:2px solid var(--hel-text-muted);"></span>
+              </button>
+              {{-- Color picker popover --}}
+              <div x-show="colorPickerAbierto" x-on:click.outside="colorPickerAbierto = false"
+                   x-transition.opacity
+                   style="position:absolute;right:0;top:3rem;background:var(--hel-surface);border:1px solid var(--hel-border);border-radius:0.75rem;padding:1rem;z-index:60;width:220px;box-shadow:0 8px 24px rgba(0,0,0,0.4);">
+                <div style="font-size:0.85rem;font-weight:700;margin-bottom:0.5rem;color:var(--hel-text);">🎨 Color accent</div>
+                <input type="color" x-model="colorTemp" style="width:100%;height:2.5rem;border:none;border-radius:0.5rem;cursor:pointer;background:transparent;">
+                {{-- Presets --}}
+                <div style="display:flex;gap:0.35rem;margin-top:0.5rem;flex-wrap:wrap;">
+                  @foreach(['#e85d9a','#8b5cf6','#3b82f6','#06b6d4','#22c55e','#f59e0b','#ef4444','#ec4899'] as $preset)
+                    <button x-on:click="colorTemp = '{{ $preset }}'"
+                            style="width:1.5rem;height:1.5rem;border-radius:50%;border:2px solid {{ $preset === ($colorAccent) ? 'white' : 'transparent' }};background:{{ $preset }};cursor:pointer;"
+                            title="{{ $preset }}"></button>
+                  @endforeach
+                </div>
+                <button class="hel-btn hel-btn-primary" x-on:click="$wire.guardarColorAccent(colorTemp)"
+                        style="margin-top:0.75rem;font-size:0.85rem;padding:0.5rem;">
+                  ✓ Aplicar
+                </button>
+              </div>
+            </div>
+          @endcan
           <button class="hel-toolbar-btn" x-on:click="pantallaCompleta()" title="Pantalla completa">⛶</button>
           <a href="{{ \Filament\Pages\Dashboard::getUrl() }}" class="hel-toolbar-btn" title="Volver al panel">✕</a>
         </div>

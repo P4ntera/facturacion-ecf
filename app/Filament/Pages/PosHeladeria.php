@@ -75,6 +75,14 @@ class PosHeladeria extends Page
     /** Forma de pago seleccionada */
     public string $formaPago = 'efectivo';
 
+    /** Color accent del POS (hex) */
+    public string $colorAccent = '#e85d9a';
+
+    public function mount(): void
+    {
+        $this->colorAccent = $this->config()->color_accent_pos ?? '#e85d9a';
+    }
+
     public static function modulo(): Modulo
     {
         return Modulo::HELADERIA_SABORES;
@@ -374,6 +382,31 @@ class PosHeladeria extends Page
     public function cantidadItems(): int
     {
         return collect($this->carrito)->sum('cantidad');
+    }
+
+    // ---------------------------------------------------------------- Color accent
+
+    public function guardarColorAccent(string $color): void
+    {
+        if (! auth()->user()?->can('heladeria.configurar')) {
+            return;
+        }
+
+        // Validar formato hex
+        if (! preg_match('/^#[0-9a-fA-F]{6}$/', $color)) {
+            Notification::make()->title('Color inválido')->warning()->send();
+
+            return;
+        }
+
+        $config = $this->empresa()->config();
+        $config->update(['color_accent_pos' => $color]);
+
+        $this->colorAccent = $color;
+
+        $this->dispatch('color-actualizado');
+
+        Notification::make()->title('Color actualizado')->success()->send();
     }
 
     // ---------------------------------------------------------------- Cobrar
