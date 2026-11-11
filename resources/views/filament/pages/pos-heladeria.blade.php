@@ -251,7 +251,7 @@
         <div class="hel-toolbar-title">🍦 POS Heladería</div>
         <div class="hel-toolbar-actions">
           <button class="hel-toolbar-btn" x-on:click="pantallaCompleta()" title="Pantalla completa">⛶</button>
-          <a href="{{ \App\Filament\Pages\Dashboard::getUrl() }}" class="hel-toolbar-btn" title="Volver al panel">✕</a>
+          <a href="{{ \Filament\Pages\Dashboard::getUrl() }}" class="hel-toolbar-btn" title="Volver al panel">✕</a>
         </div>
       </div>
 
