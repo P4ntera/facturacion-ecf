@@ -335,7 +335,7 @@ class NotaDebitoYDevolucionParcialTest extends TestCase
         );
     }
 
-    public function test_ecf_nc_parcial_tiene_informacion_referencia_con_codigo_5(): void
+    public function test_ecf_nc_parcial_tiene_informacion_referencia_con_codigo_3(): void
     {
         $venta = $this->ventaAceptada();
         $this->secuencia(TipoComprobante::NOTA_CREDITO, 'E34');
@@ -350,7 +350,7 @@ class NotaDebitoYDevolucionParcialTest extends TestCase
 
         $this->assertSame('34', $ecf['Encabezado']['IdDoc']['TipoeCF']);
         $this->assertSame($venta->ncf, $ecf['InformacionReferencia']['NCFModificado']);
-        $this->assertSame('5', $ecf['InformacionReferencia']['CodigoModificacion']);
+        $this->assertSame('3', $ecf['InformacionReferencia']['CodigoModificacion']);
     }
 
     public function test_ecf_anulacion_total_sigue_usando_codigo_1(): void

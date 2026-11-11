@@ -86,7 +86,7 @@ class EcfBuilder
         $referencia['CodigoModificacion'] = match (true) {
             $esAnulacionTotal => '1',
             $venta->tipo_comprobante === TipoComprobante::NOTA_DEBITO => '3',
-            $venta->venta_modificada_id !== null && $venta->tipo_comprobante === TipoComprobante::NOTA_CREDITO => '5',
+            $venta->venta_modificada_id !== null && $venta->tipo_comprobante === TipoComprobante::NOTA_CREDITO => '3',
             default => '3',
         };
 
