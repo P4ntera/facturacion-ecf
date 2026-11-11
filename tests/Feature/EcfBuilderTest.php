@@ -327,6 +327,93 @@ class EcfBuilderTest extends TestCase
         ], $ecf['InformacionReferencia']);
     }
 
+    public function test_e31_incluye_fecha_vencimiento_secuencia(): void
+    {
+        $this->secuencia(TipoComprobante::FACTURA_CREDITO_FISCAL, 'E31');
+
+        $producto = $this->producto('P-FV31', TasaItbis::DIECIOCHO);
+        $cliente = Cliente::create(['nombre' => 'Empresa SRL', 'documento' => '130111222', 'activo' => true]);
+
+        $venta = app(VentaService::class)->registrar([
+            'cliente_id' => $cliente->id,
+            'tipo_comprobante' => TipoComprobante::FACTURA_CREDITO_FISCAL->value,
+            'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
+        ], $this->empresaDefault)->refresh();
+
+        $idDoc = app(EcfBuilder::class)->construir($venta)['ECF']['Encabezado']['IdDoc'];
+
+        $secuencia = SecuenciaNcf::where('tipo_comprobante', TipoComprobante::FACTURA_CREDITO_FISCAL)->first();
+        $this->assertSame($secuencia->vencimiento->format('d-m-Y'), $idDoc['FechaVencimientoSecuencia']);
+    }
+
+    public function test_e32_no_incluye_fecha_vencimiento_secuencia(): void
+    {
+        $this->secuencia(TipoComprobante::FACTURA_CONSUMO, 'E32');
+
+        $producto = $this->producto('P-FV32', TasaItbis::DIECIOCHO);
+        $cliente = Cliente::create(['nombre' => 'Consumidor', 'activo' => true]);
+
+        $venta = app(VentaService::class)->registrar([
+            'cliente_id' => $cliente->id,
+            'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
+        ], $this->empresaDefault)->refresh();
+
+        $idDoc = app(EcfBuilder::class)->construir($venta)['ECF']['Encabezado']['IdDoc'];
+
+        $this->assertArrayNotHasKey('FechaVencimientoSecuencia', $idDoc);
+    }
+
+    public function test_e34_no_incluye_fecha_vencimiento_secuencia(): void
+    {
+        $this->secuencia(TipoComprobante::FACTURA_CONSUMO, 'E32');
+        $this->secuencia(TipoComprobante::NOTA_CREDITO, 'E34');
+
+        $producto = $this->producto('P-FV34', TasaItbis::DIECIOCHO);
+        $cliente = Cliente::create(['nombre' => 'Cliente NC FV', 'activo' => true]);
+
+        $ventaOriginal = app(VentaService::class)->registrar([
+            'cliente_id' => $cliente->id,
+            'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
+        ], $this->empresaDefault);
+
+        $notaCredito = app(VentaService::class)->registrar([
+            'cliente_id' => $cliente->id,
+            'tipo_comprobante' => TipoComprobante::NOTA_CREDITO->value,
+            'ncf_modifica' => $ventaOriginal->ncf,
+            'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
+        ], $this->empresaDefault)->refresh();
+
+        $idDoc = app(EcfBuilder::class)->construir($notaCredito)['ECF']['Encabezado']['IdDoc'];
+
+        $this->assertArrayNotHasKey('FechaVencimientoSecuencia', $idDoc);
+    }
+
+    public function test_rango_sin_vencimiento_rechaza(): void
+    {
+        SecuenciaNcf::create([
+            'tipo_comprobante' => TipoComprobante::FACTURA_CREDITO_FISCAL,
+            'prefijo' => 'E31',
+            'secuencia_desde' => 1,
+            'secuencia_actual' => 1,
+            'secuencia_hasta' => 1000,
+            'vencimiento' => null,
+            'activa' => true,
+        ]);
+
+        $producto = $this->producto('P-FVSV', TasaItbis::DIECIOCHO);
+        $cliente = Cliente::create(['nombre' => 'Empresa SRL', 'documento' => '130111333', 'activo' => true]);
+
+        $venta = app(VentaService::class)->registrar([
+            'cliente_id' => $cliente->id,
+            'tipo_comprobante' => TipoComprobante::FACTURA_CREDITO_FISCAL->value,
+            'lineas' => [['producto_id' => $producto->id, 'cantidad' => 1]],
+        ], $this->empresaDefault)->refresh();
+
+        $this->expectException(EcfInvalidoException::class);
+
+        app(EcfBuilder::class)->construir($venta);
+    }
+
     /** Una venta normal (sin ncf_modifica) no debe llevar NCFModificado en el XML/JSON. */
     public function test_venta_normal_no_incluye_ncf_modificado(): void
     {

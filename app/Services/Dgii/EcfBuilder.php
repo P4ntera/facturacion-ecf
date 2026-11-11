@@ -8,6 +8,7 @@ use App\Enums\TipoPago;
 use App\Enums\TipoProducto;
 use App\Exceptions\EcfInvalidoException;
 use App\Models\DetalleVenta;
+use App\Models\SecuenciaNcf;
 use App\Models\Venta;
 use Illuminate\Support\Str;
 
@@ -188,6 +189,10 @@ class EcfBuilder
             $idDoc['IndicadorServicioTodoIncluido'] = '1';
         }
 
+        if (! in_array($venta->tipo_comprobante, [TipoComprobante::FACTURA_CONSUMO, TipoComprobante::NOTA_CREDITO], true)) {
+            $idDoc['FechaVencimientoSecuencia'] = $this->fechaVencimientoSecuencia($venta);
+        }
+
         $idDoc['TipoIngresos'] = '01';
         $idDoc['TipoPago'] = (string) $venta->tipo_pago->value;
 
@@ -307,6 +312,31 @@ class EcfBuilder
         }
 
         return $item;
+    }
+
+    private function fechaVencimientoSecuencia(Venta $venta): string
+    {
+        $ncf = (string) $venta->ncf;
+        $tipo = $venta->tipo_comprobante;
+        $prefijo = 'E'.$tipo->value;
+        $numero = (int) substr($ncf, strlen($prefijo));
+
+        $secuencia = SecuenciaNcf::query()
+            ->where('empresa_id', $venta->empresa_id)
+            ->where('tipo_comprobante', $tipo)
+            ->where('prefijo', $prefijo)
+            ->where('secuencia_desde', '<=', $numero)
+            ->where('secuencia_hasta', '>=', $numero)
+            ->first();
+
+        if ($secuencia === null || $secuencia->vencimiento === null) {
+            throw new EcfInvalidoException(
+                "No se encontró la fecha de vencimiento de la secuencia del e-NCF «{$ncf}» (venta #{$venta->id}). "
+                .'Verifique que el rango en Secuencias NCF tenga una fecha de vencimiento.'
+            );
+        }
+
+        return $secuencia->vencimiento->format('d-m-Y');
     }
 
     private function monto(string $valor): string

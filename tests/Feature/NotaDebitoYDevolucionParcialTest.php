@@ -27,9 +27,9 @@ class NotaDebitoYDevolucionParcialTest extends TestCase
             'empresa_id' => $this->empresaDefault->id,
             'tipo_comprobante' => $tipo,
             'prefijo' => $prefijo,
-            'desde' => 1,
-            'hasta' => 999,
-            'siguiente' => 1,
+            'secuencia_desde' => 1,
+            'secuencia_hasta' => 999,
+            'secuencia_actual' => 1,
             'activa' => true,
             'vencimiento' => now()->addYear(),
         ]);
