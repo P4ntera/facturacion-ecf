@@ -271,7 +271,10 @@ class EcfBuilder
             $totales['ITBIS3'] = '0';
         }
 
-        $totales['MontoExento'] = $this->monto($venta->monto_exento);
+        if ($this->esPositivo((string) $venta->monto_exento)) {
+            $totales['MontoExento'] = $this->monto($venta->monto_exento);
+        }
+
         $totales['TotalITBIS'] = $this->monto($venta->total_itbis);
         $totales['MontoTotal'] = $this->monto($venta->total);
 
@@ -287,6 +290,7 @@ class EcfBuilder
                 TasaItbis::DIECIOCHO => '1',
                 TasaItbis::DIECISEIS => '2',
                 TasaItbis::CERO => '3',
+                TasaItbis::EXENTO => '4',
             },
             'NombreItem' => $detalle->descripcion,
             'IndicadorBienoServicio' => $detalle->producto->tipo === TipoProducto::SERVICIO ? '2' : '1',

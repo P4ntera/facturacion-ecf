@@ -148,10 +148,16 @@
                 <td class="text-right">{{ $venta->moneda }} {{ number_format((float) $venta->itbis_16, 2) }}</td>
             </tr>
         @endif
-        @if ((float) $venta->monto_gravado_0 > 0 || (float) $venta->monto_exento > 0)
+        @if ((float) $venta->monto_gravado_0 > 0)
+            <tr>
+                <td>Gravado 0%</td>
+                <td class="text-right">{{ $venta->moneda }} {{ number_format((float) $venta->monto_gravado_0, 2) }}</td>
+            </tr>
+        @endif
+        @if ((float) $venta->monto_exento > 0)
             <tr>
                 <td>Exento</td>
-                <td class="text-right">{{ $venta->moneda }} {{ number_format((float) $venta->monto_gravado_0 + (float) $venta->monto_exento, 2) }}</td>
+                <td class="text-right">{{ $venta->moneda }} {{ number_format((float) $venta->monto_exento, 2) }}</td>
             </tr>
         @endif
         @if ((float) $venta->descuento > 0)

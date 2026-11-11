@@ -505,6 +505,68 @@ class EcfBuilderTest extends TestCase
         $this->assertSame('68.00', $formas[1]['MontoPago']);
     }
 
+    // ===================== LÍNEAS EXENTAS =====================
+
+    public function test_venta_exenta_pura_lleva_monto_exento_y_no_gravado(): void
+    {
+        $this->secuencia(TipoComprobante::FACTURA_CONSUMO, 'E32');
+
+        $producto = $this->producto('P-EXE', TasaItbis::EXENTO);
+        $cliente = Cliente::create(['nombre' => 'Consumidor', 'activo' => true]);
+
+        $venta = app(VentaService::class)->registrar([
+            'cliente_id' => $cliente->id,
+            'lineas' => [['producto_id' => $producto->id, 'cantidad' => 2]],
+        ], $this->empresaDefault)->refresh();
+
+        $ecf = app(EcfBuilder::class)->construir($venta)['ECF'];
+        $totales = $ecf['Encabezado']['Totales'];
+        $item = $ecf['DetallesItems']['Item'][0];
+
+        $this->assertSame('4', $item['IndicadorFacturacion']);
+        $this->assertSame('200.00', $totales['MontoExento']);
+        $this->assertArrayNotHasKey('MontoGravadoI1', $totales);
+        $this->assertArrayNotHasKey('MontoGravadoI3', $totales);
+        $this->assertSame('0.00', $totales['TotalITBIS']);
+        $this->assertSame('200.00', $totales['MontoTotal']);
+
+        $this->assertSame('200.00', (string) $venta->monto_exento);
+    }
+
+    public function test_venta_mixta_18_y_exento_cuadra_totales(): void
+    {
+        $this->secuencia(TipoComprobante::FACTURA_CONSUMO, 'E32');
+
+        $pGravado = $this->producto('P-G18', TasaItbis::DIECIOCHO);
+        $pExento = $this->producto('P-EXM', TasaItbis::EXENTO);
+        $cliente = Cliente::create(['nombre' => 'Consumidor', 'activo' => true]);
+
+        $venta = app(VentaService::class)->registrar([
+            'cliente_id' => $cliente->id,
+            'lineas' => [
+                ['producto_id' => $pGravado->id, 'cantidad' => 1],
+                ['producto_id' => $pExento->id, 'cantidad' => 1],
+            ],
+        ], $this->empresaDefault)->refresh();
+
+        $ecf = app(EcfBuilder::class)->construir($venta)['ECF'];
+        $totales = $ecf['Encabezado']['Totales'];
+        $items = $ecf['DetallesItems']['Item'];
+
+        $this->assertSame('1', $items[0]['IndicadorFacturacion']);
+        $this->assertSame('4', $items[1]['IndicadorFacturacion']);
+
+        $this->assertSame('100.00', $totales['MontoGravadoI1']);
+        $this->assertSame('18.00', $totales['TotalITBIS1']);
+        $this->assertSame('100.00', $totales['MontoExento']);
+        $this->assertArrayNotHasKey('MontoGravadoI3', $totales);
+
+        // cuadre: gravado + exento + itbis = total
+        $base = bcadd($totales['MontoGravadoI1'], $totales['MontoExento'], 2);
+        $esperado = bcadd($base, $totales['TotalITBIS'], 2);
+        $this->assertSame($totales['MontoTotal'], $esperado);
+    }
+
     public function test_efectivo_con_vuelto_declara_neto(): void
     {
         $this->secuencia(TipoComprobante::FACTURA_CONSUMO, 'E32');

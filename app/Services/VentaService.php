@@ -228,7 +228,7 @@ class VentaService
                 'monto_gravado_18' => $acumulado['monto_gravado_18'],
                 'monto_gravado_16' => $acumulado['monto_gravado_16'],
                 'monto_gravado_0' => $acumulado['monto_gravado_0'],
-                'monto_exento' => '0.00',
+                'monto_exento' => $acumulado['monto_exento'],
                 'itbis_18' => $acumulado['itbis_18'],
                 'itbis_16' => $acumulado['itbis_16'],
                 'total_itbis' => $acumulado['total_itbis'],
@@ -506,7 +506,8 @@ class VentaService
 
             $acumulado = [
                 'subtotal' => '0.00', 'monto_gravado_18' => '0.00', 'monto_gravado_16' => '0.00',
-                'monto_gravado_0' => '0.00', 'itbis_18' => '0.00', 'itbis_16' => '0.00', 'total_itbis' => '0.00',
+                'monto_gravado_0' => '0.00', 'monto_exento' => '0.00',
+                'itbis_18' => '0.00', 'itbis_16' => '0.00', 'total_itbis' => '0.00',
             ];
             $detallesCrear = [];
 
@@ -530,12 +531,13 @@ class VentaService
                     TasaItbis::DIECIOCHO => $acumulado['monto_gravado_18'] = bcadd($acumulado['monto_gravado_18'], $base, 2),
                     TasaItbis::DIECISEIS => $acumulado['monto_gravado_16'] = bcadd($acumulado['monto_gravado_16'], $base, 2),
                     TasaItbis::CERO => $acumulado['monto_gravado_0'] = bcadd($acumulado['monto_gravado_0'], $base, 2),
+                    TasaItbis::EXENTO => $acumulado['monto_exento'] = bcadd($acumulado['monto_exento'], $base, 2),
                 };
 
                 match ($tasaEfectiva) {
                     TasaItbis::DIECIOCHO => $acumulado['itbis_18'] = bcadd($acumulado['itbis_18'], $itbis, 2),
                     TasaItbis::DIECISEIS => $acumulado['itbis_16'] = bcadd($acumulado['itbis_16'], $itbis, 2),
-                    TasaItbis::CERO => null,
+                    TasaItbis::CERO, TasaItbis::EXENTO => null,
                 };
 
                 $detallesCrear[] = [
@@ -571,7 +573,7 @@ class VentaService
                 'monto_gravado_18' => $acumulado['monto_gravado_18'],
                 'monto_gravado_16' => $acumulado['monto_gravado_16'],
                 'monto_gravado_0' => $acumulado['monto_gravado_0'],
-                'monto_exento' => '0.00',
+                'monto_exento' => $acumulado['monto_exento'],
                 'itbis_18' => $acumulado['itbis_18'],
                 'itbis_16' => $acumulado['itbis_16'],
                 'total_itbis' => $acumulado['total_itbis'],
@@ -663,7 +665,8 @@ class VentaService
 
             $acumulado = [
                 'subtotal' => '0.00', 'monto_gravado_18' => '0.00', 'monto_gravado_16' => '0.00',
-                'monto_gravado_0' => '0.00', 'itbis_18' => '0.00', 'itbis_16' => '0.00', 'total_itbis' => '0.00',
+                'monto_gravado_0' => '0.00', 'monto_exento' => '0.00',
+                'itbis_18' => '0.00', 'itbis_16' => '0.00', 'total_itbis' => '0.00',
             ];
             $detallesCrear = [];
             $stockMovimientos = [];
@@ -735,12 +738,13 @@ class VentaService
                     TasaItbis::DIECIOCHO => $acumulado['monto_gravado_18'] = bcadd($acumulado['monto_gravado_18'], $base, 2),
                     TasaItbis::DIECISEIS => $acumulado['monto_gravado_16'] = bcadd($acumulado['monto_gravado_16'], $base, 2),
                     TasaItbis::CERO => $acumulado['monto_gravado_0'] = bcadd($acumulado['monto_gravado_0'], $base, 2),
+                    TasaItbis::EXENTO => $acumulado['monto_exento'] = bcadd($acumulado['monto_exento'], $base, 2),
                 };
 
                 match ($tasaEfectiva) {
                     TasaItbis::DIECIOCHO => $acumulado['itbis_18'] = bcadd($acumulado['itbis_18'], $itbis, 2),
                     TasaItbis::DIECISEIS => $acumulado['itbis_16'] = bcadd($acumulado['itbis_16'], $itbis, 2),
-                    TasaItbis::CERO => null,
+                    TasaItbis::CERO, TasaItbis::EXENTO => null,
                 };
 
                 $detallesCrear[] = [
@@ -839,7 +843,7 @@ class VentaService
                 'monto_gravado_18' => $acumulado['monto_gravado_18'],
                 'monto_gravado_16' => $acumulado['monto_gravado_16'],
                 'monto_gravado_0' => $acumulado['monto_gravado_0'],
-                'monto_exento' => '0.00',
+                'monto_exento' => $acumulado['monto_exento'],
                 'itbis_18' => $acumulado['itbis_18'],
                 'itbis_16' => $acumulado['itbis_16'],
                 'total_itbis' => $acumulado['total_itbis'],
@@ -1121,6 +1125,7 @@ class VentaService
             'monto_gravado_18' => '0.00',
             'monto_gravado_16' => '0.00',
             'monto_gravado_0' => '0.00',
+            'monto_exento' => '0.00',
             'itbis_18' => '0.00',
             'itbis_16' => '0.00',
             'total_itbis' => '0.00',
@@ -1208,12 +1213,13 @@ class VentaService
                 TasaItbis::DIECIOCHO => $acumulado['monto_gravado_18'] = bcadd($acumulado['monto_gravado_18'], $desglose->base, 2),
                 TasaItbis::DIECISEIS => $acumulado['monto_gravado_16'] = bcadd($acumulado['monto_gravado_16'], $desglose->base, 2),
                 TasaItbis::CERO => $acumulado['monto_gravado_0'] = bcadd($acumulado['monto_gravado_0'], $desglose->base, 2),
+                TasaItbis::EXENTO => $acumulado['monto_exento'] = bcadd($acumulado['monto_exento'], $desglose->base, 2),
             };
 
             match ($tasaEfectiva) {
                 TasaItbis::DIECIOCHO => $acumulado['itbis_18'] = bcadd($acumulado['itbis_18'], $desglose->itbis, 2),
                 TasaItbis::DIECISEIS => $acumulado['itbis_16'] = bcadd($acumulado['itbis_16'], $desglose->itbis, 2),
-                TasaItbis::CERO => null,
+                TasaItbis::CERO, TasaItbis::EXENTO => null,
             };
 
             $detalles[] = [

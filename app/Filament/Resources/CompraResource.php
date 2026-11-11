@@ -350,6 +350,7 @@ class CompraResource extends Resource
                                     TasaItbis::DIECIOCHO->value => '18 %',
                                     TasaItbis::DIECISEIS->value => '16 %',
                                     TasaItbis::CERO->value => '0 %',
+                                    TasaItbis::EXENTO->value => 'Exento',
                                 ])
                                 ->default(TasaItbis::DIECIOCHO->value)
                                 ->required(),
