@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\AmbienteEcf;
+use App\Enums\DocumentoImpreso;
 use App\Enums\FormaReembolso;
 use App\Enums\MetodoCosto;
 use App\Enums\ModoImpresionPos;
@@ -56,6 +57,7 @@ class EmpresaConfiguracion extends Model
         'precio_scoop_premium',
         'permitir_scoop_extra',
         'color_accent_pos',
+        'textos_documentos',
     ];
 
     protected $casts = [
@@ -78,6 +80,7 @@ class EmpresaConfiguracion extends Model
         'precio_scoop_normal' => 'decimal:2',
         'precio_scoop_premium' => 'decimal:2',
         'permitir_scoop_extra' => 'boolean',
+        'textos_documentos' => 'array',
     ];
 
     // Reflejan los defaults de la columna en la migración: sin esto, un ::create()/firstOrCreate()
@@ -111,6 +114,24 @@ class EmpresaConfiguracion extends Model
      *
      * @return array<int, FormaReembolso>
      */
+    /**
+     * Texto configurado para un campo de un documento impreso. Si la empresa nunca lo configuró,
+     * devuelve el texto por defecto del documento; si lo dejó en blanco a propósito, null (no se
+     * imprime nada).
+     */
+    public function textoDocumento(DocumentoImpreso $documento, string $campo = 'pie'): ?string
+    {
+        $textos = $this->textos_documentos ?? [];
+
+        if (! array_key_exists($documento->value, $textos) || ! array_key_exists($campo, $textos[$documento->value] ?? [])) {
+            return $documento->textoPorDefecto($campo);
+        }
+
+        $valor = trim((string) $textos[$documento->value][$campo]);
+
+        return $valor === '' ? null : $valor;
+    }
+
     public function reembolsosPermitidos(): array
     {
         if (blank($this->devolucion_reembolsos)) {

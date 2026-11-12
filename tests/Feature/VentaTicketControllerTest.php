@@ -79,6 +79,59 @@ class VentaTicketControllerTest extends TestCase
         return $usuario;
     }
 
+    public function test_el_ticket_usa_el_pie_por_defecto_si_no_se_configuro(): void
+    {
+        $usuario = $this->usuarioConPermiso();
+        $venta = $this->crearVentaConDetalle();
+
+        $this->actingAs($usuario)
+            ->get(route('ventas.ticket', $venta))
+            ->assertOk()
+            ->assertSee('¡Gracias por su compra!');
+    }
+
+    public function test_el_ticket_imprime_el_pie_configurado_por_la_empresa(): void
+    {
+        $usuario = $this->usuarioConPermiso();
+        $venta = $this->crearVentaConDetalle();
+        $this->empresaDefault->config()->update(['textos_documentos' => [
+            'venta_ticket' => ['pie' => "Cambios solo con este ticket.\nVálido por 30 días."],
+        ]]);
+
+        $this->actingAs($usuario)
+            ->get(route('ventas.ticket', $venta))
+            ->assertOk()
+            ->assertSee('Cambios solo con este ticket.<br />', false)
+            ->assertSee('Válido por 30 días.')
+            ->assertDontSee('¡Gracias por su compra!');
+    }
+
+    public function test_el_ticket_no_imprime_pie_si_la_empresa_lo_dejo_en_blanco(): void
+    {
+        $usuario = $this->usuarioConPermiso();
+        $venta = $this->crearVentaConDetalle();
+        $this->empresaDefault->config()->update(['textos_documentos' => ['venta_ticket' => ['pie' => null]]]);
+
+        $this->actingAs($usuario)
+            ->get(route('ventas.ticket', $venta))
+            ->assertOk()
+            ->assertDontSee('¡Gracias por su compra!');
+    }
+
+    public function test_el_pie_configurado_se_escapa(): void
+    {
+        $usuario = $this->usuarioConPermiso();
+        $venta = $this->crearVentaConDetalle();
+        $this->empresaDefault->config()->update(['textos_documentos' => [
+            'venta_ticket' => ['pie' => '<script>alert(1)</script>'],
+        ]]);
+
+        $this->actingAs($usuario)
+            ->get(route('ventas.ticket', $venta))
+            ->assertOk()
+            ->assertDontSee('<script>alert(1)</script>', false);
+    }
+
     public function test_el_ticket_muestra_ncf_cliente_lineas_y_totales(): void
     {
         $usuario = $this->usuarioConPermiso();

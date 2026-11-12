@@ -142,6 +142,11 @@
         <div class="firma-linea">Aprobado por</div>
     </div>
 
+    @php($pie = $empresa->config()->textoDocumento(\App\Enums\DocumentoImpreso::ORDEN_COMPRA))
+    @if ($pie)
+        <p class="footer">{!! nl2br(e($pie)) !!}</p>
+    @endif
+
     <p class="footer">Generado el {{ now()->format('d/m/Y H:i') }}</p>
 </body>
 </html>

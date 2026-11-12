@@ -197,8 +197,11 @@
             <p style="font-size: 12px;">{{ \Illuminate\Support\Str::limit($ticket->observaciones, $anchoPapel->columnas() * 3) }}</p>
         @endif
 
-        <div class="separador"></div>
-        <p class="centro" style="font-size: 12px;">¡Gracias por preferirnos!</p>
+        @php($pie = $empresa->config()->textoDocumento(\App\Enums\DocumentoImpreso::LAVANDERIA_RECIBO))
+        @if ($pie)
+            <div class="separador"></div>
+            <p class="centro" style="font-size: 12px;">{!! nl2br(e($pie)) !!}</p>
+        @endif
     </div>
 </body>
 </html>

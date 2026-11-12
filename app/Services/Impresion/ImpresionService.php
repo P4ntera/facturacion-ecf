@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Impresion;
 
 use App\Enums\AnchoPapel;
+use App\Enums\DocumentoImpreso;
 use App\Enums\ModuloImpresion;
 use App\Models\Impresora;
 use App\Models\User;
@@ -187,8 +188,14 @@ class ImpresionService
         }
 
         $printer->setJustification(Printer::JUSTIFY_CENTER);
-        $printer->text(str_repeat('-', $columnas)."\n");
-        $printer->text("Gracias por su compra!\n");
+        $pie = $empresa->config()->textoDocumento(DocumentoImpreso::VENTA_TICKET);
+        if ($pie !== null) {
+            $printer->text(str_repeat('-', $columnas)."\n");
+            // Las impresoras térmicas no traen la tabla de acentos por defecto: se imprime en ASCII.
+            foreach (preg_split('/\R/', $pie) as $linea) {
+                $printer->text(wordwrap(Str::ascii($linea), $columnas, "\n", true)."\n");
+            }
+        }
         $printer->feed(2);
     }
 

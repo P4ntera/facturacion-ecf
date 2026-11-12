@@ -207,6 +207,11 @@
         </table>
     @endif
 
+    @php($pie = $empresa->config()->textoDocumento(\App\Enums\DocumentoImpreso::VENTA_FACTURA))
+    @if ($pie)
+        <div class="footer">{!! nl2br(e($pie)) !!}</div>
+    @endif
+
     @if ($venta->estaAnulada())
         <div class="footer">
             Este comprobante fue anulado{{ $venta->anulada_en ? ' el ' . $venta->anulada_en->format('d/m/Y H:i') : '' }}.

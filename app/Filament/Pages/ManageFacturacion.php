@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use App\Enums\DocumentoImpreso;
 use App\Enums\FormaReembolso;
 use App\Enums\MetodoCosto;
 use App\Enums\ModoImpresionPos;
@@ -17,6 +18,7 @@ use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\ColorPicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -75,6 +77,11 @@ class ManageFacturacion extends Page
             'precio_scoop_premium' => $config->precio_scoop_premium,
             'permitir_scoop_extra' => $config->permitir_scoop_extra,
             'color_accent_pos' => $config->color_accent_pos,
+            'textos_documentos' => collect(DocumentoImpreso::cases())->mapWithKeys(
+                fn (DocumentoImpreso $doc) => [$doc->value => collect($doc->campos())->mapWithKeys(
+                    fn (string $campo) => [$campo => $config->textoDocumento($doc, $campo)]
+                )->all()]
+            )->all(),
         ]);
     }
 
@@ -210,7 +217,7 @@ class ManageFacturacion extends Page
                     ->description('Configuración del módulo de heladería y POS.')
                     ->columnSpanFull()
                     ->columns(2)
-                    ->visible(fn () => $this->empresa()->moduloActivo(\App\Enums\Modulo::HELADERIA_SABORES))
+                    ->visible(fn () => $this->empresa()->tieneModulo(\App\Enums\Modulo::HELADERIA_SABORES))
                     ->schema([
                         Select::make('modo_precio_helado')
                             ->label('Modo de precio')
@@ -240,12 +247,24 @@ class ManageFacturacion extends Page
                             ->helperText('Color principal que se usa en el POS de heladería (botones, tabs, badges).')
                             ->columnSpanFull(),
                     ]),
+
+                Section::make('Textos en documentos impresos')
+                    ->description('Texto propio para cada documento: políticas, garantía, plazos de retiro, cuentas bancarias, etc. Déjalo en blanco para no imprimir nada.')
+                    ->columnSpanFull()
+                    ->collapsible()
+                    ->schema(fn () => $this->camposTextosDocumentos()),
             ]);
     }
 
     public function save(): void
     {
         $data = $this->form->getState();
+
+        // Los documentos de módulos apagados no están en el formulario: se conservan sus textos.
+        $data['textos_documentos'] = array_replace_recursive(
+            $this->empresa()->config()->textos_documentos ?? [],
+            $data['textos_documentos'] ?? [],
+        );
 
         $this->empresa()->config()->update($data);
 
@@ -267,6 +286,32 @@ class ManageFacturacion extends Page
                     ]),
                 ]),
         ]);
+    }
+
+    /** @return array<int, Section> */
+    private function camposTextosDocumentos(): array
+    {
+        return collect(DocumentoImpreso::cases())
+            ->filter(fn (DocumentoImpreso $doc) => $doc->disponiblePara($this->empresa()))
+            ->map(fn (DocumentoImpreso $doc) => Section::make($doc->etiqueta())
+                ->compact()
+                ->collapsible()
+                ->collapsed()
+                ->schema([
+                    Textarea::make("textos_documentos.{$doc->value}.pie")
+                        ->label('Pie del documento')
+                        ->helperText($doc->ayudaPie())
+                        ->rows(3)
+                        ->maxLength(1000),
+                    ...collect($doc->camposExtra())->map(
+                        fn (string $etiqueta, string $campo) => Textarea::make("textos_documentos.{$doc->value}.{$campo}")
+                            ->label($etiqueta)
+                            ->rows(3)
+                            ->maxLength(1000)
+                    )->values()->all(),
+                ]))
+            ->values()
+            ->all();
     }
 
     private function empresa(): Empresa

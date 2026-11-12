@@ -136,4 +136,26 @@ class ConfiguracionSettingsTest extends TestCase
             ->get(ManageFacturacion::getUrl())
             ->assertForbidden();
     }
+
+    public function test_guarda_textos_de_documentos_y_conserva_los_de_modulos_apagados(): void
+    {
+        // Un texto previo de un documento cuyo módulo pudiera estar apagado no debe perderse.
+        $this->empresaDefault->config()->update(['textos_documentos' => [
+            'lavanderia_recibo' => ['pie' => 'Prendas no retiradas en 30 días no son responsabilidad del negocio.'],
+        ]]);
+
+        Livewire::actingAs($this->usuarioAutorizado())
+            ->test(ManageFacturacion::class)
+            ->assertFormSet(['textos_documentos.venta_ticket.pie' => '¡Gracias por su compra!'])
+            ->fillForm(['textos_documentos.venta_ticket.pie' => 'Válido por 30 días.'])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $config = $this->empresaDefault->fresh()->config();
+        $this->assertSame('Válido por 30 días.', $config->textoDocumento(\App\Enums\DocumentoImpreso::VENTA_TICKET));
+        $this->assertSame(
+            'Prendas no retiradas en 30 días no son responsabilidad del negocio.',
+            $config->textoDocumento(\App\Enums\DocumentoImpreso::LAVANDERIA_RECIBO),
+        );
+    }
 }

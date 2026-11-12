@@ -13,11 +13,13 @@
         }
     }
 
-    $observacionesDefault = 'Los plazos de entrega, forma de pago y vigencia de esta cotización quedan sujetos a confirmación entre las partes.';
-    $observaciones = $cotizacion->notas ?: $observacionesDefault;
-
-    $incluyeDefault = 'Instalación completa del sistema, capacitación y 30 días de soporte post-instalación por WhatsApp o asistencia remota para dudas y ajustes.';
-    $noIncluyeDefault = 'Mejoras, nuevas funcionalidades o modificaciones futuras no contempladas en el alcance inicial. Estos trabajos se cotizarán y cobrarán por separado.';
+    // Textos configurables en Configuración → Facturación → Textos en documentos impresos.
+    $cfg = $empresa->config();
+    $docCot = \App\Enums\DocumentoImpreso::COTIZACION;
+    $observaciones = $cotizacion->notas ?: $cfg->textoDocumento($docCot, 'observaciones');
+    $incluye = $cfg->textoDocumento($docCot, 'incluye');
+    $noIncluye = $cfg->textoDocumento($docCot, 'no_incluye');
+    $pie = $cfg->textoDocumento($docCot);
 
     $cp = $colorPrimario;
     $cs = $colorSecundario;
@@ -222,22 +224,30 @@
     </table>
 
     {{-- 5. CONDITIONS --}}
-    <p class="section-title">Alcance y condiciones del servicio</p>
-    <table class="cond-table">
-        <tr>
-            <td class="cond-label">Incluye</td>
-            <td>{{ $incluyeDefault }}</td>
-        </tr>
-        <tr>
-            <td class="cond-label">No incluye</td>
-            <td>{{ $noIncluyeDefault }}</td>
-        </tr>
-    </table>
+    @if ($incluye || $noIncluye)
+        <p class="section-title">Alcance y condiciones del servicio</p>
+        <table class="cond-table">
+            @if ($incluye)
+                <tr>
+                    <td class="cond-label">Incluye</td>
+                    <td>{!! nl2br(e($incluye)) !!}</td>
+                </tr>
+            @endif
+            @if ($noIncluye)
+                <tr>
+                    <td class="cond-label">No incluye</td>
+                    <td>{!! nl2br(e($noIncluye)) !!}</td>
+                </tr>
+            @endif
+        </table>
+    @endif
 
     {{-- 6. OBSERVATIONS --}}
-    <p class="observations">
-        <strong>Observaciones:</strong> {{ $observaciones }}
-    </p>
+    @if ($observaciones)
+        <p class="observations">
+            <strong>Observaciones:</strong> {!! nl2br(e($observaciones)) !!}
+        </p>
+    @endif
 
     {{-- 7. FOOTER --}}
     <hr class="footer-line">
@@ -253,7 +263,7 @@
                 @endif
             </td>
             <td style="width: 40%; text-align: right; color: {{ $cs }};">
-                Gracias por considerar nuestros servicios.
+                {!! nl2br(e($pie ?? '')) !!}
             </td>
         </tr>
     </table>

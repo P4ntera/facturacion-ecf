@@ -142,8 +142,11 @@
             <p class="centro negrita">{{ $venta->codigo_seguridad }}</p>
         @endif
 
-        <div class="separador"></div>
-        <p class="centro">¡Gracias por su compra!</p>
+        @php($pie = $empresa->config()->textoDocumento(\App\Enums\DocumentoImpreso::VENTA_TICKET))
+        @if ($pie)
+            <div class="separador"></div>
+            <p class="centro">{!! nl2br(e($pie)) !!}</p>
+        @endif
     </div>
 </body>
 </html>

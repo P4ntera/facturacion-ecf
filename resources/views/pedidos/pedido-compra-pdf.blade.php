@@ -150,6 +150,11 @@
         Este documento es una solicitud de compra estimada; no constituye una factura ni un comprobante fiscal.
     </div>
 
+    @php($pie = $empresa->config()->textoDocumento(\App\Enums\DocumentoImpreso::PEDIDO_COMPRA))
+    @if ($pie)
+        <div class="footer">{!! nl2br(e($pie)) !!}</div>
+    @endif
+
     @if ($pedido->estaCancelado())
         <div class="footer">
             Este pedido fue cancelado{{ $pedido->cancelado_en ? ' el ' . $pedido->cancelado_en->format('d/m/Y H:i') : '' }}.
