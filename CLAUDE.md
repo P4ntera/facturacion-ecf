@@ -41,6 +41,10 @@ la base de datos si los encuentra, para que no queden huérfanos.
 - `APP_DEBUG=false` y `APP_ENV=production` en el `.env` de producción — nunca exponer trazas de
   excepciones ni información de configuración a usuarios finales.
 - No commitear `.env` (ya está en `.gitignore`); mantener secretos fuera del repo.
+- `SUPER_ADMIN_PASSWORD` (mínimo 12 caracteres) es obligatoria en producción: sin ella
+  `FilamentAdminSeeder` aborta sin crear nada. La contraseña demo solo vale en desarrollo/tests.
+  El seeder nunca pisa una contraseña existente; si en producción encuentra un super-admin que
+  sigue con la demo, lo avisa en consola para cambiarla a mano.
 
 ## Regla de tenancy para features nuevas
 
