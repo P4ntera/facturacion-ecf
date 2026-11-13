@@ -7,16 +7,20 @@ namespace App\Filament\Pages;
 use App\Enums\FormaPago;
 use App\Enums\ModoPrecioHelado;
 use App\Enums\Modulo;
+use App\Enums\TipoProducto;
+use App\Exceptions\VentaInvalidaException;
 use App\Filament\Concerns\RestringidoPorModulo;
 use App\Models\Cliente;
 use App\Models\ComboHelado;
 use App\Models\Empresa;
+use App\Models\EmpresaConfiguracion;
 use App\Models\PresentacionHelado;
 use App\Models\Producto;
 use App\Models\SaborHelado;
 use App\Models\ToppingHelado;
 use App\Services\HeladeriaService;
 use App\Support\ComprobanteVenta;
+use App\Support\MensajeError;
 use BackedEnum;
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
@@ -165,7 +169,7 @@ class PosHeladeria extends Page
         return $this->empresa()->id;
     }
 
-    public function config(): \App\Models\EmpresaConfiguracion
+    public function config(): EmpresaConfiguracion
     {
         return $this->empresa()->config();
     }
@@ -220,7 +224,7 @@ class PosHeladeria extends Page
     {
         return Producto::where('empresa_id', $this->empresaId())
             ->where('activo', true)
-            ->where('tipo', \App\Enums\TipoProducto::PRODUCTO)
+            ->where('tipo', TipoProducto::PRODUCTO)
             ->orderBy('nombre')
             ->get();
     }
@@ -489,7 +493,30 @@ class PosHeladeria extends Page
             return;
         }
 
+        // El carrito viene del navegador: precios y descripciones se recalculan en el servidor
+        // antes de cobrar. Si algo cambió (precio editado en el catálogo, ítem desactivado o
+        // carrito manipulado), NO se cobra: se muestra el total real y el cajero confirma de nuevo.
+        $totalMostrado = $this->totalCarrito();
+
+        try {
+            $this->carrito = app(HeladeriaService::class)->revalidarCarrito($this->carrito, $this->empresa());
+        } catch (VentaInvalidaException $e) {
+            Notification::make()->title('Revise el carrito')->body($e->getMessage())->warning()->send();
+
+            return;
+        }
+
         $total = $this->totalCarrito();
+
+        if (abs($total - $totalMostrado) >= 0.01) {
+            Notification::make()
+                ->title('Los precios del carrito se actualizaron')
+                ->body('El total ahora es RD$ '.number_format($total, 2).'. Revíselo y confirme de nuevo.')
+                ->warning()
+                ->send();
+
+            return;
+        }
 
         // Validar que el efectivo recibido cubra el total
         if ($this->formaPago === 'efectivo') {
@@ -498,7 +525,7 @@ class PosHeladeria extends Page
             if ($montoRecibido < $total) {
                 Notification::make()
                     ->title('Efectivo insuficiente')
-                    ->body('Faltan RD$ ' . number_format($total - $montoRecibido, 2))
+                    ->body('Faltan RD$ '.number_format($total - $montoRecibido, 2))
                     ->danger()
                     ->send();
 
@@ -529,17 +556,17 @@ class PosHeladeria extends Page
 
             Notification::make()
                 ->title('¡Venta registrada!')
-                ->body("Total: RD$ " . number_format((float) $venta->total, 2))
+                ->body('Total: RD$ '.number_format((float) $venta->total, 2))
                 ->success()
                 ->send();
 
             // Con comprobante fiscal se abre el ticket para imprimirlo (representación impresa
             // con e-NCF y QR); el cobro rápido sin comprobante sigue sin imprimir.
             $this->dispatch('venta-cobrada', ticketUrl: $venta->ncf !== null ? route('ventas.ticket', $venta) : null);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             Notification::make()
-                ->title('Error al registrar la venta')
-                ->body($e->getMessage())
+                ->title('No se pudo registrar la venta')
+                ->body(MensajeError::para($e))
                 ->danger()
                 ->send();
         }

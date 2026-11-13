@@ -8,6 +8,7 @@ use App\Filament\Resources\EmpresaResource;
 use App\Models\Empresa;
 use App\Models\EmpresaModulo;
 use App\Services\ModulosEmpresaService;
+use App\Support\MensajeError;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Support\Exceptions\Halt;
@@ -44,7 +45,7 @@ class EditEmpresa extends EditRecord
         try {
             app(ModulosEmpresaService::class)->validarDependencias($data['modulos'] ?? []);
         } catch (DependenciaModuloException $e) {
-            Notification::make()->title($e->getMessage())->danger()->send();
+            Notification::make()->title(MensajeError::para($e))->danger()->send();
 
             throw new Halt;
         }

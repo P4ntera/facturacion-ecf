@@ -9,6 +9,7 @@ use App\Enums\EstadoTicketLavanderia;
 use App\Enums\FormaPago;
 use App\Filament\Resources\TicketLavanderiaResource;
 use App\Services\TicketLavanderiaService;
+use App\Support\MensajeError;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Placeholder;
@@ -49,7 +50,7 @@ class ViewTicketLavanderia extends ViewRecord
                 ->visible(fn () => $this->record->estado_pago === EstadoPagoTicket::PENDIENTE
                     && ! in_array($this->record->estado, [EstadoTicketLavanderia::CANCELADO]))
                 ->modalHeading('Cobrar Ticket')
-                ->modalDescription(fn () => 'Total a cobrar: RD$ ' . number_format((float) $this->record->total, 2))
+                ->modalDescription(fn () => 'Total a cobrar: RD$ '.number_format((float) $this->record->total, 2))
                 ->form([
                     Select::make('forma_pago')
                         ->label('Forma de Pago')
@@ -86,7 +87,7 @@ class ViewTicketLavanderia extends ViewRecord
                             $vuelto = (float) ($get('vuelto') ?? 0);
 
                             return new HtmlString(
-                                '<span class="text-2xl font-bold text-success-600 dark:text-success-400">RD$ ' . number_format($vuelto, 2) . '</span>'
+                                '<span class="text-2xl font-bold text-success-600 dark:text-success-400">RD$ '.number_format($vuelto, 2).'</span>'
                             );
                         }),
 
@@ -118,7 +119,7 @@ class ViewTicketLavanderia extends ViewRecord
                         Notification::make()->title('Ticket cobrado')->success()->send();
                         $this->refreshFormData(['estado_pago', 'venta_id']);
                     } catch (\RuntimeException $e) {
-                        Notification::make()->title($e->getMessage())->danger()->send();
+                        Notification::make()->title(MensajeError::para($e))->danger()->send();
                     }
                 }),
 

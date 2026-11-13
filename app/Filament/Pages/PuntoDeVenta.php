@@ -5,14 +5,12 @@ declare(strict_types=1);
 namespace App\Filament\Pages;
 
 use App\Enums\FormaPago;
-use App\Enums\Modulo;
 use App\Enums\ModoImpresionPos;
+use App\Enums\Modulo;
 use App\Enums\ModuloImpresion;
 use App\Enums\TipoComprobante;
 use App\Enums\TipoPago;
 use App\Enums\TipoVenta;
-use App\Exceptions\SecuenciaNcfAgotadaException;
-use App\Exceptions\StockInsuficienteException;
 use App\Exceptions\VentaInvalidaException;
 use App\Filament\Concerns\RestringidoPorModulo;
 use App\Models\ArqueoCaja;
@@ -21,6 +19,7 @@ use App\Models\Descuento;
 use App\Models\Empresa;
 use App\Models\Producto;
 use App\Models\ProductoPresentacion;
+use App\Models\Promocion;
 use App\Models\Venta;
 use App\Services\ArqueoCajaService;
 use App\Services\Dgii\ConsultaContribuyenteService;
@@ -28,6 +27,7 @@ use App\Services\Impresion\ImpresionService;
 use App\Services\PromocionService;
 use App\Services\SecuenciaNcfService;
 use App\Services\VentaService;
+use App\Support\MensajeError;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
@@ -36,6 +36,7 @@ use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
 class PuntoDeVenta extends Page
@@ -134,6 +135,20 @@ class PuntoDeVenta extends Page
 
     public function updated(string $name): void
     {
+        // Descuento que ya no existe, se desactivó o no es de esta empresa: se quita y se avisa,
+        // en vez de dejar el total en 0.00 sin explicación.
+        if ($name === 'descuentoId' && filled($this->descuentoId) && $this->descuentoSeleccionado() === null) {
+            $this->descuentoId = '';
+
+            Notification::make()->title('Ese descuento ya no está disponible.')->warning()->send();
+        }
+
+        if ($name === 'descuentoId' && filled($this->descuentoId) && ! $this->puedeAplicarDescuento()) {
+            $this->descuentoId = '';
+
+            Notification::make()->title('No tiene permiso para aplicar descuentos.')->warning()->send();
+        }
+
         if ($name === 'descuentoId' || str($name)->startsWith('carrito.')) {
             $this->recalcularTotales();
         }
@@ -815,7 +830,7 @@ class PuntoDeVenta extends Page
      * Promociones vigentes de la empresa actual, para mostrar en la UI del POS.
      * Los descuentos por promoción se aplican automáticamente en VentaService::calcularLineas().
      *
-     * @return Collection<int, \App\Models\Promocion>
+     * @return Collection<int, Promocion>
      */
     public function promocionesVigentes(): Collection
     {
@@ -857,7 +872,7 @@ class PuntoDeVenta extends Page
         try {
             app(ArqueoCajaService::class)->abrir($fondoInicial, auth()->id(), $this->empresa());
         } catch (RuntimeException $e) {
-            Notification::make()->title($e->getMessage())->danger()->send();
+            Notification::make()->title(MensajeError::para($e))->danger()->send();
 
             return;
         }
@@ -890,6 +905,13 @@ class PuntoDeVenta extends Page
             return;
         }
 
+        // Última barrera antes de registrar: precios, factor y descuentos según el servidor.
+        $this->sanearCarrito();
+
+        if (filled($this->descuentoId) && ! $this->puedeAplicarDescuento()) {
+            $this->descuentoId = '';
+        }
+
         try {
             $venta = app(VentaService::class)->registrar([
                 'cliente_id' => $this->clienteId,
@@ -905,8 +927,13 @@ class PuntoDeVenta extends Page
                 'lineas' => $this->lineasParaService(),
                 ...$this->datosAdicionalesVenta(),
             ], $this->empresa());
-        } catch (VentaInvalidaException|StockInsuficienteException|SecuenciaNcfAgotadaException $e) {
-            Notification::make()->title($e->getMessage())->danger()->send();
+        } catch (ValidationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            // Cobrar es el momento más delicado del cajero: cualquier fallo (de negocio o
+            // inesperado) se muestra como aviso legible en vez de la ventana de error de Livewire.
+            // VentaService corre en una transacción, así que no queda una venta a medias.
+            Notification::make()->title(MensajeError::para($e))->danger()->send();
 
             return;
         }
@@ -1110,6 +1137,69 @@ class PuntoDeVenta extends Page
         return [];
     }
 
+    /** El permiso se exige en el servidor: ocultar el campo en pantalla no impide enviarlo. */
+    public function puedeAplicarDescuento(): bool
+    {
+        return (bool) auth()->user()?->can('ventas.aplicar_descuento');
+    }
+
+    /**
+     * Repone en el carrito lo que NO le corresponde decidir al navegador. El carrito es una
+     * propiedad pública de Livewire, así que desde el navegador se puede reescribir cualquier
+     * campo: aquí precio y factor se vuelven a leer del producto/presentación (un producto de
+     * RD$500 no se puede cobrar a RD$1), y el descuento por línea se anula si el usuario no tiene
+     * `ventas.aplicar_descuento`. Corre antes de cada cálculo de totales y antes de cobrar.
+     */
+    protected function sanearCarrito(): void
+    {
+        if (empty($this->carrito)) {
+            return;
+        }
+
+        $productos = Producto::query()
+            ->where('empresa_id', $this->empresaId())
+            ->whereIn('id', array_filter(array_column($this->carrito, 'producto_id')))
+            ->get()
+            ->keyBy('id');
+
+        $idsPresentacion = array_filter(array_column($this->carrito, 'presentacion_id'));
+        $presentaciones = $idsPresentacion === []
+            ? collect()
+            : ProductoPresentacion::query()
+                ->where('empresa_id', $this->empresaId())
+                ->whereIn('id', $idsPresentacion)
+                ->get()
+                ->keyBy('id');
+
+        $puedeDescontar = $this->puedeAplicarDescuento();
+
+        foreach ($this->carrito as $indice => $linea) {
+            if (! $puedeDescontar) {
+                $this->carrito[$indice]['descuento'] = '0.00';
+            }
+
+            $producto = $productos->get($linea['producto_id'] ?? null);
+
+            // Producto inexistente o de otra empresa: VentaService lo rechaza con su mensaje.
+            if ($producto === null) {
+                continue;
+            }
+
+            $presentacion = $presentaciones->get($linea['presentacion_id'] ?? null);
+
+            if ($presentacion !== null && $presentacion->producto_id !== $producto->id) {
+                $presentacion = null;
+            }
+
+            $esPesado = ($linea['tipo_venta'] ?? null) === TipoVenta::PESADO->value;
+
+            $this->carrito[$indice]['precio_unitario'] = $esPesado
+                ? (string) ($producto->precio_por_peso ?? 0)
+                : (string) ($presentacion?->precio ?? $producto->precio);
+            $this->carrito[$indice]['factor'] = $esPesado ? '1' : (string) ($presentacion?->factor ?? 1);
+        }
+    }
+
     protected function recalcularTotales(): void
     {
         if (empty($this->carrito)) {
@@ -1118,6 +1208,8 @@ class PuntoDeVenta extends Page
 
             return;
         }
+
+        $this->sanearCarrito();
 
         try {
             $lineas = $this->lineasParaService();

@@ -8,9 +8,12 @@ use App\Enums\EstadoCotizacion;
 use App\Enums\FormaPago;
 use App\Enums\TipoComprobante;
 use App\Enums\TipoPago;
+use App\Exceptions\StockInsuficienteException;
+use App\Exceptions\VentaInvalidaException;
 use App\Filament\Resources\CotizacionResource;
 use App\Models\Cotizacion;
 use App\Services\CotizacionService;
+use App\Support\MensajeError;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
 use Filament\Facades\Filament;
@@ -120,8 +123,8 @@ class ViewCotizacion extends ViewRecord
                             ->title("Venta creada: {$venta->ncf}")
                             ->success()
                             ->send();
-                    } catch (RuntimeException|\App\Exceptions\VentaInvalidaException|\App\Exceptions\StockInsuficienteException $e) {
-                        Notification::make()->title($e->getMessage())->danger()->send();
+                    } catch (RuntimeException|VentaInvalidaException|StockInsuficienteException $e) {
+                        Notification::make()->title(MensajeError::para($e))->danger()->send();
                     }
                 }),
 
@@ -138,7 +141,7 @@ class ViewCotizacion extends ViewRecord
                         $nueva = app(CotizacionService::class)->duplicar($record, Filament::getTenant());
                         Notification::make()->title("Cotización {$nueva->numero} creada.")->success()->send();
                     } catch (RuntimeException $e) {
-                        Notification::make()->title($e->getMessage())->danger()->send();
+                        Notification::make()->title(MensajeError::para($e))->danger()->send();
                     }
                 }),
 

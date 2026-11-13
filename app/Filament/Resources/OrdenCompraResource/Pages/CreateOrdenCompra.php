@@ -8,11 +8,12 @@ use App\Filament\Resources\OrdenCompraResource;
 use App\Models\Producto;
 use App\Models\Proveedor;
 use App\Services\OrdenCompraService;
+use App\Support\MensajeError;
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
-use Illuminate\Database\Eloquent\Model;
 use Filament\Support\Exceptions\Halt;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 use RuntimeException;
 
@@ -89,7 +90,7 @@ class CreateOrdenCompra extends CreateRecord
                 Filament::getTenant(),
             );
         } catch (RuntimeException $e) {
-            Notification::make()->title($e->getMessage())->danger()->send();
+            Notification::make()->title(MensajeError::para($e))->danger()->send();
 
             throw new Halt;
         }

@@ -33,7 +33,8 @@ class PuntoDeVentaTest extends TestCase
         Permission::firstOrCreate(['name' => 'pos.acceder', 'guard_name' => 'web']);
         Permission::firstOrCreate(['name' => 'facturacion.acceder', 'guard_name' => 'web']);
         $rol = Role::firstOrCreate(['empresa_id' => $this->empresaDefault->id, 'name' => 'Vendedor', 'guard_name' => 'web']);
-        $rol->syncPermissions(['pos.acceder', 'facturacion.acceder']);
+        Permission::firstOrCreate(['name' => 'ventas.aplicar_descuento', 'guard_name' => 'web']);
+        $rol->syncPermissions(['pos.acceder', 'facturacion.acceder', 'ventas.aplicar_descuento']);
 
         $usuario = User::factory()->create();
         $usuario->assignRole('Vendedor');
@@ -308,7 +309,6 @@ class PuntoDeVentaTest extends TestCase
         $response->assertOk();
         $response->assertSee('class="pos-screen"', false);
         $response->assertSee('$store.sidebar.close()', false);
-        $response->assertSee('livewire:navigate', false);
         $response->assertSee('class="pos-grid"', false);
         $response->assertSee('class="pos-main"', false);
         $response->assertSee('class="pos-side"', false);

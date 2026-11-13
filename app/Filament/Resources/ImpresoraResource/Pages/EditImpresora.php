@@ -4,6 +4,7 @@ namespace App\Filament\Resources\ImpresoraResource\Pages;
 
 use App\Exceptions\ImpresoraInvalidaException;
 use App\Filament\Resources\ImpresoraResource;
+use App\Support\MensajeError;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Support\Exceptions\Halt;
@@ -26,7 +27,7 @@ class EditImpresora extends EditRecord
         try {
             return parent::handleRecordUpdate($record, $data);
         } catch (ImpresoraInvalidaException $e) {
-            Notification::make()->title($e->getMessage())->danger()->send();
+            Notification::make()->title(MensajeError::para($e))->danger()->send();
 
             throw new Halt;
         }

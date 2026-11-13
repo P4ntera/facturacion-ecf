@@ -9,6 +9,7 @@ use App\Models\Compra;
 use App\Models\OrdenCompra;
 use App\Services\CompraService;
 use App\Services\CostoPrecioService;
+use App\Support\MensajeError;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
@@ -57,8 +58,8 @@ class CreateCompra extends CreateRecord
             }
 
             $lineas[(string) Str::uuid()] = [
-                'producto_id'    => $detalle->producto_id,
-                'cantidad'       => (float) $detalle->cantidadPendiente(),
+                'producto_id' => $detalle->producto_id,
+                'cantidad' => (float) $detalle->cantidadPendiente(),
                 'costo_unitario' => (float) $detalle->precio_unitario,
             ];
         }
@@ -66,8 +67,8 @@ class CreateCompra extends CreateRecord
         $this->form->fill([
             ...$this->data,
             'orden_compra_id' => $orden->id,
-            'proveedor_id'    => $orden->proveedor_id,
-            'lineas'          => $lineas,
+            'proveedor_id' => $orden->proveedor_id,
+            'lineas' => $lineas,
         ]);
     }
 
@@ -108,8 +109,8 @@ class CreateCompra extends CreateRecord
      */
     public function agregarLinea(): void
     {
-        $productoId    = $this->data['nueva_linea_producto_id'] ?? null;
-        $cantidad      = $this->data['nueva_linea_cantidad'] ?? null;
+        $productoId = $this->data['nueva_linea_producto_id'] ?? null;
+        $cantidad = $this->data['nueva_linea_cantidad'] ?? null;
         $costoUnitario = $this->data['nueva_linea_costo_unitario'] ?? null;
 
         if (! $productoId || ! $cantidad || $costoUnitario === null || $costoUnitario === '') {
@@ -120,14 +121,14 @@ class CreateCompra extends CreateRecord
 
         $lineas = $this->data['lineas'] ?? [];
         $lineas[(string) Str::uuid()] = [
-            'producto_id'    => $productoId,
-            'cantidad'       => $cantidad,
+            'producto_id' => $productoId,
+            'cantidad' => $cantidad,
             'costo_unitario' => $costoUnitario,
         ];
 
         $this->data['lineas'] = $lineas;
-        $this->data['nueva_linea_producto_id']    = null;
-        $this->data['nueva_linea_cantidad']       = 1;
+        $this->data['nueva_linea_producto_id'] = null;
+        $this->data['nueva_linea_cantidad'] = 1;
         $this->data['nueva_linea_costo_unitario'] = null;
     }
 
@@ -139,21 +140,21 @@ class CreateCompra extends CreateRecord
     {
         try {
             $compra = app(CompraService::class)->crear([
-                'proveedor_id'         => $data['proveedor_id'],
-                'orden_compra_id'      => $data['orden_compra_id'] ?? null,
-                'tipo_comprobante'     => filled($data['tipo_comprobante'] ?? null) ? TipoComprobante::from($data['tipo_comprobante']) : null,
-                'ncf'                  => $data['ncf'] ?? null,
-                'fecha'                => $data['fecha'],
-                'itbis_incluido'       => $data['itbis_incluido'] ?? false,
-                'monto_total_factura'  => $data['monto_total_factura'] ?? null,
-                'tipo_pago'            => $data['tipo_pago'] ?? null,
-                'fecha_vencimiento'    => $data['fecha_vencimiento'] ?? null,
-                'lineas'               => $data['lineas'],
+                'proveedor_id' => $data['proveedor_id'],
+                'orden_compra_id' => $data['orden_compra_id'] ?? null,
+                'tipo_comprobante' => filled($data['tipo_comprobante'] ?? null) ? TipoComprobante::from($data['tipo_comprobante']) : null,
+                'ncf' => $data['ncf'] ?? null,
+                'fecha' => $data['fecha'],
+                'itbis_incluido' => $data['itbis_incluido'] ?? false,
+                'monto_total_factura' => $data['monto_total_factura'] ?? null,
+                'tipo_pago' => $data['tipo_pago'] ?? null,
+                'fecha_vencimiento' => $data['fecha_vencimiento'] ?? null,
+                'lineas' => $data['lineas'],
             ], auth()->id(), Filament::getTenant());
         } catch (RuntimeException|StockInsuficienteException $e) {
-            Notification::make()->title($e->getMessage())->danger()->send();
+            Notification::make()->title(MensajeError::para($e))->danger()->send();
 
-            throw new Halt();
+            throw new Halt;
         }
 
         $this->avisarPreciosSugeridos($compra);

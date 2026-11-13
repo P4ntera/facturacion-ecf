@@ -6,6 +6,7 @@ namespace App\Filament\Resources\CotizacionResource\Pages;
 
 use App\Filament\Resources\CotizacionResource;
 use App\Services\CotizacionService;
+use App\Support\MensajeError;
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
@@ -43,7 +44,7 @@ class CreateCotizacion extends CreateRecord
                 Filament::getTenant(),
             );
         } catch (RuntimeException $e) {
-            Notification::make()->title($e->getMessage())->danger()->send();
+            Notification::make()->title(MensajeError::para($e))->danger()->send();
 
             throw new Halt;
         }

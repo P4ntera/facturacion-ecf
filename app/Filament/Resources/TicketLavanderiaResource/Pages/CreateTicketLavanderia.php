@@ -7,16 +7,18 @@ namespace App\Filament\Resources\TicketLavanderiaResource\Pages;
 use App\Enums\FormaPago;
 use App\Filament\Resources\TicketLavanderiaResource;
 use App\Services\TicketLavanderiaService;
+use App\Support\MensajeError;
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Support\Exceptions\Halt;
+use Illuminate\Database\Eloquent\Model;
 
 class CreateTicketLavanderia extends CreateRecord
 {
     protected static string $resource = TicketLavanderiaResource::class;
 
-    protected function handleRecordCreation(array $data): \Illuminate\Database\Eloquent\Model
+    protected function handleRecordCreation(array $data): Model
     {
         $empresa = Filament::getTenant();
 
@@ -54,9 +56,9 @@ class CreateTicketLavanderia extends CreateRecord
                 datos: $data,
             );
         } catch (\RuntimeException $e) {
-            Notification::make()->title($e->getMessage())->danger()->send();
+            Notification::make()->title(MensajeError::para($e))->danger()->send();
 
-            throw new Halt();
+            throw new Halt;
         }
     }
 

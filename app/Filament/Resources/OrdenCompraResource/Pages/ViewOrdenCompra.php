@@ -9,6 +9,7 @@ use App\Filament\Resources\CompraResource;
 use App\Filament\Resources\OrdenCompraResource;
 use App\Models\OrdenCompra;
 use App\Services\OrdenCompraService;
+use App\Support\MensajeError;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
 use Filament\Notifications\Notification;
@@ -40,7 +41,7 @@ class ViewOrdenCompra extends ViewRecord
                         app(OrdenCompraService::class)->aprobar($record);
                         Notification::make()->title('Orden aprobada y enviada.')->success()->send();
                     } catch (RuntimeException $e) {
-                        Notification::make()->title($e->getMessage())->danger()->send();
+                        Notification::make()->title(MensajeError::para($e))->danger()->send();
                     }
                 }),
 
@@ -55,7 +56,7 @@ class ViewOrdenCompra extends ViewRecord
                         app(OrdenCompraService::class)->enviar($record);
                         Notification::make()->title('Orden enviada al proveedor.')->success()->send();
                     } catch (RuntimeException $e) {
-                        Notification::make()->title($e->getMessage())->danger()->send();
+                        Notification::make()->title(MensajeError::para($e))->danger()->send();
                     }
                 }),
 
@@ -91,7 +92,7 @@ class ViewOrdenCompra extends ViewRecord
                         app(OrdenCompraService::class)->cancelar($record);
                         Notification::make()->title('Orden cancelada.')->warning()->send();
                     } catch (RuntimeException $e) {
-                        Notification::make()->title($e->getMessage())->danger()->send();
+                        Notification::make()->title(MensajeError::para($e))->danger()->send();
                     }
                 }),
         ];

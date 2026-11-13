@@ -79,6 +79,29 @@ Guía completa: `docs/instalacion-local.md`.
   retención y copia opcional a `RESPALDO_COPIA_DIRECTORIO`. Es global a la instalación, no por
   empresa.
 
+### Errores que ve el usuario
+
+- Al usuario solo le llegan mensajes escritos para él. Todo `catch` que muestre el mensaje de una
+  excepción en una notificación usa `App\Support\MensajeError::para($e)`: las de negocio
+  (`App\Exceptions\*`, o `RuntimeException`/`InvalidArgumentException` lanzadas tal cual por un
+  service) muestran su mensaje; cualquier otra se registra en el log con una referencia corta y se
+  muestra un texto genérico con esa referencia. Nunca `->title($e->getMessage())` directo:
+  `catch (RuntimeException)` también atrapa `QueryException` y mostraría SQL.
+- Cobrar (POS general, táctil y heladería) atrapa `Throwable`: un fallo inesperado sale como aviso
+  y el carrito se conserva para reintentar.
+- Fallos de una acción de Livewire (500, 403, sin red, sesión expirada): aviso en español dibujado
+  en el navegador por `resources/views/filament/hooks/errores-livewire.blade.php`, sin depender del
+  servidor. Páginas completas de error en `resources/views/errors` (plantilla `erp.blade.php`).
+
+### El carrito del POS viene del navegador
+
+Las propiedades públicas de Livewire (`$carrito`, `$descuentoId`...) se pueden reescribir desde el
+navegador. De ellas solo se cree QUÉ se pidió y la cantidad; precio, factor y descripción se
+vuelven a leer de la base antes de calcular y de cobrar (`PuntoDeVenta::sanearCarrito()`,
+`HeladeriaService::revalidarCarrito()`). Los descuentos (global y por línea) exigen
+`ventas.aplicar_descuento` en el servidor, no solo ocultar el campo. Un POS nuevo debe seguir la
+misma regla y cubrirla con un test de "carrito manipulado".
+
 ## Regla de tenancy para features nuevas
 
 Toda tabla de negocio nueva (cabecera) DEBE llevar, desde el primer commit que la crea:

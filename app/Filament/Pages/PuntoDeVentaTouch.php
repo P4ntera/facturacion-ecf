@@ -12,6 +12,7 @@ use App\Models\Categoria;
 use App\Models\Producto;
 use App\Models\Venta;
 use App\Services\ArqueoCajaService;
+use App\Support\MensajeError;
 use BackedEnum;
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
@@ -203,7 +204,7 @@ class PuntoDeVentaTouch extends PuntoDeVenta
         try {
             app(ArqueoCajaService::class)->abrir($fondoInicial, auth()->id(), $this->empresa(), $caja);
         } catch (RuntimeException $e) {
-            Notification::make()->title($e->getMessage())->danger()->send();
+            Notification::make()->title(MensajeError::para($e))->danger()->send();
 
             return;
         }
@@ -378,6 +379,12 @@ class PuntoDeVentaTouch extends PuntoDeVenta
     public function establecerDescuentoLinea(int $indice, string $valor): void
     {
         if (! isset($this->carrito[$indice])) {
+            return;
+        }
+
+        if (! $this->puedeAplicarDescuento()) {
+            Notification::make()->title('No tiene permiso para aplicar descuentos.')->warning()->send();
+
             return;
         }
 

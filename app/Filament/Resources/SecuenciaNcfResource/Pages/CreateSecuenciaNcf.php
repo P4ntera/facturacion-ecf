@@ -6,6 +6,7 @@ use App\Enums\TipoComprobante;
 use App\Exceptions\RangoNcfSolapadoException;
 use App\Filament\Resources\SecuenciaNcfResource;
 use App\Services\SecuenciaNcfService;
+use App\Support\MensajeError;
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
@@ -38,7 +39,7 @@ class CreateSecuenciaNcf extends CreateRecord
                 Filament::getTenant(),
             );
         } catch (RangoNcfSolapadoException $e) {
-            Notification::make()->title($e->getMessage())->danger()->send();
+            Notification::make()->title(MensajeError::para($e))->danger()->send();
 
             throw new Halt;
         }

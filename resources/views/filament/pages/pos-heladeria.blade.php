@@ -2,6 +2,22 @@
   $empresa = $this->empresa();
   $config = $this->config();
   $presentacionActual = $this->presentacionActual();
+
+  // El color de acento lo elige cada negocio: el texto que va encima se calcula (oscuro o blanco)
+  // para que siempre se lea. Con el rosa por defecto, el blanco no llega al contraste mínimo (4.5:1).
+  $luminancia = function (string $hex): float {
+      $hex = ltrim($hex, '#');
+      $hex = strlen($hex) === 3 ? $hex[0].$hex[0].$hex[1].$hex[1].$hex[2].$hex[2] : $hex;
+      $canales = array_map(function (string $par): float {
+          $c = hexdec($par) / 255;
+
+          return $c <= 0.03928 ? $c / 12.92 : (($c + 0.055) / 1.055) ** 2.4;
+      }, str_split(str_pad($hex, 6, '0'), 2));
+
+      return 0.2126 * $canales[0] + 0.7152 * $canales[1] + 0.0722 * $canales[2];
+  };
+  $lumAccent = $luminancia((string) $colorAccent);
+  $sobreAccent = (1.05 / ($lumAccent + 0.05)) >= (($lumAccent + 0.05) / 0.0565) ? '#ffffff' : '#14141f';
 @endphp
 
 <div
@@ -36,6 +52,8 @@
   <style>
     .pos-heladeria {
       --hel-primary: {{ $colorAccent }};
+      --hel-on-primary: {{ $sobreAccent }};
+      --hel-on-success: #052e16;
       --hel-bg: #1a1a2e;
       --hel-surface: #16213e;
       --hel-surface-hover: #1f3056;
@@ -45,7 +63,7 @@
       --hel-success: #22c55e;
       --hel-warning: #f59e0b;
       --hel-danger: #ef4444;
-      font-family: 'Nunito', system-ui, sans-serif;
+      font-family: 'Inter', system-ui, sans-serif;
       background: var(--hel-bg);
       color: var(--hel-text);
       min-height: 100vh;
@@ -74,7 +92,7 @@
       text-align: center;
     }
     .hel-tab:hover { background: var(--hel-surface-hover); color: var(--hel-text); }
-    .hel-tab.active { background: var(--hel-primary); color: white; }
+    .hel-tab.active { background: var(--hel-primary); color: var(--hel-on-primary); }
 
     .hel-card {
       background: var(--hel-surface);
@@ -87,7 +105,11 @@
       user-select: none;
       -webkit-user-select: none;
       -webkit-tap-highlight-color: transparent;
+      /* Es un <button>: hereda tipografía y color en vez de los del navegador. */
+      font: inherit; color: inherit; width: 100%; display: block;
     }
+    .hel-card > span { display: block; }
+    .hel-card > span.hel-color-dot { display: inline-block; }
     .hel-card:hover { border-color: var(--hel-primary); transform: translateY(-2px); }
     .hel-card:active { transform: scale(0.97); }
     .hel-card.selected { border-color: var(--hel-primary); box-shadow: 0 0 0 2px var(--hel-primary); }
@@ -95,7 +117,7 @@
     .hel-card-emoji { font-size: 2rem; margin-bottom: 0.25rem; }
     .hel-card-name { font-weight: 600; font-size: 0.9rem; }
     .hel-card-price { color: var(--hel-primary); font-weight: 700; font-size: 0.85rem; margin-top: 0.25rem; }
-    .hel-card-meta { color: var(--hel-text-muted); font-size: 0.75rem; }
+    .hel-card-meta { color: var(--hel-text-muted); font-size: 0.8rem; }
 
     .hel-color-dot {
       width: 2rem; height: 2rem; border-radius: 50%;
@@ -105,12 +127,12 @@
     .hel-card.selected .hel-color-dot { border-color: white; }
 
     .hel-section-title {
-      font-size: 1rem; font-weight: 700; margin-bottom: 0.75rem;
+      font-size: 1rem; font-weight: 700; margin: 0 0 0.75rem;
       color: var(--hel-text); display: flex; align-items: center; gap: 0.5rem;
     }
     .hel-badge {
-      background: var(--hel-primary); color: white;
-      font-size: 0.7rem; padding: 0.15rem 0.5rem; border-radius: 1rem;
+      background: var(--hel-primary); color: var(--hel-on-primary);
+      font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 1rem;
     }
 
     .hel-items-grid {
@@ -131,20 +153,20 @@
       font-weight: 600; background: var(--hel-surface); color: var(--hel-text-muted);
       border: 1px solid var(--hel-border);
     }
-    .hel-step.active { background: var(--hel-primary); color: white; border-color: var(--hel-primary); }
-    .hel-step.done { background: var(--hel-success); color: white; border-color: var(--hel-success); }
+    .hel-step.active { background: var(--hel-primary); color: var(--hel-on-primary); border-color: var(--hel-primary); }
+    .hel-step.done { background: var(--hel-success); color: var(--hel-on-success); border-color: var(--hel-success); }
     .hel-step-arrow { color: var(--hel-text-muted); font-size: 0.8rem; }
 
     .hel-filter-chips {
       display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.75rem;
     }
     .hel-chip {
-      padding: 0.35rem 0.75rem; border-radius: 1.5rem; border: 1px solid var(--hel-border);
+      padding: 0.35rem 0.9rem; min-height: 2.75rem; border-radius: 1.5rem; border: 1px solid var(--hel-border);
       background: transparent; color: var(--hel-text-muted); cursor: pointer;
       font-size: 0.8rem; transition: all 0.15s;
     }
     .hel-chip:hover { border-color: var(--hel-primary); color: var(--hel-text); }
-    .hel-chip.active { background: var(--hel-primary); color: white; border-color: var(--hel-primary); }
+    .hel-chip.active { background: var(--hel-primary); color: var(--hel-on-primary); border-color: var(--hel-primary); }
 
     .hel-btn {
       padding: 0.75rem 1.25rem; border-radius: 0.5rem; border: none;
@@ -152,7 +174,7 @@
       transition: all 0.15s; width: 100%; text-align: center;
       user-select: none; -webkit-user-select: none;
     }
-    .hel-btn-primary { background: var(--hel-primary); color: white; }
+    .hel-btn-primary { background: var(--hel-primary); color: var(--hel-on-primary); }
     .hel-btn-primary:hover { filter: brightness(1.1); }
     .hel-btn-primary:active { transform: scale(0.98); }
     .hel-btn-outline {
@@ -161,7 +183,7 @@
     }
     .hel-btn-outline:hover { border-color: var(--hel-primary); color: var(--hel-text); }
     .hel-btn-danger { background: var(--hel-danger); color: white; }
-    .hel-btn-success { background: var(--hel-success); color: white; }
+    .hel-btn-success { background: var(--hel-success); color: var(--hel-on-success); }
 
     /* Carrito */
     .hel-cart-header {
@@ -183,7 +205,7 @@
       display: flex; align-items: center; gap: 0.25rem;
     }
     .hel-cart-qty button {
-      width: 1.75rem; height: 1.75rem; border-radius: 0.25rem; border: 1px solid var(--hel-border);
+      width: 2.75rem; height: 2.75rem; border-radius: 0.5rem; border: 1px solid var(--hel-border);
       background: var(--hel-surface-hover); color: var(--hel-text); cursor: pointer;
       display: flex; align-items: center; justify-content: center;
       font-size: 1rem; font-weight: 700;
@@ -192,6 +214,7 @@
     .hel-cart-remove {
       background: none; border: none; color: var(--hel-danger); cursor: pointer;
       font-size: 1rem; padding: 0.25rem;
+      min-width: 2.75rem; min-height: 2.75rem;
     }
 
     .hel-cart-footer {
@@ -209,12 +232,13 @@
       border-bottom: 1px solid var(--hel-border);
     }
     .hel-toolbar-title {
-      font-size: 1.25rem; font-weight: 800;
+      font-size: 1.25rem; font-weight: 800; margin: 0;
       color: var(--hel-primary);
     }
     .hel-toolbar-actions { display: flex; gap: 0.5rem; }
     .hel-toolbar-btn {
-      width: 2.5rem; height: 2.5rem; border-radius: 0.5rem; border: 1px solid var(--hel-border);
+      width: 2.75rem; height: 2.75rem; border-radius: 0.5rem; border: 1px solid var(--hel-border);
+      text-decoration: none;
       background: var(--hel-surface); color: var(--hel-text-muted); cursor: pointer;
       display: flex; align-items: center; justify-content: center; font-size: 1.1rem;
     }
@@ -236,7 +260,7 @@
       color: var(--hel-text); font-size: 1.1rem; text-align: center;
       margin-bottom: 0.75rem;
     }
-    .hel-input:focus { outline: none; border-color: var(--hel-primary); }
+    .hel-input:focus { border-color: var(--hel-primary); }
 
     .hel-empty {
       text-align: center; padding: 3rem 1rem;
@@ -244,19 +268,30 @@
     }
     .hel-empty-emoji { font-size: 3rem; margin-bottom: 0.5rem; }
 
+    /* Foco siempre visible (teclado, lector de código de barras, navegación por tabulador). */
+    .pos-heladeria :focus-visible { outline: 3px solid #ffffff; outline-offset: 2px; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .pos-heladeria *, .pos-heladeria *::before, .pos-heladeria *::after { transition: none !important; animation: none !important; }
+      .hel-card:hover, .hel-card:active, .hel-btn-primary:active { transform: none; }
+    }
+
+    .hel-solo-lector { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
     [x-cloak] { display: none !important; }
   </style>
 
   <div class="hel-grid">
     {{-- ====== PANEL PRINCIPAL ====== --}}
-    <div style="display: flex; flex-direction: column;">
+    <main style="display: flex; flex-direction: column;">
       {{-- Toolbar --}}
       <div class="hel-toolbar">
-        <div class="hel-toolbar-title">🍦 POS Heladería</div>
+        <h1 class="hel-toolbar-title"><span aria-hidden="true">🍦</span> POS Heladería</h1>
         <div class="hel-toolbar-actions">
           @can('heladeria.configurar')
             <div style="position: relative;">
-              <button class="hel-toolbar-btn" x-on:click="colorPickerAbierto = !colorPickerAbierto" title="Color del POS">
+              <button type="button" class="hel-toolbar-btn" x-on:click="colorPickerAbierto = !colorPickerAbierto" title="Color del POS"
+                      aria-label="Cambiar el color del POS" x-bind:aria-expanded="colorPickerAbierto.toString()">
                 <span style="display:inline-block;width:1rem;height:1rem;border-radius:50%;background:var(--hel-primary);border:2px solid var(--hel-text-muted);"></span>
               </button>
               {{-- Color picker popover --}}
@@ -264,36 +299,36 @@
                    x-transition.opacity
                    style="position:absolute;right:0;top:3rem;background:var(--hel-surface);border:1px solid var(--hel-border);border-radius:0.75rem;padding:1rem;z-index:60;width:220px;box-shadow:0 8px 24px rgba(0,0,0,0.4);">
                 <div style="font-size:0.85rem;font-weight:700;margin-bottom:0.5rem;color:var(--hel-text);">🎨 Color accent</div>
-                <input type="color" x-model="colorTemp" style="width:100%;height:2.5rem;border:none;border-radius:0.5rem;cursor:pointer;background:transparent;">
+                <input type="color" x-model="colorTemp" aria-label="Color personalizado" style="width:100%;height:2.5rem;border:none;border-radius:0.5rem;cursor:pointer;background:transparent;">
                 {{-- Presets --}}
                 <div style="display:flex;gap:0.35rem;margin-top:0.5rem;flex-wrap:wrap;">
                   @foreach(['#e85d9a','#8b5cf6','#3b82f6','#06b6d4','#22c55e','#f59e0b','#ef4444','#ec4899'] as $preset)
-                    <button x-on:click="colorTemp = '{{ $preset }}'"
-                            style="width:1.5rem;height:1.5rem;border-radius:50%;border:2px solid {{ $preset === ($colorAccent) ? 'white' : 'transparent' }};background:{{ $preset }};cursor:pointer;"
+                    <button type="button" x-on:click="colorTemp = '{{ $preset }}'" aria-label="Usar el color {{ $preset }}"
+                            style="width:2rem;height:2rem;border-radius:50%;border:2px solid {{ $preset === ($colorAccent) ? 'white' : 'transparent' }};background:{{ $preset }};cursor:pointer;"
                             title="{{ $preset }}"></button>
                   @endforeach
                 </div>
-                <button class="hel-btn hel-btn-primary" x-on:click="$wire.guardarColorAccent(colorTemp)"
+                <button type="button" class="hel-btn hel-btn-primary" x-on:click="$wire.guardarColorAccent(colorTemp)"
                         style="margin-top:0.75rem;font-size:0.85rem;padding:0.5rem;">
                   ✓ Aplicar
                 </button>
               </div>
             </div>
           @endcan
-          <button class="hel-toolbar-btn" x-on:click="pantallaCompleta()" title="Pantalla completa">⛶</button>
-          <a href="{{ \Filament\Pages\Dashboard::getUrl() }}" class="hel-toolbar-btn" title="Volver al panel">✕</a>
+          <button type="button" class="hel-toolbar-btn" x-on:click="pantallaCompleta()" title="Pantalla completa" aria-label="Pantalla completa"><span aria-hidden="true">⛶</span></button>
+          <a href="{{ \Filament\Pages\Dashboard::getUrl() }}" class="hel-toolbar-btn" title="Volver al panel" aria-label="Salir del POS y volver al panel"><span aria-hidden="true">✕</span></a>
         </div>
       </div>
 
       {{-- Tabs --}}
-      <div class="hel-tabs">
-        <button class="hel-tab {{ $tab === 'armado' ? 'active' : '' }}" wire:click="cambiarTab('armado')">
+      <div class="hel-tabs" role="tablist" aria-label="Tipo de producto">
+        <button type="button" role="tab" aria-selected="{{ $tab === 'armado' ? 'true' : 'false' }}" class="hel-tab {{ $tab === 'armado' ? 'active' : '' }}" wire:click="cambiarTab('armado')">
           🍦 Helado Armado
         </button>
-        <button class="hel-tab {{ $tab === 'combos' ? 'active' : '' }}" wire:click="cambiarTab('combos')">
+        <button type="button" role="tab" aria-selected="{{ $tab === 'combos' ? 'true' : 'false' }}" class="hel-tab {{ $tab === 'combos' ? 'active' : '' }}" wire:click="cambiarTab('combos')">
           🍨 Combos
         </button>
-        <button class="hel-tab {{ $tab === 'directo' ? 'active' : '' }}" wire:click="cambiarTab('directo')">
+        <button type="button" role="tab" aria-selected="{{ $tab === 'directo' ? 'true' : 'false' }}" class="hel-tab {{ $tab === 'directo' ? 'active' : '' }}" wire:click="cambiarTab('directo')">
           🍭 Productos
         </button>
       </div>
@@ -302,44 +337,44 @@
         {{-- ============ TAB: HELADO ARMADO ============ --}}
         @if($tab === 'armado')
           {{-- Steps indicator --}}
-          <div class="hel-steps">
-            <span class="hel-step {{ $paso === 'presentacion' ? 'active' : ($presentacionId ? 'done' : '') }}">1. Presentación</span>
-            <span class="hel-step-arrow">→</span>
-            <span class="hel-step {{ $paso === 'sabores' ? 'active' : (!empty($saboresSeleccionados) && $paso === 'toppings' ? 'done' : '') }}">2. Sabores</span>
-            <span class="hel-step-arrow">→</span>
-            <span class="hel-step {{ $paso === 'toppings' ? 'active' : '' }}">3. Toppings</span>
+          <div class="hel-steps" role="list" aria-label="Pasos para armar el helado">
+            <span role="listitem" @if($paso === 'presentacion') aria-current="step" @endif class="hel-step {{ $paso === 'presentacion' ? 'active' : ($presentacionId ? 'done' : '') }}">1. Presentación</span>
+            <span class="hel-step-arrow" aria-hidden="true">→</span>
+            <span role="listitem" @if($paso === 'sabores') aria-current="step" @endif class="hel-step {{ $paso === 'sabores' ? 'active' : (!empty($saboresSeleccionados) && $paso === 'toppings' ? 'done' : '') }}">2. Sabores</span>
+            <span class="hel-step-arrow" aria-hidden="true">→</span>
+            <span role="listitem" @if($paso === 'toppings') aria-current="step" @endif class="hel-step {{ $paso === 'toppings' ? 'active' : '' }}">3. Toppings</span>
           </div>
 
           {{-- Paso 1: Presentaciones --}}
           @if($paso === 'presentacion')
-            <div class="hel-section-title">Elige la presentación</div>
+            <h2 class="hel-section-title">Elige la presentación</h2>
             <div class="hel-items-grid">
               @foreach($this->presentaciones() as $p)
-                <div class="hel-card" wire:click="seleccionarPresentacion({{ $p->id }})">
-                  <div class="hel-card-emoji">{{ $p->icono }}</div>
-                  <div class="hel-card-name">{{ $p->nombre }}</div>
-                  <div class="hel-card-meta">{{ $p->scoops_incluidos }} scoop{{ $p->scoops_incluidos > 1 ? 's' : '' }}</div>
+                <button type="button" class="hel-card" wire:click="seleccionarPresentacion({{ $p->id }})">
+                  <span class="hel-card-emoji">{{ $p->icono }}</span>
+                  <span class="hel-card-name">{{ $p->nombre }}</span>
+                  <span class="hel-card-meta">{{ $p->scoops_incluidos }} scoop{{ $p->scoops_incluidos > 1 ? 's' : '' }}</span>
                   @if($p->toppings_incluidos > 0)
-                    <div class="hel-card-meta">+{{ $p->toppings_incluidos }} topping{{ $p->toppings_incluidos > 1 ? 's' : '' }}</div>
+                    <span class="hel-card-meta">+{{ $p->toppings_incluidos }} topping{{ $p->toppings_incluidos > 1 ? 's' : '' }}</span>
                   @endif
-                  <div class="hel-card-price">RD$ {{ number_format($p->precio, 0) }}</div>
-                </div>
+                  <span class="hel-card-price">RD$ {{ number_format($p->precio, 0) }}</span>
+                </button>
               @endforeach
             </div>
           @endif
 
           {{-- Paso 2: Sabores --}}
           @if($paso === 'sabores' && $presentacionActual)
-            <div class="hel-section-title">
+            <h2 class="hel-section-title">
               Elige tus sabores
               <span class="hel-badge">{{ count($saboresSeleccionados) }}/{{ $presentacionActual->scoops_incluidos }}</span>
-            </div>
+            </h2>
 
             {{-- Filtro por categoría --}}
             <div class="hel-filter-chips">
-              <button class="hel-chip {{ !$filtroCategoria ? 'active' : '' }}" wire:click="$set('filtroCategoria', null)">Todos</button>
+              <button type="button" aria-pressed="{{ !$filtroCategoria ? 'true' : 'false' }}" class="hel-chip {{ !$filtroCategoria ? 'active' : '' }}" wire:click="$set('filtroCategoria', null)">Todos</button>
               @foreach(\App\Enums\CategoriaSabor::cases() as $cat)
-                <button class="hel-chip {{ $filtroCategoria === $cat->value ? 'active' : '' }}"
+                <button type="button" aria-pressed="{{ $filtroCategoria === $cat->value ? 'true' : 'false' }}" class="hel-chip {{ $filtroCategoria === $cat->value ? 'active' : '' }}"
                         wire:click="$set('filtroCategoria', '{{ $cat->value }}')">
                   {{ $cat->etiqueta() }}
                 </button>
@@ -348,22 +383,23 @@
 
             <div class="hel-items-grid">
               @foreach($this->sabores() as $s)
-                <div class="hel-card {{ in_array($s->id, $saboresSeleccionados) ? 'selected' : '' }}"
+                <button type="button" class="hel-card {{ in_array($s->id, $saboresSeleccionados) ? 'selected' : '' }}"
+                     aria-pressed="{{ in_array($s->id, $saboresSeleccionados) ? 'true' : 'false' }}"
                      wire:click="toggleSabor({{ $s->id }})">
-                  <div class="hel-color-dot" style="background: {{ $s->color_hex }};"></div>
-                  <div class="hel-card-name">{{ $s->nombre }}</div>
+                  <span class="hel-color-dot" style="background: {{ $s->color_hex }};"></span>
+                  <span class="hel-card-name">{{ $s->nombre }}</span>
                   @if($s->premium)
-                    <div class="hel-card-meta" style="color: var(--hel-warning);">★ Premium</div>
+                    <span class="hel-card-meta" style="color: var(--hel-warning);">★ Premium</span>
                   @endif
-                </div>
+                </button>
               @endforeach
             </div>
 
             <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
-              <button class="hel-btn hel-btn-outline" wire:click="resetBuilder" style="flex: 0 0 auto; width: auto; padding: 0.75rem 1rem;">
+              <button type="button" class="hel-btn hel-btn-outline" wire:click="resetBuilder" style="flex: 0 0 auto; width: auto; padding: 0.75rem 1rem;">
                 ← Atrás
               </button>
-              <button class="hel-btn hel-btn-primary" wire:click="irAToppings"
+              <button type="button" class="hel-btn hel-btn-primary" wire:click="irAToppings"
                       @if(empty($saboresSeleccionados)) disabled style="opacity: 0.5;" @endif>
                 Siguiente: Toppings →
               </button>
@@ -372,12 +408,12 @@
 
           {{-- Paso 3: Toppings --}}
           @if($paso === 'toppings' && $presentacionActual)
-            <div class="hel-section-title">
+            <h2 class="hel-section-title">
               Agrega toppings
               @if($presentacionActual->toppings_incluidos > 0)
                 <span class="hel-badge">{{ $presentacionActual->toppings_incluidos }} gratis</span>
               @endif
-            </div>
+            </h2>
 
             <div class="hel-items-grid">
               @foreach($this->toppings() as $t)
@@ -385,26 +421,27 @@
                   $esGratis = array_search($t->id, $toppingsSeleccionados) !== false
                               && array_search($t->id, $toppingsSeleccionados) < $presentacionActual->toppings_incluidos;
                 @endphp
-                <div class="hel-card {{ in_array($t->id, $toppingsSeleccionados) ? 'selected' : '' }}"
+                <button type="button" class="hel-card {{ in_array($t->id, $toppingsSeleccionados) ? 'selected' : '' }}"
+                     aria-pressed="{{ in_array($t->id, $toppingsSeleccionados) ? 'true' : 'false' }}"
                      wire:click="toggleTopping({{ $t->id }})">
-                  <div class="hel-card-emoji">{{ $t->icono }}</div>
-                  <div class="hel-card-name">{{ $t->nombre }}</div>
-                  <div class="hel-card-price">
+                  <span class="hel-card-emoji">{{ $t->icono }}</span>
+                  <span class="hel-card-name">{{ $t->nombre }}</span>
+                  <span class="hel-card-price">
                     @if($esGratis)
                       <span style="color: var(--hel-success);">¡Gratis!</span>
                     @else
                       +RD$ {{ number_format($t->precio, 0) }}
                     @endif
-                  </div>
-                </div>
+                  </span>
+                </button>
               @endforeach
             </div>
 
             <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
-              <button class="hel-btn hel-btn-outline" wire:click="$set('paso', 'sabores')" style="flex: 0 0 auto; width: auto; padding: 0.75rem 1rem;">
+              <button type="button" class="hel-btn hel-btn-outline" wire:click="$set('paso', 'sabores')" style="flex: 0 0 auto; width: auto; padding: 0.75rem 1rem;">
                 ← Atrás
               </button>
-              <button class="hel-btn hel-btn-primary" wire:click="agregarArmadoAlCarrito">
+              <button type="button" class="hel-btn hel-btn-primary" wire:click="agregarArmadoAlCarrito">
                 🛒 Agregar al carrito
               </button>
             </div>
@@ -413,18 +450,18 @@
 
         {{-- ============ TAB: COMBOS ============ --}}
         @if($tab === 'combos')
-          <div class="hel-section-title">Combos disponibles</div>
+          <h2 class="hel-section-title">Combos disponibles</h2>
           <div class="hel-items-grid">
             @forelse($this->combos() as $c)
-              <div class="hel-card" wire:click="agregarCombo({{ $c->id }})">
-                <div class="hel-card-emoji">{{ $c->icono }}</div>
-                <div class="hel-card-name">{{ $c->nombre }}</div>
+              <button type="button" class="hel-card" wire:click="agregarCombo({{ $c->id }})">
+                <span class="hel-card-emoji">{{ $c->icono }}</span>
+                <span class="hel-card-name">{{ $c->nombre }}</span>
                 @if($c->descripcion)
-                  <div class="hel-card-meta">{{ Str::limit($c->descripcion, 40) }}</div>
+                  <span class="hel-card-meta">{{ Str::limit($c->descripcion, 40) }}</span>
                 @endif
-                <div class="hel-card-meta">{{ $c->scoops_incluidos }}🍨 + {{ $c->toppings_incluidos }}🍫</div>
-                <div class="hel-card-price">RD$ {{ number_format($c->precio, 0) }}</div>
-              </div>
+                <span class="hel-card-meta">{{ $c->scoops_incluidos }}🍨 + {{ $c->toppings_incluidos }}🍫</span>
+                <span class="hel-card-price">RD$ {{ number_format($c->precio, 0) }}</span>
+              </button>
             @empty
               <div class="hel-empty" style="grid-column: 1 / -1;">
                 <div class="hel-empty-emoji">🍨</div>
@@ -436,14 +473,14 @@
 
         {{-- ============ TAB: PRODUCTOS DIRECTOS ============ --}}
         @if($tab === 'directo')
-          <div class="hel-section-title">Productos directos</div>
+          <h2 class="hel-section-title">Productos directos</h2>
           <div class="hel-items-grid">
             @forelse($this->productosDirectos() as $p)
-              <div class="hel-card" wire:click="agregarProductoDirecto({{ $p->id }})">
-                <div class="hel-card-emoji">🍭</div>
-                <div class="hel-card-name">{{ $p->nombre }}</div>
-                <div class="hel-card-price">RD$ {{ number_format($p->precio, 0) }}</div>
-              </div>
+              <button type="button" class="hel-card" wire:click="agregarProductoDirecto({{ $p->id }})">
+                <span class="hel-card-emoji">🍭</span>
+                <span class="hel-card-name">{{ $p->nombre }}</span>
+                <span class="hel-card-price">RD$ {{ number_format($p->precio, 0) }}</span>
+              </button>
             @empty
               <div class="hel-empty" style="grid-column: 1 / -1;">
                 <div class="hel-empty-emoji">🍭</div>
@@ -454,14 +491,14 @@
           </div>
         @endif
       </div>
-    </div>
+    </main>
 
     {{-- ====== SIDEBAR: CARRITO ====== --}}
-    <div class="hel-sidebar">
+    <aside class="hel-sidebar" aria-label="Carrito">
       <div class="hel-cart-header">
-        <span>🛒 Carrito</span>
+        <h2 style="margin: 0; font-size: inherit; font-weight: inherit;"><span aria-hidden="true">🛒</span> Carrito</h2>
         @if(!empty($carrito))
-          <button class="hel-cart-remove" wire:click="vaciarCarrito" title="Vaciar carrito">🗑</button>
+          <button type="button" class="hel-cart-remove" wire:click="vaciarCarrito" title="Vaciar carrito" aria-label="Vaciar el carrito"><span aria-hidden="true">🗑</span></button>
         @endif
       </div>
 
@@ -473,11 +510,11 @@
               <div class="hel-cart-item-price">RD$ {{ number_format($item['precio'] * $item['cantidad'], 0) }}</div>
             </div>
             <div class="hel-cart-qty">
-              <button wire:click="decrementarCantidad({{ $index }})">−</button>
-              <span>{{ $item['cantidad'] }}</span>
-              <button wire:click="incrementarCantidad({{ $index }})">+</button>
+              <button type="button" wire:click="decrementarCantidad({{ $index }})" aria-label="Quitar uno de {{ $item['descripcion'] }}"><span aria-hidden="true">−</span></button>
+              <span><span class="hel-solo-lector">Cantidad: </span>{{ $item['cantidad'] }}</span>
+              <button type="button" wire:click="incrementarCantidad({{ $index }})" aria-label="Agregar uno más de {{ $item['descripcion'] }}"><span aria-hidden="true">+</span></button>
             </div>
-            <button class="hel-cart-remove" wire:click="quitarDelCarrito({{ $index }})">✕</button>
+            <button type="button" class="hel-cart-remove" wire:click="quitarDelCarrito({{ $index }})" aria-label="Quitar {{ $item['descripcion'] }} del carrito"><span aria-hidden="true">✕</span></button>
           </div>
         @empty
           <div class="hel-empty">
@@ -498,33 +535,35 @@
             <span>ITBIS</span><span>RD$ {{ number_format((float) $totalesCarrito['itbis'], 2) }}</span>
           </div>
         @endif
-        <div class="hel-cart-total">
+        <div class="hel-cart-total" aria-live="polite">
           <span>Total</span>
           <span style="color: var(--hel-primary);">RD$ {{ number_format($this->totalCarrito(), 2) }}</span>
         </div>
 
         @if(!empty($carrito))
-          <button class="hel-btn hel-btn-primary" x-on:click="cobrarAbierto = true"
+          <button type="button" class="hel-btn hel-btn-primary" x-on:click="cobrarAbierto = true"
                   style="font-size: 1.1rem; padding: 1rem;">
             💳 Cobrar ({{ $this->cantidadItems() }} item{{ $this->cantidadItems() > 1 ? 's' : '' }})
           </button>
         @else
-          <button class="hel-btn hel-btn-outline" disabled style="opacity: 0.4; cursor: not-allowed;">
+          <button type="button" class="hel-btn hel-btn-outline" disabled style="opacity: 0.4; cursor: not-allowed;">
             💳 Cobrar
           </button>
         @endif
       </div>
-    </div>
+    </aside>
   </div>
 
   {{-- ====== MODAL COBRAR ====== --}}
   <div class="hel-overlay" x-show="cobrarAbierto" x-cloak x-on:click.self="cobrarAbierto = false"
+       x-on:keydown.escape.window="cobrarAbierto = false"
+       x-init="$watch('cobrarAbierto', abierto => abierto && $nextTick(() => ($refs.modalCobrar.querySelector('input') ?? $refs.modalCobrar.querySelector('button'))?.focus()))"
        x-transition:enter="transition ease-out duration-150"
        x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
        x-transition:leave="transition ease-in duration-100"
        x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0">
-    <div class="hel-modal" x-on:click.stop>
-      <div class="hel-modal-title">💰 Cobrar venta</div>
+    <div class="hel-modal" x-on:click.stop x-ref="modalCobrar" role="dialog" aria-modal="true" aria-labelledby="hel-cobrar-titulo">
+      <h2 class="hel-modal-title" id="hel-cobrar-titulo" style="margin-top: 0;"><span aria-hidden="true">💰</span> Cobrar venta</h2>
 
       <div style="text-align: center; margin-bottom: 1rem;">
         <div style="font-size: 0.85rem; color: var(--hel-text-muted);">Total a cobrar</div>
@@ -535,12 +574,12 @@
 
       {{-- Comprobante: solo si la empresa tiene más de una opción (configuración fiscal) --}}
       @if(count($this->opcionesComprobante()) > 1)
-        <label style="font-size: 0.85rem; color: var(--hel-text-muted); display: block; margin-bottom: 0.25rem;">
+        <div id="hel-lbl-comprobante" style="font-size: 0.85rem; color: var(--hel-text-muted); display: block; margin-bottom: 0.25rem;">
           Comprobante
-        </label>
-        <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+        </div>
+        <div role="group" aria-labelledby="hel-lbl-comprobante" style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
           @foreach($this->opcionesComprobante() as $valor => $etiqueta)
-            <button
+            <button type="button" aria-pressed="{{ $comprobante === (string) $valor ? 'true' : 'false' }}"
               class="hel-chip {{ $comprobante === (string) $valor ? 'active' : '' }}"
               wire:click="$set('comprobante', '{{ $valor }}')"
               style="flex: 1 1 45%; text-align: center; padding: 0.5rem; font-size: 0.8rem;"
@@ -551,19 +590,19 @@
 
       {{-- Cliente: opcional en consumo, obligatorio en crédito fiscal --}}
       @if($this->conComprobante())
-        <label style="font-size: 0.85rem; color: var(--hel-text-muted); display: block; margin-bottom: 0.25rem;">
+        <label for="hel-buscar-cliente" style="font-size: 0.85rem; color: var(--hel-text-muted); display: block; margin-bottom: 0.25rem;">
           Cliente (RNC/Cédula) — obligatorio para crédito fiscal
         </label>
         @if($cliente = $this->clienteSeleccionado())
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; font-size: 0.9rem;">
             <span><strong>{{ $cliente->nombre }}</strong> · {{ $cliente->documento ?: 'sin documento' }}</span>
-            <button class="hel-chip" wire:click="quitarCliente" style="padding: 0.25rem 0.6rem;">Quitar</button>
+            <button type="button" class="hel-chip" wire:click="quitarCliente" style="padding: 0.25rem 0.6rem;">Quitar</button>
           </div>
         @else
-          <input type="text" class="hel-input" wire:model.live.debounce.400ms="buscarCliente" placeholder="Buscar por nombre o RNC/cédula">
+          <input type="text" id="hel-buscar-cliente" class="hel-input" wire:model.live.debounce.400ms="buscarCliente" placeholder="Buscar por nombre o RNC/cédula">
           <div style="margin-bottom: 0.75rem;">
             @foreach($this->clientesEncontrados() as $encontrado)
-              <button class="hel-chip" wire:click="seleccionarCliente({{ $encontrado->id }})"
+              <button type="button" class="hel-chip" wire:click="seleccionarCliente({{ $encontrado->id }})"
                       style="display: block; width: 100%; text-align: left; padding: 0.4rem 0.6rem; margin-top: 0.25rem; font-size: 0.85rem;">
                 {{ $encontrado->nombre }} · {{ $encontrado->documento ?: 'sin documento' }}
               </button>
@@ -573,13 +612,13 @@
       @endif
 
       {{-- Forma de pago --}}
-      <label style="font-size: 0.85rem; color: var(--hel-text-muted); display: block; margin-bottom: 0.25rem;">
+      <div id="hel-lbl-forma-pago" style="font-size: 0.85rem; color: var(--hel-text-muted); display: block; margin-bottom: 0.25rem;">
         Forma de pago
-      </label>
-      <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem;">
+      </div>
+      <div role="group" aria-labelledby="hel-lbl-forma-pago" style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem;">
         @foreach(\App\Enums\FormaPago::cases() as $fp)
           @if($fp !== \App\Enums\FormaPago::MIXTO)
-            <button
+            <button type="button" aria-pressed="{{ $formaPago === $fp->value ? 'true' : 'false' }}"
               class="hel-chip {{ $formaPago === $fp->value ? 'active' : '' }}"
               wire:click="$set('formaPago', '{{ $fp->value }}')"
               style="flex: 1; text-align: center; padding: 0.5rem;"
@@ -593,11 +632,12 @@
 
       {{-- Efectivo recibido (solo si es efectivo) --}}
       @if($formaPago === 'efectivo')
-        <label style="font-size: 0.85rem; color: var(--hel-text-muted); display: block; margin-bottom: 0.25rem;">
+        <label for="hel-efectivo-recibido" style="font-size: 0.85rem; color: var(--hel-text-muted); display: block; margin-bottom: 0.25rem;">
           Efectivo recibido
         </label>
         <input
           type="number"
+          id="hel-efectivo-recibido"
           class="hel-input"
           x-model="recibido"
           placeholder="0.00"
@@ -606,7 +646,7 @@
           x-on:keydown.enter="$wire.cobrar(parseFloat(recibido || '0'))"
         >
 
-        <div style="display: flex; justify-content: space-between; margin-bottom: 1rem; font-size: 0.9rem;">
+        <div aria-live="polite" style="display: flex; justify-content: space-between; margin-bottom: 1rem; font-size: 0.9rem;">
           <span style="color: var(--hel-text-muted);">Cambio:</span>
           <span style="font-weight: 700; color: var(--hel-success);">
             RD$ <span x-text="cambio({{ $this->totalCarrito() }}).toFixed(2)"></span>
@@ -619,10 +659,10 @@
       @endif
 
       <div style="display: flex; gap: 0.5rem;">
-        <button class="hel-btn hel-btn-outline" x-on:click="cobrarAbierto = false; recibido = '';" style="flex: 1;">
+        <button type="button" class="hel-btn hel-btn-outline" x-on:click="cobrarAbierto = false; recibido = '';" style="flex: 1;">
           Cancelar
         </button>
-        <button class="hel-btn hel-btn-success" x-on:click="$wire.cobrar(parseFloat(recibido || '0'))" style="flex: 1;">
+        <button type="button" class="hel-btn hel-btn-success" x-on:click="$wire.cobrar(parseFloat(recibido || '0'))" style="flex: 1;">
           ✓ Confirmar
         </button>
       </div>

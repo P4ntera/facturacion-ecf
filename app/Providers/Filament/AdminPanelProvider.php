@@ -2,6 +2,7 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\AvatarProviders\InicialesAvatarProvider;
 use App\Filament\Pages\Auth\EditProfile;
 use App\Http\Middleware\EstablecerEmpresaPermisos;
 use App\Http\Middleware\VerificarLicencia;
@@ -111,6 +112,12 @@ class AdminPanelProvider extends PanelProvider
                 PanelsRenderHook::BODY_END,
                 fn () => new HtmlString('<script>try{let k="_x_collapsedGroups",v=localStorage.getItem(k);if(v&&v!=="[]"){localStorage.removeItem(k)}}catch(e){}</script>'),
             )
+            // Avisos legibles (en español) cuando una acción de Livewire falla, en lugar de la
+            // ventana con la página de error cruda. Ver la vista para el detalle.
+            ->renderHook(
+                PanelsRenderHook::BODY_END,
+                fn () => view('filament.hooks.errores-livewire'),
+            )
             // Cuerpo de texto (--font-body). Filament no permite una segunda familia solo para
             // titulares vía este método: Manrope (--font-headline) se aplica en theme.css sobre
             // las hook classes de heading de Filament (fi-header-heading y similares).
@@ -118,6 +125,9 @@ class AdminPanelProvider extends PanelProvider
             // El mismo CSS declara también Manrope.
             ->font('Inter', url: asset('fonts/erp/fuentes.css'), provider: LocalFontProvider::class)
             ->brandName('FesrSoft ERP')
+            // Iniciales en SVG embebido en vez de ui-avatars.com: funciona sin internet y no envía
+            // nombres de usuarios ni empresas a un tercero.
+            ->defaultAvatarProvider(InicialesAvatarProvider::class)
             // Menú de usuario en la barra superior: con ->topNavigation() el sidebar solo existe
             // en mobile, así que en posición Sidebar el menú desaparecería en escritorio. La
             // variante de sidebar (avatar + nombre + rol) del override

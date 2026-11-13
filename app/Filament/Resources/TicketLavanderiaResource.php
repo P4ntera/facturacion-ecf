@@ -17,6 +17,7 @@ use App\Models\TicketLavanderia;
 use App\Models\TipoPrenda;
 use App\Services\TicketLavanderiaService;
 use App\Support\ComprobanteVenta;
+use App\Support\MensajeError;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\DatePicker;
@@ -27,12 +28,13 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Infolists\Components\RepeatableEntry;
+use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
-use Illuminate\Support\HtmlString;
-use Filament\Schemas\Components\Utilities\Get;
-use Filament\Schemas\Components\Utilities\Set;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
@@ -40,6 +42,7 @@ use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\HtmlString;
 
 class TicketLavanderiaResource extends Resource
 {
@@ -166,7 +169,7 @@ class TicketLavanderiaResource extends Resource
                                     $vuelto = (float) ($get('datos_venta.vuelto') ?? 0);
 
                                     return new HtmlString(
-                                        '<span class="text-2xl font-bold text-success-600 dark:text-success-400">RD$ ' . number_format($vuelto, 2) . '</span>'
+                                        '<span class="text-2xl font-bold text-success-600 dark:text-success-400">RD$ '.number_format($vuelto, 2).'</span>'
                                     );
                                 }),
 
@@ -446,7 +449,7 @@ class TicketLavanderiaResource extends Resource
                             app(TicketLavanderiaService::class)->avanzarEstado($record);
                             Notification::make()->title('Marcado como Listo')->success()->send();
                         } catch (\RuntimeException $e) {
-                            Notification::make()->title($e->getMessage())->danger()->send();
+                            Notification::make()->title(MensajeError::para($e))->danger()->send();
                         }
                     }),
 
@@ -457,7 +460,7 @@ class TicketLavanderiaResource extends Resource
                     ->visible(fn (TicketLavanderia $record): bool => $record->estado_pago === EstadoPagoTicket::PENDIENTE
                         && $record->estado !== EstadoTicketLavanderia::CANCELADO)
                     ->modalHeading('Cobrar Ticket')
-                    ->modalDescription(fn (TicketLavanderia $record): string => 'Total: RD$ ' . number_format((float) $record->total, 2))
+                    ->modalDescription(fn (TicketLavanderia $record): string => 'Total: RD$ '.number_format((float) $record->total, 2))
                     ->schema(fn (TicketLavanderia $record): array => [
                         Select::make('forma_pago')
                             ->label('Forma de Pago')
@@ -494,7 +497,7 @@ class TicketLavanderiaResource extends Resource
                                 $vuelto = (float) ($get('vuelto') ?? 0);
 
                                 return new HtmlString(
-                                    '<span class="text-2xl font-bold text-success-600 dark:text-success-400">RD$ ' . number_format($vuelto, 2) . '</span>'
+                                    '<span class="text-2xl font-bold text-success-600 dark:text-success-400">RD$ '.number_format($vuelto, 2).'</span>'
                                 );
                             }),
 
@@ -521,7 +524,7 @@ class TicketLavanderiaResource extends Resource
                             app(TicketLavanderiaService::class)->cobrar($record, Filament::getTenant(), $datosVenta);
                             Notification::make()->title('Ticket cobrado')->success()->send();
                         } catch (\RuntimeException $e) {
-                            Notification::make()->title($e->getMessage())->danger()->send();
+                            Notification::make()->title(MensajeError::para($e))->danger()->send();
                         }
                     }),
 
@@ -538,7 +541,7 @@ class TicketLavanderiaResource extends Resource
                             app(TicketLavanderiaService::class)->entregar($record, Filament::getTenant());
                             Notification::make()->title('Ticket entregado')->success()->send();
                         } catch (\RuntimeException $e) {
-                            Notification::make()->title($e->getMessage())->danger()->send();
+                            Notification::make()->title(MensajeError::para($e))->danger()->send();
                         }
                     }),
 
@@ -558,7 +561,7 @@ class TicketLavanderiaResource extends Resource
                             app(TicketLavanderiaService::class)->cancelar($record);
                             Notification::make()->title('Ticket cancelado')->warning()->send();
                         } catch (\RuntimeException $e) {
-                            Notification::make()->title($e->getMessage())->danger()->send();
+                            Notification::make()->title(MensajeError::para($e))->danger()->send();
                         }
                     }),
             ]);
@@ -567,44 +570,43 @@ class TicketLavanderiaResource extends Resource
     public static function infolist(Schema $schema): Schema
     {
         return $schema->components([
-            \Filament\Infolists\Components\TextEntry::make('numero')->label('Número'),
-            \Filament\Infolists\Components\TextEntry::make('cliente.nombre')->label('Cliente')->placeholder('Portador'),
-            \Filament\Infolists\Components\TextEntry::make('recepcionista.name')->label('Recepcionista'),
-            \Filament\Infolists\Components\TextEntry::make('estado')
+            TextEntry::make('numero')->label('Número'),
+            TextEntry::make('cliente.nombre')->label('Cliente')->placeholder('Portador'),
+            TextEntry::make('recepcionista.name')->label('Recepcionista'),
+            TextEntry::make('estado')
                 ->label('Estado')
                 ->badge()
                 ->formatStateUsing(fn (EstadoTicketLavanderia $state) => $state->etiqueta())
                 ->color(fn (EstadoTicketLavanderia $state) => $state->color()),
-            \Filament\Infolists\Components\TextEntry::make('estado_pago')
+            TextEntry::make('estado_pago')
                 ->label('Estado de Pago')
                 ->badge()
                 ->formatStateUsing(fn (EstadoPagoTicket $state) => $state->etiqueta())
                 ->color(fn (EstadoPagoTicket $state) => $state->color()),
-            \Filament\Infolists\Components\TextEntry::make('total')->label('Total')->money('DOP'),
-            \Filament\Infolists\Components\TextEntry::make('itbis')->label('ITBIS')->money('DOP')
+            TextEntry::make('total')->label('Total')->money('DOP'),
+            TextEntry::make('itbis')->label('ITBIS')->money('DOP')
                 ->visible(fn (TicketLavanderia $record): bool => (float) $record->itbis > 0),
-            \Filament\Infolists\Components\TextEntry::make('fecha_prometida')->label('Fecha Prometida')->dateTime('d/m/Y h:i A')->placeholder('—'),
-            \Filament\Infolists\Components\TextEntry::make('observaciones')->label('Observaciones')->placeholder('—')->columnSpanFull(),
-            \Filament\Infolists\Components\TextEntry::make('created_at')->label('Recibido')->dateTime('d/m/Y H:i'),
-            \Filament\Infolists\Components\TextEntry::make('entregado_en')->label('Entregado')->dateTime('d/m/Y H:i')->placeholder('—'),
-            \Filament\Infolists\Components\TextEntry::make('venta.numero_comprobante')->label('Comprobante')->placeholder('—'),
+            TextEntry::make('fecha_prometida')->label('Fecha Prometida')->dateTime('d/m/Y h:i A')->placeholder('—'),
+            TextEntry::make('observaciones')->label('Observaciones')->placeholder('—')->columnSpanFull(),
+            TextEntry::make('created_at')->label('Recibido')->dateTime('d/m/Y H:i'),
+            TextEntry::make('entregado_en')->label('Entregado')->dateTime('d/m/Y H:i')->placeholder('—'),
+            TextEntry::make('venta.numero_comprobante')->label('Comprobante')->placeholder('—'),
 
-            \Filament\Infolists\Components\RepeatableEntry::make('detalles')
+            RepeatableEntry::make('detalles')
                 ->label('Prendas')
                 ->schema([
-                    \Filament\Infolists\Components\TextEntry::make('tipoPrenda.nombre')->label('Prenda'),
-                    \Filament\Infolists\Components\TextEntry::make('servicioLavanderia.nombre')->label('Servicio'),
-                    \Filament\Infolists\Components\TextEntry::make('cantidad')->label('Cant.'),
-                    \Filament\Infolists\Components\TextEntry::make('precio_unitario')->label('Precio unit.')->money('DOP'),
-                    \Filament\Infolists\Components\TextEntry::make('subtotal')->label('Subtotal')->money('DOP'),
-                    \Filament\Infolists\Components\TextEntry::make('observaciones')->label('Observaciones')->placeholder('—'),
+                    TextEntry::make('tipoPrenda.nombre')->label('Prenda'),
+                    TextEntry::make('servicioLavanderia.nombre')->label('Servicio'),
+                    TextEntry::make('cantidad')->label('Cant.'),
+                    TextEntry::make('precio_unitario')->label('Precio unit.')->money('DOP'),
+                    TextEntry::make('subtotal')->label('Subtotal')->money('DOP'),
+                    TextEntry::make('observaciones')->label('Observaciones')->placeholder('—'),
                 ])
                 ->columns(6),
         ]);
     }
 
-
-    public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
+    public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()->with(['cliente', 'recepcionista']);
     }

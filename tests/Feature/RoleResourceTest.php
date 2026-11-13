@@ -71,7 +71,7 @@ class RoleResourceTest extends TestCase
 
         Livewire::actingAs($admin)
             ->test(ListRoles::class)
-            ->assertTableColumnStateSet('usuarios_count', 1, Role::where('name', 'Administrador')->first());
+            ->assertTableColumnStateSet('users_count', 1, Role::where('name', 'Administrador')->first());
     }
 
     public function test_no_se_puede_eliminar_el_rol_administrador(): void

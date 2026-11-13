@@ -233,6 +233,8 @@
                         min="0"
                         step="0.01"
                         class="form-input"
+                        aria-label="Descuento de {{ $linea['nombre'] }}"
+                        @disabled(! $this->puedeAplicarDescuento())
                         wire:model.live.debounce.400ms="carrito.{{ $indice }}.descuento"
                       />
                     </td>

@@ -11,6 +11,7 @@ use App\Models\Compra;
 use App\Models\DetalleCompra;
 use App\Models\DevolucionCompra;
 use App\Services\DevolucionCompraService;
+use App\Support\MensajeError;
 use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
 use Filament\Facades\Filament;
@@ -132,14 +133,14 @@ class DevolucionCompraResource extends Resource
                         })
                         ->live()
                         ->afterStateUpdated(function ($state, callable $set) {
-                            $detalle = $state ? DetalleCompra::find($state) : null;
+                            $detalle = $state ? static::detalleCompra($state) : null;
                             $set('nueva_linea_cantidad', $detalle?->cantidadDisponibleParaDevolver());
                         }),
 
                     TextEntry::make('nueva_linea_costo_preview')
                         ->hiddenLabel()
                         ->state(function (Get $get) {
-                            $detalle = DetalleCompra::find($get('nueva_linea_detalle_compra_id'));
+                            $detalle = static::detalleCompra($get('nueva_linea_detalle_compra_id'));
 
                             return $detalle ? 'Costo unitario: RD$'.number_format((float) $detalle->costo_unitario, 2) : '—';
                         }),
@@ -173,7 +174,7 @@ class DevolucionCompraResource extends Resource
 
                     TextEntry::make('detalle_compra_id')
                         ->hiddenLabel()
-                        ->formatStateUsing(fn ($state) => DetalleCompra::find($state)?->producto?->nombre ?? '—'),
+                        ->formatStateUsing(fn ($state) => static::detalleCompra($state)?->producto?->nombre ?? '—'),
 
                     TextEntry::make('cantidad')
                         ->hiddenLabel()
@@ -200,7 +201,12 @@ class DevolucionCompraResource extends Resource
                             }
 
                             $calc = $lineas->map(function ($l) {
-                                $detalle = DetalleCompra::find($l['detalle_compra_id']);
+                                $detalle = static::detalleCompra($l['detalle_compra_id']);
+
+                                if ($detalle === null) {
+                                    return null;
+                                }
+
                                 $cantidad = (float) $l['cantidad'];
                                 $subtotal = round((float) $detalle->costo_unitario * $cantidad, 2);
                                 $porcentaje = $detalle->tasa_itbis->porcentaje();
@@ -210,7 +216,7 @@ class DevolucionCompraResource extends Resource
                                     'subtotal' => $subtotal,
                                     'itbis_monto' => round($subtotal * $porcentaje / 100, 2),
                                 ];
-                            })->all();
+                            })->filter()->values()->all();
 
                             $totales = app(DevolucionCompraService::class)->calcularTotales($calc);
 
@@ -223,6 +229,22 @@ class DevolucionCompraResource extends Resource
                         }),
                 ]),
         ]);
+    }
+
+    /**
+     * Línea de compra por id, SOLO si su compra es de la empresa activa. DetalleCompra no tiene
+     * empresa_id ni Resource propio, así que no hereda el scope de tenancy: un id manipulado en el
+     * formulario mostraría producto, cantidad y costo de una compra de otra empresa.
+     */
+    public static function detalleCompra(mixed $id): ?DetalleCompra
+    {
+        if (blank($id)) {
+            return null;
+        }
+
+        return DetalleCompra::query()
+            ->whereHas('compra', fn (Builder $q) => $q->where('empresa_id', Filament::getTenant()->id))
+            ->find($id);
     }
 
     public static function infolist(Schema $schema): Schema
@@ -351,7 +373,7 @@ class DevolucionCompraResource extends Resource
                         try {
                             app(DevolucionCompraService::class)->anular($record, $data['motivo'], auth()->id());
                         } catch (RuntimeException $e) {
-                            Notification::make()->title($e->getMessage())->danger()->send();
+                            Notification::make()->title(MensajeError::para($e))->danger()->send();
 
                             return;
                         }
@@ -362,8 +384,7 @@ class DevolucionCompraResource extends Resource
             ->defaultSort('fecha', 'desc');
     }
 
-
-    public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
+    public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()->with(['compra.proveedor', 'user']);
     }

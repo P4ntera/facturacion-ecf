@@ -4,8 +4,8 @@ namespace App\Filament\Resources\DevolucionCompraResource\Pages;
 
 use App\Exceptions\StockInsuficienteException;
 use App\Filament\Resources\DevolucionCompraResource;
-use App\Models\DetalleCompra;
 use App\Services\DevolucionCompraService;
+use App\Support\MensajeError;
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
@@ -48,7 +48,7 @@ class CreateDevolucionCompra extends CreateRecord
     public function agregarLinea(): void
     {
         $detalleCompraId = $this->data['nueva_linea_detalle_compra_id'] ?? null;
-        $cantidad         = $this->data['nueva_linea_cantidad'] ?? null;
+        $cantidad = $this->data['nueva_linea_cantidad'] ?? null;
 
         if (! $detalleCompraId || ! $cantidad) {
             Notification::make()->title('Selecciona un producto e indica la cantidad a devolver.')->warning()->send();
@@ -56,7 +56,7 @@ class CreateDevolucionCompra extends CreateRecord
             return;
         }
 
-        $detalle = DetalleCompra::find($detalleCompraId);
+        $detalle = DevolucionCompraResource::detalleCompra($detalleCompraId);
 
         if (! $detalle) {
             return;
@@ -78,12 +78,12 @@ class CreateDevolucionCompra extends CreateRecord
 
         $lineas[(string) Str::uuid()] = [
             'detalle_compra_id' => $detalleCompraId,
-            'cantidad'          => $cantidad,
+            'cantidad' => $cantidad,
         ];
 
         $this->data['lineas'] = $lineas;
         $this->data['nueva_linea_detalle_compra_id'] = null;
-        $this->data['nueva_linea_cantidad']          = null;
+        $this->data['nueva_linea_cantidad'] = null;
     }
 
     protected function handleRecordCreation(array $data): Model
@@ -91,20 +91,20 @@ class CreateDevolucionCompra extends CreateRecord
         try {
             return app(DevolucionCompraService::class)->crear([
                 'compra_id' => $data['compra_id'],
-                'fecha'     => $data['fecha'],
-                'motivo'    => $data['motivo'],
-                'lineas'    => collect($data['lineas'])
+                'fecha' => $data['fecha'],
+                'motivo' => $data['motivo'],
+                'lineas' => collect($data['lineas'])
                     ->map(fn ($l) => [
                         'detalle_compra_id' => $l['detalle_compra_id'],
-                        'cantidad'          => $l['cantidad'],
+                        'cantidad' => $l['cantidad'],
                     ])
                     ->values()
                     ->all(),
             ], auth()->id(), Filament::getTenant());
         } catch (RuntimeException|StockInsuficienteException $e) {
-            Notification::make()->title($e->getMessage())->danger()->send();
+            Notification::make()->title(MensajeError::para($e))->danger()->send();
 
-            throw new Halt();
+            throw new Halt;
         }
     }
 }

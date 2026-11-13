@@ -8,6 +8,7 @@ use App\Filament\Concerns\RestringidoPorModulo;
 use App\Filament\Resources\ArqueoCajaResource\Pages;
 use App\Models\ArqueoCaja;
 use App\Services\ArqueoCajaService;
+use App\Support\MensajeError;
 use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
 use Filament\Facades\Filament;
@@ -232,7 +233,7 @@ class ArqueoCajaResource extends Resource
                                 auth()->user()?->can('arqueo.cerrar_ajeno') ?? false,
                             );
                         } catch (RuntimeException $e) {
-                            Notification::make()->title($e->getMessage())->danger()->send();
+                            Notification::make()->title(MensajeError::para($e))->danger()->send();
 
                             return;
                         }
@@ -250,8 +251,7 @@ class ArqueoCajaResource extends Resource
             ->defaultSort('abierto_en', 'desc');
     }
 
-
-    public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
+    public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()->with(['user', 'caja']);
     }

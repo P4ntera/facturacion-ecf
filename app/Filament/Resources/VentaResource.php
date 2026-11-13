@@ -25,7 +25,9 @@ use App\Models\Venta;
 use App\Services\ArqueoCajaService;
 use App\Services\Dgii\EnvioEcfService;
 use App\Services\Impresion\ImpresionService;
+use App\Services\ReporteService;
 use App\Services\VentaService;
+use App\Support\MensajeError;
 use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
 use Filament\Facades\Filament;
@@ -212,7 +214,7 @@ class VentaResource extends Resource
         ]);
     }
 
-    public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
+    public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()->with(['cliente', 'user']);
     }
@@ -359,10 +361,10 @@ class VentaResource extends Resource
 
                         // Comprobantes físicos (tipo B) requieren tipo de anulación para el 608
                         if ($record->tipo_comprobante?->esFisico()) {
-                            $campos[] = \Filament\Forms\Components\Select::make('tipo_anulacion_608')
+                            $campos[] = Select::make('tipo_anulacion_608')
                                 ->label('Tipo de anulación (608)')
                                 ->options(
-                                    collect(\App\Services\ReporteService::TIPO_ANULACION_608)
+                                    collect(ReporteService::TIPO_ANULACION_608)
                                         ->mapWithKeys(fn (string $label, string $code) => [$code => "{$code} - {$label}"])
                                         ->all()
                                 )
@@ -376,7 +378,7 @@ class VentaResource extends Resource
                         try {
                             $venta = app(VentaService::class)->anular($record, $data['motivo'], auth()->id(), $data['tipo_anulacion_608'] ?? null);
                         } catch (VentaYaAnuladaException|ArqueoCajaCerradoException|VentaInvalidaException|SecuenciaNcfAgotadaException|CuentaConPagosRegistradosException $e) {
-                            Notification::make()->title($e->getMessage())->danger()->send();
+                            Notification::make()->title(MensajeError::para($e))->danger()->send();
 
                             return;
                         }
@@ -433,7 +435,7 @@ class VentaResource extends Resource
                                 $record, Filament::getTenant(), $data['detalles'], $data['motivo'],
                             );
                         } catch (VentaInvalidaException|SecuenciaNcfAgotadaException $e) {
-                            Notification::make()->title($e->getMessage())->danger()->send();
+                            Notification::make()->title(MensajeError::para($e))->danger()->send();
 
                             return;
                         }
@@ -517,7 +519,7 @@ class VentaResource extends Resource
                                 app(ArqueoCajaService::class)->arqueoAbiertoDe(auth()->id(), $empresa),
                             );
                         } catch (VentaInvalidaException|SecuenciaNcfAgotadaException $e) {
-                            Notification::make()->title($e->getMessage())->danger()->send();
+                            Notification::make()->title(MensajeError::para($e))->danger()->send();
 
                             return;
                         }

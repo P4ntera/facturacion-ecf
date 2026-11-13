@@ -9,6 +9,7 @@ use App\Filament\Concerns\RestringidoPorModulo;
 use App\Filament\Resources\SecuenciaNcfResource\Pages;
 use App\Models\SecuenciaNcf;
 use App\Services\SecuenciaNcfService;
+use App\Support\MensajeError;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\DatePicker;
@@ -321,7 +322,7 @@ class SecuenciaNcfResource extends Resource
                         try {
                             app(SecuenciaNcfService::class)->activarManualmente($record);
                         } catch (RangoNcfSolapadoException $e) {
-                            Notification::make()->title($e->getMessage())->danger()->send();
+                            Notification::make()->title(MensajeError::para($e))->danger()->send();
 
                             return;
                         }

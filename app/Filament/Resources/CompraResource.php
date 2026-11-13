@@ -19,6 +19,8 @@ use App\Models\Producto;
 use App\Models\Proveedor;
 use App\Services\CompraService;
 use App\Services\DgiiRncService;
+use App\Services\ReporteService;
+use App\Support\MensajeError;
 use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
 use Filament\Facades\Filament;
@@ -46,7 +48,6 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Validation\Rules\Unique;
-use App\Services\ReporteService;
 use RuntimeException;
 
 class CompraResource extends Resource
@@ -562,7 +563,7 @@ class CompraResource extends Resource
         ]);
     }
 
-    public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
+    public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()->with(['proveedor', 'user']);
     }
@@ -658,7 +659,7 @@ class CompraResource extends Resource
                         try {
                             app(CompraService::class)->anular($record, $data['motivo'], auth()->id());
                         } catch (RuntimeException $e) {
-                            Notification::make()->title($e->getMessage())->danger()->send();
+                            Notification::make()->title(MensajeError::para($e))->danger()->send();
 
                             return;
                         }

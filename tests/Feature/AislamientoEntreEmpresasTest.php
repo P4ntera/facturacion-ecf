@@ -2,11 +2,12 @@
 
 namespace Tests\Feature;
 
-use App\Enums\EstadoCompra;
+use App\Enums\CategoriaSabor;
 use App\Enums\EstadoFiscal;
 use App\Enums\EstadoVenta;
 use App\Enums\FormaPago;
 use App\Enums\FormaReembolso;
+use App\Enums\PerfilEmpresa;
 use App\Enums\TasaItbis;
 use App\Enums\TipoComprobante;
 use App\Enums\TipoDocumentoCliente;
@@ -15,45 +16,61 @@ use App\Enums\TipoProducto;
 use App\Enums\TipoProveedor;
 use App\Exceptions\SecuenciaNcfAgotadaException;
 use App\Exceptions\VentaInvalidaException;
-use App\Filament\Resources\CuentaPorCobrarResource;
-use App\Filament\Resources\CuentaPorPagarResource;
-use App\Models\CuentaPorCobrar;
-use App\Models\CuentaPorPagar;
-use App\Models\PagoRecibido;
-use App\Models\PagoRealizado;
-use App\Services\CuentaPorCobrarService;
-use App\Services\CuentaPorPagarService;
+use App\Filament\Pages\PosHeladeria;
 use App\Filament\Pages\PuntoDeVenta;
 use App\Filament\Pages\PuntoDeVentaTouch;
 use App\Filament\Resources\ArqueoCajaResource;
 use App\Filament\Resources\CajaResource;
 use App\Filament\Resources\CajaResource\Pages\CreateCaja;
 use App\Filament\Resources\ClienteResource;
+use App\Filament\Resources\ComboHeladoResource;
 use App\Filament\Resources\CompraResource\Pages\CreateCompra;
+use App\Filament\Resources\CuentaPorCobrarResource;
+use App\Filament\Resources\CuentaPorPagarResource;
 use App\Filament\Resources\DescuentoResource;
 use App\Filament\Resources\DescuentoResource\Pages\CreateDescuento;
 use App\Filament\Resources\EmpresaResource;
 use App\Filament\Resources\PedidoCompraResource;
+use App\Filament\Resources\PresentacionHeladoResource;
 use App\Filament\Resources\ProductoResource;
 use App\Filament\Resources\ProductoResource\Pages\CreateProducto;
 use App\Filament\Resources\ProductoResource\Pages\ListProductos;
+use App\Filament\Resources\SaborHeladoResource;
+use App\Filament\Resources\TicketLavanderiaResource;
+use App\Filament\Resources\ToppingHeladoResource;
 use App\Models\Caja;
 use App\Models\Cliente;
+use App\Models\ComboHelado;
+use App\Models\CuentaPorCobrar;
+use App\Models\CuentaPorPagar;
 use App\Models\Descuento;
 use App\Models\Empresa;
+use App\Models\PagoRealizado;
+use App\Models\PagoRecibido;
+use App\Models\PresentacionHelado;
 use App\Models\Producto;
 use App\Models\Proveedor;
+use App\Models\SaborHelado;
 use App\Models\SecuenciaNcf;
+use App\Models\ServicioLavanderia;
+use App\Models\TicketLavanderia;
+use App\Models\TipoPrenda;
+use App\Models\ToppingHelado;
 use App\Models\User;
 use App\Models\Venta;
 use App\Services\ArqueoCajaService;
 use App\Services\CompraService;
 use App\Services\CostoPrecioService;
+use App\Services\CuentaPorCobrarService;
+use App\Services\CuentaPorPagarService;
 use App\Services\DevolucionCompraService;
+use App\Services\HeladeriaService;
+use App\Services\ModulosEmpresaService;
 use App\Services\OrdenCompraService;
 use App\Services\PedidoCompraService;
 use App\Services\RolesEmpresaService;
 use App\Services\SecuenciaNcfService;
+use App\Services\TicketLavanderiaService;
 use App\Services\VentaService;
 use Database\Seeders\RolePermissionSeeder;
 use Filament\Facades\Filament;
@@ -61,11 +78,6 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
-use App\Filament\Resources\TicketLavanderiaResource;
-use App\Models\ServicioLavanderia;
-use App\Models\TicketLavanderia;
-use App\Models\TipoPrenda;
-use App\Services\TicketLavanderiaService;
 use RuntimeException;
 use Tests\Support\TenantDefaults;
 use Tests\TestCase;
@@ -109,14 +121,16 @@ class AislamientoEntreEmpresasTest extends TestCase
         $cliente = Cliente::create([
             'empresa_id' => $empresa->id,
             'tipo_documento' => TipoDocumentoCliente::CEDULA,
-            'documento' => '00'.$empresa->id.'11111111',
+            'documento' => '001'.str_pad((string) $empresa->id, 8, '0', STR_PAD_LEFT),
             'nombre' => "Cliente de {$razonSocial}",
             'activo' => true,
         ]);
 
         $proveedor = Proveedor::create([
             'empresa_id' => $empresa->id,
-            'rnc' => '02'.$empresa->id.'2222222',
+            // 9 dígitos fijos sea cual sea el id: concatenar el id crudo desbordaba varchar(11)
+            // cuando la secuencia de empresas pasaba de 99 en una corrida completa de la suite.
+            'rnc' => '2'.str_pad((string) $empresa->id, 8, '0', STR_PAD_LEFT),
             'tipo' => TipoProveedor::FORMAL,
             'nombre' => "Proveedor de {$razonSocial}",
             'activo' => true,
@@ -1104,9 +1118,9 @@ class AislamientoEntreEmpresasTest extends TestCase
      */
     private function crearVentaCreditoConCxC(array $datosEmpresa): CuentaPorCobrar
     {
-        $empresa  = $datosEmpresa['empresa'];
+        $empresa = $datosEmpresa['empresa'];
         $producto = $datosEmpresa['producto'];
-        $cliente  = $datosEmpresa['cliente'];
+        $cliente = $datosEmpresa['cliente'];
 
         // Secuencia NCF necesaria para registrar la venta.
         SecuenciaNcf::firstOrCreate(
@@ -1200,8 +1214,8 @@ class AislamientoEntreEmpresasTest extends TestCase
      */
     private function crearCompraCreditoConCxP(array $datosEmpresa): CuentaPorPagar
     {
-        $empresa   = $datosEmpresa['empresa'];
-        $producto  = $datosEmpresa['producto'];
+        $empresa = $datosEmpresa['empresa'];
+        $producto = $datosEmpresa['producto'];
         $proveedor = $datosEmpresa['proveedor'];
 
         $this->comoEmpresa($empresa);
@@ -1211,7 +1225,7 @@ class AislamientoEntreEmpresasTest extends TestCase
             'fecha' => now()->toDateString(),
             'tipo_pago' => TipoPago::CREDITO->value,
             'lineas' => [['producto_id' => $producto->id, 'cantidad' => 5, 'costo_unitario' => 80]],
-        ], $datosEmpresa['admin']->id);
+        ], $datosEmpresa['admin']->id, $empresa);
 
         return CuentaPorPagar::where('compra_id', $compra->id)->firstOrFail();
     }
@@ -1282,14 +1296,14 @@ class AislamientoEntreEmpresasTest extends TestCase
      * Crea los datos mínimos de lavandería para una empresa: tipo de prenda, servicio y un
      * ticket. Devuelve los tres más el usuario recepcionista que creó el ticket.
      *
-     * @return array{tipoPrenda: TipoPrenda, servicio: ServicioLavanderia, ticket: TicketLavanderia, recepcionista: \App\Models\User}
+     * @return array{tipoPrenda: TipoPrenda, servicio: ServicioLavanderia, ticket: TicketLavanderia, recepcionista: User}
      */
     private function crearDatosLavanderia(Empresa $empresa, User $admin): array
     {
         // Asegurar que la empresa tenga perfil LAVANDERIA para que sembrarRolesBase() cree
         // los roles específicos (Recepcionista/Operador Lavandería).
-        if ($empresa->perfil !== \App\Enums\PerfilEmpresa::LAVANDERIA) {
-            $empresa->update(['perfil' => \App\Enums\PerfilEmpresa::LAVANDERIA]);
+        if ($empresa->perfil !== PerfilEmpresa::LAVANDERIA) {
+            $empresa->update(['perfil' => PerfilEmpresa::LAVANDERIA]);
             app(RolesEmpresaService::class)->sembrarRolesBase($empresa);
         }
 
@@ -1435,6 +1449,160 @@ class AislamientoEntreEmpresasTest extends TestCase
                     ],
                 ],
             ],
+        );
+    }
+
+    // ──────────────────────────────────────────────────────────────────────
+    // Aislamiento del módulo Heladería
+    // ──────────────────────────────────────────────────────────────────────
+
+    /**
+     * Helper: deja la empresa con perfil HELADERIA y un catálogo mínimo propio.
+     *
+     * @return array{presentacion: PresentacionHelado, sabor: SaborHelado, topping: ToppingHelado, combo: ComboHelado}
+     */
+    private function crearDatosHeladeria(Empresa $empresa): array
+    {
+        if ($empresa->perfil !== PerfilEmpresa::HELADERIA) {
+            $empresa->update(['perfil' => PerfilEmpresa::HELADERIA]);
+            app(RolesEmpresaService::class)->sembrarRolesBase($empresa);
+            app(ModulosEmpresaService::class)->sembrarModulos($empresa);
+        }
+
+        $empresa->config()->update(['permite_ventas_sin_comprobante' => true]);
+
+        $de = $empresa->razon_social;
+
+        return [
+            'presentacion' => PresentacionHelado::create(['empresa_id' => $empresa->id, 'nombre' => "Cono de {$de}", 'icono' => '🍦', 'scoops_incluidos' => 1, 'toppings_incluidos' => 0, 'precio' => 100, 'activo' => true, 'orden' => 1]),
+            'sabor' => SaborHelado::create(['empresa_id' => $empresa->id, 'nombre' => "Sabor de {$de}", 'color_hex' => '#ffffff', 'categoria' => CategoriaSabor::cases()[0], 'premium' => false, 'disponible' => true, 'activo' => true, 'orden' => 1]),
+            'topping' => ToppingHelado::create(['empresa_id' => $empresa->id, 'nombre' => "Topping de {$de}", 'icono' => '🍫', 'precio' => 25, 'activo' => true, 'orden' => 1]),
+            'combo' => ComboHelado::create(['empresa_id' => $empresa->id, 'nombre' => "Combo de {$de}", 'icono' => '🍨', 'descripcion' => null, 'scoops_incluidos' => 2, 'toppings_incluidos' => 1, 'precio' => 300, 'activo' => true, 'orden' => 1]),
+        ];
+    }
+
+    /** 39. El POS de heladería solo ofrece el catálogo de la empresa activa. */
+    public function test_39_pos_heladeria_solo_muestra_el_catalogo_propio(): void
+    {
+        $datosA = $this->crearEmpresaConDatos('Empresa A', '131000001');
+        $datosT = $this->crearEmpresaConDatos('Tobogán', '131000002');
+        $helA = $this->crearDatosHeladeria($datosA['empresa']);
+        $helT = $this->crearDatosHeladeria($datosT['empresa']);
+        $this->comoEmpresa($datosA['empresa']);
+
+        Livewire::actingAs($datosA['admin'])
+            ->test(PosHeladeria::class)
+            ->assertSee($helA['presentacion']->nombre)
+            ->assertDontSee($helT['presentacion']->nombre)
+            ->call('cambiarTab', 'combos')
+            ->assertSee($helA['combo']->nombre)
+            ->assertDontSee($helT['combo']->nombre)
+            ->call('cambiarTab', 'directo')
+            ->assertSee($datosA['producto']->nombre)
+            ->assertDontSee($datosT['producto']->nombre);
+    }
+
+    /** 40. El POS de heladería ignora ids de presentación, combo o producto de otra empresa. */
+    public function test_40_pos_heladeria_ignora_ids_de_otra_empresa(): void
+    {
+        $datosA = $this->crearEmpresaConDatos('Empresa A', '131000001');
+        $datosT = $this->crearEmpresaConDatos('Tobogán', '131000002');
+        $this->crearDatosHeladeria($datosA['empresa']);
+        $helT = $this->crearDatosHeladeria($datosT['empresa']);
+        $this->comoEmpresa($datosA['empresa']);
+
+        Livewire::actingAs($datosA['admin'])
+            ->test(PosHeladeria::class)
+            ->call('seleccionarPresentacion', $helT['presentacion']->id)
+            ->assertSet('presentacionId', null)
+            ->assertSet('paso', 'presentacion')
+            ->call('agregarCombo', $helT['combo']->id)
+            ->call('agregarProductoDirecto', $datosT['producto']->id)
+            ->assertSet('carrito', []);
+    }
+
+    /** 41. Un carrito manipulado en el navegador (ids ajenos o precio alterado) no se cobra así. */
+    public function test_41_pos_heladeria_no_cobra_un_carrito_manipulado(): void
+    {
+        $datosA = $this->crearEmpresaConDatos('Empresa A', '131000001');
+        $datosT = $this->crearEmpresaConDatos('Tobogán', '131000002');
+        $helA = $this->crearDatosHeladeria($datosA['empresa']);
+        $helT = $this->crearDatosHeladeria($datosT['empresa']);
+        $this->comoEmpresa($datosA['empresa']);
+
+        $pos = Livewire::actingAs($datosA['admin'])->test(PosHeladeria::class);
+
+        // a) Combo de otra empresa metido a mano en el carrito: no hay venta.
+        $pos->set('carrito', [['tipo' => 'combo', 'descripcion' => 'Regalo', 'precio' => 1, 'cantidad' => 1, 'detalle' => ['combo_id' => $helT['combo']->id]]])
+            ->call('cobrar', 1000.0)
+            ->assertNotDispatched('venta-cobrada');
+
+        // b) Combo propio de RD$300 con el precio reescrito a RD$1: tampoco se cobra a ese
+        //    precio; el carrito vuelve al precio real y hay que confirmar de nuevo.
+        $pos->set('carrito', [['tipo' => 'combo', 'descripcion' => 'Barato', 'precio' => 1, 'cantidad' => 1, 'detalle' => ['combo_id' => $helA['combo']->id]]])
+            ->call('cobrar', 1000.0)
+            ->assertNotDispatched('venta-cobrada')
+            ->assertSet('carrito.0.precio', 300.0)
+            ->assertSet('carrito.0.descripcion', $helA['combo']->nombre);
+
+        $this->assertSame(0, Venta::count());
+
+        // c) Con el precio ya corregido, la venta sale por el total real (300 + 18 % de ITBIS).
+        $pos->call('cobrar', 1000.0)->assertDispatched('venta-cobrada');
+
+        $venta = Venta::sole();
+        $this->assertSame($datosA['empresa']->id, $venta->empresa_id);
+        $this->assertSame('354.00', (string) $venta->total);
+    }
+
+    /** 42. Los catálogos de heladería (sabores, presentaciones, toppings, combos) listan solo lo propio. */
+    public function test_42_los_catalogos_de_heladeria_listan_solo_lo_propio(): void
+    {
+        $datosA = $this->crearEmpresaConDatos('Empresa A', '131000001');
+        $datosT = $this->crearEmpresaConDatos('Tobogán', '131000002');
+        $helA = $this->crearDatosHeladeria($datosA['empresa']);
+        $helT = $this->crearDatosHeladeria($datosT['empresa']);
+        $this->comoEmpresa($datosA['empresa']);
+
+        $paginas = [
+            'sabor' => SaborHeladoResource::class,
+            'presentacion' => PresentacionHeladoResource::class,
+            'topping' => ToppingHeladoResource::class,
+            'combo' => ComboHeladoResource::class,
+        ];
+
+        foreach ($paginas as $clave => $resource) {
+            $this->actingAs($datosA['admin'])
+                ->get($resource::getUrl('index', tenant: $datosA['empresa']))
+                ->assertOk()
+                ->assertSee($helA[$clave]->nombre)
+                ->assertDontSee($helT[$clave]->nombre);
+        }
+    }
+
+    /** 43. El producto puente HEL-* de una venta de heladería es de la empresa que vende. */
+    public function test_43_el_producto_puente_de_heladeria_es_por_empresa(): void
+    {
+        $datosA = $this->crearEmpresaConDatos('Empresa A', '131000001');
+        $datosT = $this->crearEmpresaConDatos('Tobogán', '131000002');
+        $this->crearDatosHeladeria($datosA['empresa']);
+        $this->crearDatosHeladeria($datosT['empresa']);
+
+        $item = [['tipo' => 'combo', 'descripcion' => 'Combo Familiar', 'precio' => 300, 'cantidad' => 1]];
+        $servicio = app(HeladeriaService::class);
+
+        foreach ([$datosA, $datosT] as $datos) {
+            $this->comoEmpresa($datos['empresa']);
+            $this->actingAs($datos['admin']);
+            $servicio->facturar($item, $datos['empresa'], ['user_id' => $datos['admin']->id, 'forma_pago' => FormaPago::EFECTIVO]);
+        }
+
+        $puentes = Producto::withoutGlobalScopes()->where('codigo', 'like', 'HEL-%')->get();
+
+        $this->assertCount(2, $puentes);
+        $this->assertEqualsCanonicalizing(
+            [$datosA['empresa']->id, $datosT['empresa']->id],
+            $puentes->pluck('empresa_id')->all(),
         );
     }
 }

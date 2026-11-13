@@ -6,6 +6,7 @@ use App\Enums\TipoComprobante;
 use App\Exceptions\RangoNcfSolapadoException;
 use App\Filament\Resources\SecuenciaNcfResource;
 use App\Services\SecuenciaNcfService;
+use App\Support\MensajeError;
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
@@ -35,7 +36,7 @@ class EditSecuenciaNcf extends EditRecord
                 ignorarId: $this->record->id,
             );
         } catch (RangoNcfSolapadoException $e) {
-            Notification::make()->title($e->getMessage())->danger()->send();
+            Notification::make()->title(MensajeError::para($e))->danger()->send();
 
             throw new Halt;
         }

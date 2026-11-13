@@ -5,6 +5,7 @@ namespace App\Filament\Resources\PedidoCompraResource\Pages;
 use App\Filament\Resources\PedidoCompraResource;
 use App\Models\Producto;
 use App\Services\PedidoCompraService;
+use App\Support\MensajeError;
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
@@ -109,7 +110,7 @@ class CreatePedidoCompra extends CreateRecord
                 'lineas' => $data['lineas'],
             ], auth()->id(), Filament::getTenant());
         } catch (RuntimeException $e) {
-            Notification::make()->title($e->getMessage())->danger()->send();
+            Notification::make()->title(MensajeError::para($e))->danger()->send();
 
             throw new Halt;
         }

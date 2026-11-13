@@ -7,12 +7,14 @@ namespace App\Filament\Pages;
 use App\Enums\EstadoComanda;
 use App\Enums\EstadoMesa;
 use App\Enums\Modulo;
+use App\Exceptions\VentaInvalidaException;
 use App\Filament\Concerns\RestringidoPorModulo;
 use App\Models\AreaRestaurante;
 use App\Models\Comanda;
 use App\Models\Mesa;
 use App\Models\Producto;
 use App\Services\ComandaService;
+use App\Support\MensajeError;
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -143,7 +145,7 @@ class MapaMesas extends Page
             $this->resetProductoForm();
             Notification::make()->title('Comanda abierta')->success()->send();
         } catch (RuntimeException $e) {
-            Notification::make()->title($e->getMessage())->danger()->send();
+            Notification::make()->title(MensajeError::para($e))->danger()->send();
         }
     }
 
@@ -187,7 +189,7 @@ class MapaMesas extends Page
             $this->resetProductoForm();
             Notification::make()->title("{$producto->nombre} agregado")->success()->send();
         } catch (RuntimeException $e) {
-            Notification::make()->title($e->getMessage())->danger()->send();
+            Notification::make()->title(MensajeError::para($e))->danger()->send();
         }
     }
 
@@ -231,8 +233,8 @@ class MapaMesas extends Page
             $venta = app(ComandaService::class)->cerrar($comanda, auth()->user());
             $this->comandaAbiertaId = null;
             Notification::make()->title("Venta #{$venta->id} generada")->success()->send();
-        } catch (RuntimeException|\App\Exceptions\VentaInvalidaException $e) {
-            Notification::make()->title($e->getMessage())->danger()->send();
+        } catch (RuntimeException|VentaInvalidaException $e) {
+            Notification::make()->title(MensajeError::para($e))->danger()->send();
         }
     }
 
@@ -246,7 +248,7 @@ class MapaMesas extends Page
             $this->comandaAbiertaId = null;
             Notification::make()->title('Comanda cancelada')->success()->send();
         } catch (RuntimeException $e) {
-            Notification::make()->title($e->getMessage())->danger()->send();
+            Notification::make()->title(MensajeError::para($e))->danger()->send();
         }
     }
 
@@ -260,7 +262,7 @@ class MapaMesas extends Page
             app(ComandaService::class)->transferir($comanda, $nuevaMesa);
             Notification::make()->title("Comanda transferida a mesa {$nuevaMesa->numero}")->success()->send();
         } catch (RuntimeException $e) {
-            Notification::make()->title($e->getMessage())->danger()->send();
+            Notification::make()->title(MensajeError::para($e))->danger()->send();
         }
     }
 

@@ -4,6 +4,7 @@ namespace App\Filament\Resources\ImpresoraResource\Pages;
 
 use App\Exceptions\ImpresoraInvalidaException;
 use App\Filament\Resources\ImpresoraResource;
+use App\Support\MensajeError;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Support\Exceptions\Halt;
@@ -25,7 +26,7 @@ class CreateImpresora extends CreateRecord
         try {
             return parent::handleRecordCreation($data);
         } catch (ImpresoraInvalidaException $e) {
-            Notification::make()->title($e->getMessage())->danger()->send();
+            Notification::make()->title(MensajeError::para($e))->danger()->send();
 
             throw new Halt;
         }

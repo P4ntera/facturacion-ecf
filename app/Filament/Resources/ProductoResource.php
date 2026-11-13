@@ -16,6 +16,7 @@ use App\Models\Categoria;
 use App\Models\Producto;
 use App\Services\CostoPrecioService;
 use App\Services\InventarioService;
+use App\Support\MensajeError;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\FileUpload;
@@ -501,7 +502,7 @@ class ProductoResource extends Resource
                                 $data['observacion'] ?? null,
                             ));
                         } catch (StockInsuficienteException $e) {
-                            Notification::make()->title($e->getMessage())->danger()->send();
+                            Notification::make()->title(MensajeError::para($e))->danger()->send();
 
                             return;
                         }
@@ -522,7 +523,7 @@ class ProductoResource extends Resource
             : null;
     }
 
-    public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
+    public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()->with(['categoria']);
     }

@@ -8,9 +8,9 @@ use App\Enums\FormaPago;
 use App\Enums\ModoPrecioHelado;
 use App\Enums\TasaItbis;
 use App\Enums\TipoProducto;
+use App\Exceptions\VentaInvalidaException;
 use App\Models\ComboHelado;
 use App\Models\Empresa;
-use App\Models\EmpresaConfiguracion;
 use App\Models\PresentacionHelado;
 use App\Models\Producto;
 use App\Models\SaborHelado;
@@ -86,7 +86,7 @@ class HeladeriaService
         // Armar descripción legible
         $nombresSabores = $sabores->pluck('nombre')->implode(', ');
         if ($nombresSabores) {
-            $descripcion .= ': ' . $nombresSabores;
+            $descripcion .= ': '.$nombresSabores;
         }
 
         // Incluir toppings en la descripción
@@ -97,7 +97,7 @@ class HeladeriaService
                 ->implode(', ');
 
             if ($nombresToppings) {
-                $descripcion .= ' + ' . $nombresToppings;
+                $descripcion .= ' + '.$nombresToppings;
             }
         }
 
@@ -164,6 +164,103 @@ class HeladeriaService
     }
 
     /**
+     * Reconstruye el carrito del POS con precios y descripciones leídos de la base de datos.
+     *
+     * El carrito vive en una propiedad pública de Livewire: el navegador puede reescribir su
+     * `precio` (un helado de RD$350 a RD$1). Aquí lo único que se le cree al navegador es QUÉ se
+     * pidió (ids de presentación, sabores, toppings, combo o producto) y la cantidad; el precio
+     * siempre se recalcula. Un ítem que ya no existe, se desactivó o es de otra empresa aborta.
+     *
+     * @param  array<int, array<string, mixed>>  $items
+     * @return array<int, array<string, mixed>>
+     *
+     * @throws VentaInvalidaException
+     */
+    public function revalidarCarrito(array $items, Empresa $empresa): array
+    {
+        $noDisponible = fn (string $que) => new VentaInvalidaException(
+            "«{$que}» ya no está disponible. Quítelo del carrito y vuelva a agregarlo."
+        );
+
+        return array_values(array_map(function (array $item) use ($empresa, $noDisponible) {
+            $detalle = (array) ($item['detalle'] ?? []);
+            $nombre = (string) ($item['descripcion'] ?? 'Un producto');
+            $cantidad = max(1, (int) ($item['cantidad'] ?? 1));
+
+            switch ($item['tipo'] ?? null) {
+                case 'armado':
+                    $presentacion = PresentacionHelado::where('empresa_id', $empresa->id)
+                        ->where('activo', true)
+                        ->find($detalle['presentacion_id'] ?? null);
+
+                    if ($presentacion === null) {
+                        throw $noDisponible($nombre);
+                    }
+
+                    $sabores = SaborHelado::where('empresa_id', $empresa->id)
+                        ->where('activo', true)
+                        ->whereIn('id', array_map('intval', (array) ($detalle['sabores'] ?? [])))
+                        ->pluck('id')->all();
+                    $toppings = ToppingHelado::where('empresa_id', $empresa->id)
+                        ->where('activo', true)
+                        ->whereIn('id', array_map('intval', (array) ($detalle['toppings'] ?? [])))
+                        ->pluck('id')->all();
+
+                    if ($sabores === []) {
+                        throw $noDisponible($nombre);
+                    }
+
+                    $precio = $this->calcularPrecioArmado($presentacion, ['sabores' => $sabores, 'toppings' => $toppings], $empresa);
+
+                    return [
+                        'tipo' => 'armado',
+                        'descripcion' => $precio['descripcion'],
+                        'precio' => $precio['total'],
+                        'cantidad' => $cantidad,
+                        'detalle' => ['presentacion_id' => $presentacion->id, 'sabores' => $sabores, 'toppings' => $toppings],
+                    ];
+
+                case 'combo':
+                    $combo = ComboHelado::where('empresa_id', $empresa->id)
+                        ->where('activo', true)
+                        ->find($detalle['combo_id'] ?? null);
+
+                    if ($combo === null) {
+                        throw $noDisponible($nombre);
+                    }
+
+                    return [
+                        'tipo' => 'combo',
+                        'descripcion' => $combo->nombre,
+                        'precio' => (float) $combo->precio,
+                        'cantidad' => $cantidad,
+                        'detalle' => ['combo_id' => $combo->id],
+                    ];
+
+                case 'directo':
+                    $producto = Producto::where('empresa_id', $empresa->id)
+                        ->where('activo', true)
+                        ->find($detalle['producto_id'] ?? null);
+
+                    if ($producto === null) {
+                        throw $noDisponible($nombre);
+                    }
+
+                    return [
+                        'tipo' => 'directo',
+                        'descripcion' => $producto->nombre,
+                        'precio' => (float) $producto->precio,
+                        'cantidad' => $cantidad,
+                        'detalle' => ['producto_id' => $producto->id],
+                    ];
+
+                default:
+                    throw new VentaInvalidaException('El carrito tiene un ítem que no se reconoce. Vacíelo y vuelva a armar la venta.');
+            }
+        }, $items));
+    }
+
+    /**
      * Registra una venta de heladería delegando a VentaService.
      *
      * @param  array<int, array{tipo: string, descripcion: string, precio: float, cantidad: int}>  $items
@@ -218,14 +315,14 @@ class HeladeriaService
         // Código único por descripción COMPLETA. Antes se usaban los primeros 30 caracteres:
         // dos helados que empezaban igual compartían producto y la factura salía con la
         // descripción del primero que se vendió.
-        $codigo = 'HEL-' . mb_strtoupper(Str::slug(mb_substr($nombre, 0, 18))) . '-' . substr(md5(mb_strtolower($nombre)), 0, 10);
+        $codigo = 'HEL-'.mb_strtoupper(Str::slug(mb_substr($nombre, 0, 18))).'-'.substr(md5(mb_strtolower($nombre)), 0, 10);
         $producto = Producto::firstOrCreate(
             [
                 'empresa_id' => $empresa->id,
                 'codigo' => $codigo,
             ],
             [
-                'nombre' => 'Heladería: ' . $nombre,
+                'nombre' => 'Heladería: '.$nombre,
                 'tipo' => TipoProducto::SERVICIO,
                 'costo' => 0,
                 'precio' => $precio,

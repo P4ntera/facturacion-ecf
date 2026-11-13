@@ -11,9 +11,10 @@ use App\Filament\Resources\CuentaPorPagarResource\Pages;
 use App\Models\CuentaPorPagar;
 use App\Models\PagoRealizado;
 use App\Services\CuentaPorPagarService;
+use App\Support\MensajeError;
 use Filament\Actions\Action;
-use Filament\Facades\Filament;
 use Filament\Actions\ViewAction;
+use Filament\Facades\Filament;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -200,7 +201,7 @@ class CuentaPorPagarResource extends Resource
                         try {
                             app(CuentaPorPagarService::class)->registrarPago($record, $data, auth()->id());
                         } catch (PagoExcedeSaldoException|RuntimeException $e) {
-                            Notification::make()->title($e->getMessage())->danger()->send();
+                            Notification::make()->title(MensajeError::para($e))->danger()->send();
 
                             return;
                         }
@@ -234,7 +235,7 @@ class CuentaPorPagarResource extends Resource
                         try {
                             app(CuentaPorPagarService::class)->anularPago($pago, $data['motivo']);
                         } catch (RuntimeException $e) {
-                            Notification::make()->title($e->getMessage())->danger()->send();
+                            Notification::make()->title(MensajeError::para($e))->danger()->send();
 
                             return;
                         }
@@ -261,8 +262,7 @@ class CuentaPorPagarResource extends Resource
         };
     }
 
-
-    public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
+    public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()->with(['proveedor', 'compra']);
     }

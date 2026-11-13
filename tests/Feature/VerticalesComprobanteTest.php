@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\CategoriaSabor;
 use App\Enums\EstadoFiscal;
 use App\Enums\FormaPago;
 use App\Enums\PerfilEmpresa;
@@ -9,6 +10,8 @@ use App\Enums\TipoComprobante;
 use App\Filament\Pages\PosHeladeria;
 use App\Models\Cliente;
 use App\Models\Empresa;
+use App\Models\PresentacionHelado;
+use App\Models\SaborHelado;
 use App\Models\SecuenciaNcf;
 use App\Models\ServicioLavanderia;
 use App\Models\TicketLavanderia;
@@ -315,9 +318,17 @@ class VerticalesComprobanteTest extends TestCase
         $cliente = Cliente::create(['empresa_id' => $this->empresa->id, 'nombre' => 'Empresa Cliente SRL', 'tipo_documento' => 'rnc', 'documento' => '131234567', 'activo' => true]);
         $ajeno = Cliente::create(['empresa_id' => Empresa::factory()->create()->id, 'nombre' => 'Empresa Ajena SRL', 'tipo_documento' => 'rnc', 'documento' => '101999999', 'activo' => true]);
 
+        // El carrito se arma desde el catálogo: el POS ya no acepta ítems con precio puesto a mano.
+        $copa = PresentacionHelado::create(['empresa_id' => $this->empresa->id, 'nombre' => 'Copa', 'icono' => '🍨', 'scoops_incluidos' => 1, 'toppings_incluidos' => 0, 'precio' => 250, 'activo' => true, 'orden' => 1]);
+        $vainilla = SaborHelado::create(['empresa_id' => $this->empresa->id, 'nombre' => 'Vainilla', 'color_hex' => '#f5e6c8', 'categoria' => CategoriaSabor::cases()[0], 'premium' => false, 'disponible' => true, 'activo' => true, 'orden' => 1]);
+
         $pagina = Livewire::test(PosHeladeria::class)
             ->assertSet('comprobante', ComprobanteVenta::SIN_COMPROBANTE)
-            ->set('carrito', [['tipo' => 'armado', 'descripcion' => 'Copa: Vainilla', 'precio' => 250, 'cantidad' => 1, 'detalle' => []]])
+            ->call('seleccionarPresentacion', $copa->id)
+            ->call('toggleSabor', $vainilla->id)
+            ->call('irAToppings')
+            ->call('agregarArmadoAlCarrito')
+            ->assertSet('carrito.0.precio', 250.0)
             ->assertSee('295.00')
             ->set('comprobante', '31')
             ->set('buscarCliente', 'Empresa')

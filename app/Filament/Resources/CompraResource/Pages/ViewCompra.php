@@ -6,6 +6,7 @@ use App\Filament\Resources\CompraResource;
 use App\Filament\Resources\DevolucionCompraResource;
 use App\Models\Compra;
 use App\Services\CostoPrecioService;
+use App\Support\MensajeError;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Repeater;
@@ -107,7 +108,7 @@ class ViewCompra extends ViewRecord
                 try {
                     $actualizados = app(CostoPrecioService::class)->aplicarPrecios($precios, $record->empresa);
                 } catch (RuntimeException $e) {
-                    Notification::make()->title($e->getMessage())->danger()->send();
+                    Notification::make()->title(MensajeError::para($e))->danger()->send();
 
                     return;
                 }

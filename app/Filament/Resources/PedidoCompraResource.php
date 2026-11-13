@@ -12,6 +12,7 @@ use App\Models\Compra;
 use App\Models\PedidoCompra;
 use App\Models\Producto;
 use App\Services\PedidoCompraService;
+use App\Support\MensajeError;
 use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
 use Filament\Facades\Filament;
@@ -377,7 +378,7 @@ class PedidoCompraResource extends Resource
                             Mail::to($data['email'])->send(new PedidoCompraEnviado($record));
                             app(PedidoCompraService::class)->marcarEnviado($record, $data['email'], auth()->id());
                         } catch (RuntimeException $e) {
-                            Notification::make()->title($e->getMessage())->danger()->send();
+                            Notification::make()->title(MensajeError::para($e))->danger()->send();
 
                             return;
                         }
@@ -401,7 +402,7 @@ class PedidoCompraResource extends Resource
                         try {
                             app(PedidoCompraService::class)->cancelar($record, $data['motivo'], auth()->id());
                         } catch (RuntimeException $e) {
-                            Notification::make()->title($e->getMessage())->danger()->send();
+                            Notification::make()->title(MensajeError::para($e))->danger()->send();
 
                             return;
                         }
@@ -418,8 +419,7 @@ class PedidoCompraResource extends Resource
         return $pedido->compras()->where('estado', '!=', EstadoCompra::ANULADA)->latest('id')->first();
     }
 
-
-    public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
+    public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()->with(['proveedor', 'user']);
     }

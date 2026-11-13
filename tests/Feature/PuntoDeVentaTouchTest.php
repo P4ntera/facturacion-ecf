@@ -27,11 +27,12 @@ class PuntoDeVentaTouchTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function cajero(): User
+    private function cajero(bool $puedeDescontar = true): User
     {
         Permission::firstOrCreate(['name' => 'pos.acceder', 'guard_name' => 'web']);
+        Permission::firstOrCreate(['name' => 'ventas.aplicar_descuento', 'guard_name' => 'web']);
         $rol = Role::firstOrCreate(['empresa_id' => $this->empresaDefault->id, 'name' => 'Cajero', 'guard_name' => 'web']);
-        $rol->syncPermissions(['pos.acceder']);
+        $rol->syncPermissions($puedeDescontar ? ['pos.acceder', 'ventas.aplicar_descuento'] : ['pos.acceder']);
 
         $usuario = User::factory()->create();
         $usuario->assignRole('Cajero');
@@ -223,6 +224,25 @@ class PuntoDeVentaTouchTest extends TestCase
         $componente->set('tipoComprobante', TipoComprobante::NOTA_CREDITO->value)->call('cobrar');
 
         $this->assertSame(0, Venta::count());
+    }
+
+    public function test_sin_permiso_de_descuento_el_cajero_no_puede_descontar_ni_alterar_el_precio(): void
+    {
+        $caja = $this->caja();
+        $producto = $this->producto();
+
+        Livewire::actingAs($this->cajero(puedeDescontar: false))
+            ->test(PuntoDeVentaTouch::class)
+            ->call('seleccionarCaja', $caja->id)
+            ->call('abrirCaja', '0')
+            ->call('tocarProducto', $producto->id)
+            ->call('establecerDescuentoLinea', 0, '50')
+            ->assertSet('carrito.0.descuento', '0.00')
+            // Lo mismo si el navegador escribe el descuento o el precio directo en el carrito.
+            ->set('carrito.0.descuento', '50.00')
+            ->assertSet('carrito.0.descuento', '0.00')
+            ->set('carrito.0.precio_unitario', '1.00')
+            ->assertSet('carrito.0.precio_unitario', (string) $producto->precio);
     }
 
     public function test_teclado_numerico_cantidad_antes_del_producto_y_edicion_de_linea(): void
