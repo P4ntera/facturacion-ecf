@@ -1,7 +1,5 @@
-/* Manrope para titulares (ver sección "Tipografía de titulares" más abajo). Bunny Fonts: mismo
-   proveedor sin API key que usa Filament por defecto en ->font(), sin necesidad de un segundo
-   FontProvider solo para esta fuente. */
-@import url('https://fonts.bunny.net/css?family=manrope:500,600,700,800');
+/* Manrope (titulares) e Inter (texto) se sirven desde public/fonts/erp/fuentes.css, que el panel
+   enlaza vía ->font() con LocalFontProvider. Nada de CDN: debe funcionar sin internet. */
 
 @import '../../../../vendor/filament/filament/resources/css/theme.css';
 

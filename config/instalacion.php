@@ -10,4 +10,29 @@ return [
      */
     'super_admin_password' => env('SUPER_ADMIN_PASSWORD'),
 
+    /*
+     * Versión mínima de PostgreSQL. La búsqueda sin acentos (collation no determinística con
+     * LIKE) solo funciona desde la 18; con una anterior fallan el buscador del POS y los listados.
+     */
+    'postgres_minimo' => 18,
+
+    /*
+     * Respaldo automático (`php artisan erp:respaldo`, programado a diario). Pensado para las
+     * instalaciones locales, donde no hay nadie más cuidando la base de datos.
+     *
+     * - directorio: dónde se guardan. Vacío = storage/app/respaldos.
+     * - copia_directorio: segunda ubicación (otro disco, USB, carpeta sincronizada con la nube).
+     *   Un respaldo que vive solo en el mismo disco que la base no protege de que el disco muera.
+     * - pg_dump: ruta al ejecutable si no está en el PATH (típico en Windows, p. ej.
+     *   "C:\Program Files\PostgreSQL\18\bin\pg_dump.exe").
+     */
+    'respaldo' => [
+        'activo' => (bool) env('RESPALDO_ACTIVO', true),
+        'hora' => env('RESPALDO_HORA', '12:30'),
+        'retencion_dias' => (int) env('RESPALDO_RETENCION_DIAS', 14),
+        'directorio' => env('RESPALDO_DIRECTORIO'),
+        'copia_directorio' => env('RESPALDO_COPIA_DIRECTORIO'),
+        'pg_dump' => env('RESPALDO_PG_DUMP', 'pg_dump'),
+    ],
+
 ];

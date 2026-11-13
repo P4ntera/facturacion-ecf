@@ -63,6 +63,22 @@ Con `LICENSE_ENABLED=true`, una empresa sin licencia vigente queda en solo lectu
   instalar `firebase/php-jwt`.
 - Sin internet, una licencia ya validada sigue vigente hasta `license_expires_at`.
 
+### Instalación, uso sin internet y respaldos
+
+Guía completa: `docs/instalacion-local.md`.
+
+- Nada de CDN: fuentes, estilos y scripts se sirven desde la propia instalación. Inter y Manrope
+  viven en `public/fonts/erp` (`fuentes.css`, enlazado con `LocalFontProvider`).
+  `FuentesLocalesTest` falla si una vista o un CSS carga un recurso externo.
+- PostgreSQL 18 o superior (`config/instalacion.php`): la búsqueda sin acentos no funciona antes.
+- `ext-bcmath`, `ext-openssl` y `ext-pdo_pgsql` están en `composer.json`; `imagick` (QR de e-CF) y
+  `zip` (respaldo de archivos) son recomendadas.
+- `php artisan erp:verificar-instalacion` (solo lectura) revisa requisitos, seguridad y respaldos;
+  correrlo al instalar y después de cada actualización.
+- `php artisan erp:respaldo` (programado a diario) = `pg_dump` + zip de `storage/app` y `.env`, con
+  retención y copia opcional a `RESPALDO_COPIA_DIRECTORIO`. Es global a la instalación, no por
+  empresa.
+
 ## Regla de tenancy para features nuevas
 
 Toda tabla de negocio nueva (cabecera) DEBE llevar, desde el primer commit que la crea:

@@ -23,3 +23,12 @@ Schedule::command('ecf:procesar-pendientes')
     ->everyFiveMinutes()
     ->withoutOverlapping()
     ->description('Reintentar e-CF pendientes y refrescar los que están en proceso');
+
+// Respaldo diario de la base de datos y los archivos (logos, certificados). La hora por defecto
+// es a mediodía porque la PC de un negocio suele estar apagada de madrugada.
+if (config('instalacion.respaldo.activo')) {
+    Schedule::command('erp:respaldo')
+        ->dailyAt((string) config('instalacion.respaldo.hora', '12:30'))
+        ->withoutOverlapping()
+        ->description('Respaldo de la base de datos y archivos');
+}

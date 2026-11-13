@@ -8,6 +8,7 @@ use App\Http\Middleware\VerificarLicencia;
 use App\Models\Empresa;
 use Filament\Actions\Action;
 use Filament\Enums\UserMenuPosition;
+use Filament\FontProviders\LocalFontProvider;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -113,7 +114,9 @@ class AdminPanelProvider extends PanelProvider
             // Cuerpo de texto (--font-body). Filament no permite una segunda familia solo para
             // titulares vía este método: Manrope (--font-headline) se aplica en theme.css sobre
             // las hook classes de heading de Filament (fi-header-heading y similares).
-            ->font('Inter')
+            // Fuentes locales (public/fonts/erp), sin CDN: una instalación sin internet se ve igual.
+            // El mismo CSS declara también Manrope.
+            ->font('Inter', url: asset('fonts/erp/fuentes.css'), provider: LocalFontProvider::class)
             ->brandName('FesrSoft ERP')
             // Menú de usuario en la barra superior: con ->topNavigation() el sidebar solo existe
             // en mobile, así que en posición Sidebar el menú desaparecería en escritorio. La
