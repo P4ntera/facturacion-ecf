@@ -47,6 +47,9 @@
             <div class="flex items-center justify-between">
               <div>
                 <p class="font-semibold">{{ $this->clienteSeleccionado()->nombre }}</p>
+                @if ($listaAplicada = $this->listaPrecioAplicada())
+                  <p class="pos-muted">Lista de precio: {{ $listaAplicada }}</p>
+                @endif
                 @if ($this->clienteSeleccionado()->documento)
                   <p class="pos-muted">{{ $this->clienteSeleccionado()->documento }}</p>
                 @endif

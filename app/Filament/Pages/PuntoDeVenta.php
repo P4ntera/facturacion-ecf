@@ -149,6 +149,10 @@ class PuntoDeVenta extends Page
             Notification::make()->title('No tiene permiso para aplicar descuentos.')->warning()->send();
         }
 
+        if ($name === 'clienteId') {
+            $this->revalorarPorCambioDeCliente();
+        }
+
         if ($name === 'descuentoId' || str($name)->startsWith('carrito.')) {
             $this->recalcularTotales();
         }
@@ -206,6 +210,13 @@ class PuntoDeVenta extends Page
     {
         $this->clienteId = $clienteId;
         $this->busquedaCliente = '';
+
+        // El cliente puede traer su propia lista de precio: el carrito se vuelve a valorar.
+        $this->revalorarPorCambioDeCliente();
+
+        if (($lista = $this->listaPrecioAplicada()) !== null && ! empty($this->carrito)) {
+            Notification::make()->title("Se aplicó la lista de precio «{$lista}».")->info()->send();
+        }
     }
 
     /** Vuelve a "Al portador" / Consumidor Final (sin cliente). */
@@ -213,6 +224,18 @@ class PuntoDeVenta extends Page
     {
         $this->clienteId = null;
         $this->busquedaCliente = '';
+        $this->revalorarPorCambioDeCliente();
+    }
+
+    /**
+     * Con carrito vacío no hay nada que revalorar (y en el POS táctil recalcular republicaría la
+     * pantalla del cliente, pisando el "gracias" que queda justo después de cobrar).
+     */
+    protected function revalorarPorCambioDeCliente(): void
+    {
+        if (! empty($this->carrito)) {
+            $this->recalcularTotales();
+        }
     }
 
     /** Alias para el botón "Consumidor Final" de la vista de Caja. */
@@ -253,6 +276,7 @@ class PuntoDeVenta extends Page
 
         $this->clienteId = $cliente->id;
         $this->busquedaCliente = '';
+        $this->revalorarPorCambioDeCliente();
 
         Notification::make()->title("Cliente cargado desde la DGII/JCE: {$cliente->nombre}")->success()->send();
     }
@@ -1172,6 +1196,7 @@ class PuntoDeVenta extends Page
                 ->keyBy('id');
 
         $puedeDescontar = $this->puedeAplicarDescuento();
+        $preciosLista = $this->preciosDeListaDelCliente(array_keys($productos->all()));
 
         foreach ($this->carrito as $indice => $linea) {
             if (! $puedeDescontar) {
@@ -1193,11 +1218,49 @@ class PuntoDeVenta extends Page
 
             $esPesado = ($linea['tipo_venta'] ?? null) === TipoVenta::PESADO->value;
 
-            $this->carrito[$indice]['precio_unitario'] = $esPesado
-                ? (string) ($producto->precio_por_peso ?? 0)
-                : (string) ($presentacion?->precio ?? $producto->precio);
+            // Lista de precio del cliente: aplica al producto en su unidad base (sin presentación
+            // o con la presentación base). Una caja o un producto por peso tienen su propio precio.
+            $aplicaLista = ! $esPesado
+                && ($presentacion === null || $presentacion->es_base)
+                && isset($preciosLista[$producto->id]);
+
+            $this->carrito[$indice]['precio_unitario'] = match (true) {
+                $aplicaLista => (string) $preciosLista[$producto->id],
+                $esPesado => (string) ($producto->precio_por_peso ?? 0),
+                default => (string) ($presentacion?->precio ?? $producto->precio),
+            };
             $this->carrito[$indice]['factor'] = $esPesado ? '1' : (string) ($presentacion?->factor ?? 1);
         }
+    }
+
+    /**
+     * Precios de la lista asignada al cliente seleccionado, por producto_id. Vacío si no hay
+     * cliente, no tiene lista, la lista está inactiva o es de otra empresa.
+     *
+     * @param  array<int>  $productoIds
+     * @return array<int, string>
+     */
+    protected function preciosDeListaDelCliente(array $productoIds): array
+    {
+        $lista = $this->clienteSeleccionado()?->listaPrecio;
+
+        if ($lista === null || ! $lista->activa || $lista->empresa_id !== $this->empresaId() || $productoIds === []) {
+            return [];
+        }
+
+        return $lista->productos()
+            ->whereIn('productos.id', $productoIds)
+            ->get()
+            ->mapWithKeys(fn (Producto $producto) => [$producto->id => (string) $producto->pivot->precio])
+            ->all();
+    }
+
+    /** Nombre de la lista de precio que se está aplicando, para mostrarlo al cajero. */
+    public function listaPrecioAplicada(): ?string
+    {
+        $lista = $this->clienteSeleccionado()?->listaPrecio;
+
+        return $lista !== null && $lista->activa && $lista->empresa_id === $this->empresaId() ? $lista->nombre : null;
     }
 
     protected function recalcularTotales(): void

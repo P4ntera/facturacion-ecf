@@ -428,6 +428,9 @@
                 @if ($this->clienteSeleccionado()->documento)
                   <span class="pt-muted"> · {{ $this->clienteSeleccionado()->documento }}</span>
                 @endif
+                @if ($listaAplicada = $this->listaPrecioAplicada())
+                  <span class="pt-muted"> · Lista: {{ $listaAplicada }}</span>
+                @endif
               </div>
               <button type="button" style="padding:0 1rem" wire:click="quitarCliente">Quitar</button>
             </div>

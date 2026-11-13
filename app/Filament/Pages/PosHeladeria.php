@@ -313,6 +313,25 @@ class PosHeladeria extends Page
         $this->paso = 'toppings';
     }
 
+    /**
+     * Toppings elegidos que salen gratis (los incluidos en la presentación): misma regla que usa
+     * el servicio para cobrar.
+     *
+     * @return array<int>
+     */
+    public function toppingsGratis(): array
+    {
+        $presentacion = $this->presentacionActual();
+
+        if ($presentacion === null) {
+            return [];
+        }
+
+        $cobrados = app(HeladeriaService::class)->toppingsCobrados($presentacion, $this->toppingsSeleccionados, $this->empresa());
+
+        return array_values(array_diff($this->toppingsSeleccionados, $cobrados));
+    }
+
     public function toggleTopping(int $id): void
     {
         if (in_array($id, $this->toppingsSeleccionados)) {

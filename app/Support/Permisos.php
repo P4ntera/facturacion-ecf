@@ -146,6 +146,7 @@ class Permisos
             'Lavandería' => [
                 'lavanderia.ver_tickets' => 'Ver tickets de lavandería',
                 'lavanderia.crear_ticket' => 'Crear tickets de lavandería',
+                'lavanderia.precio_manual' => 'Cambiar a mano el precio de una prenda en el ticket',
                 'lavanderia.cambiar_estado' => 'Cambiar estado de tickets',
                 'lavanderia.entregar' => 'Entregar prendas al cliente',
                 'lavanderia.anular_ticket' => 'Anular tickets de lavandería',

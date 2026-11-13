@@ -320,6 +320,10 @@ class TicketLavanderiaResource extends Resource
                                 ->prefix('RD$')
                                 ->minValue(0)
                                 ->required()
+                                // Sin el permiso el precio lo pone el sistema (matriz o precio base):
+                                // el campo se ve pero no se edita, y el servicio ignora lo que llegue.
+                                ->disabled(fn (): bool => ! (auth()->user()?->can('lavanderia.precio_manual') ?? false))
+                                ->dehydrated()
                                 ->live()
                                 ->afterStateUpdated(function (Get $get, Set $set, ?string $state) {
                                     $precio = (float) ($state ?: 0);

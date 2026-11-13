@@ -64,6 +64,27 @@ class HeladeriaServiceTest extends TestCase
         $this->assertStringContainsString('Nueces', $conExtra['descripcion']);
     }
 
+    public function test_los_toppings_gratis_son_los_mas_baratos_sin_importar_el_orden_en_que_se_eligen(): void
+    {
+        $copa = $this->presentacion(['toppings_incluidos' => 1]);
+        $barato = $this->topping('Chispas', 20);
+        $medio = $this->topping('Sirope', 35);
+        $caro = $this->topping('Nueces', 50);
+
+        // Elegidos del más caro al más barato: en pantalla y en el cobro sale gratis el de RD$20.
+        $elegidos = [$caro->id, $medio->id, $barato->id];
+        $cobrados = $this->servicio->toppingsCobrados($copa, $elegidos, $this->empresa);
+
+        $this->assertEqualsCanonicalizing([$caro->id, $medio->id], $cobrados);
+        $this->assertSame([$barato->id], array_values(array_diff($elegidos, $cobrados)));
+
+        $this->empresa->config()->update(['modo_precio_helado' => ModoPrecioHelado::POR_PRESENTACION]);
+        $precio = $this->servicio->calcularPrecioArmado($copa, ['sabores' => [$this->sabor('Vainilla')->id], 'toppings' => $elegidos], $this->empresa->fresh());
+
+        $this->assertEqualsWithDelta(200.0 + 50 + 35, $precio['total'], 0.001);
+        $this->assertSame([], $this->servicio->toppingsCobrados($copa, [$caro->id], $this->empresa), 'Uno solo, uno incluido: gratis.');
+    }
+
     public function test_por_scoop_suma_cada_bola_con_su_precio_normal_o_premium(): void
     {
         $this->empresa->config()->update([

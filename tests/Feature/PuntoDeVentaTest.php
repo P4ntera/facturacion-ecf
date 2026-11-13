@@ -11,6 +11,7 @@ use App\Models\ArqueoCaja;
 use App\Models\Cliente;
 use App\Models\Descuento;
 use App\Models\Empresa;
+use App\Models\ListaPrecio;
 use App\Models\Producto;
 use App\Models\Role;
 use App\Models\SecuenciaNcf;
@@ -379,6 +380,61 @@ class PuntoDeVentaTest extends TestCase
             // El ITBIS va sobre la base ya descontada: 18% de 90 = 16.20 (no de 100).
             ->assertSet('totales.total_itbis', '16.20')
             ->assertSet('totales.total', '106.20');
+    }
+
+    public function test_al_elegir_un_cliente_con_lista_de_precio_el_carrito_toma_sus_precios(): void
+    {
+        $producto = $this->producto();
+        $lista = ListaPrecio::create(['empresa_id' => $this->empresaDefault->id, 'nombre' => 'Mayorista', 'activa' => true]);
+        $lista->productos()->attach($producto->id, ['precio' => 80]);
+        $mayorista = Cliente::create(['empresa_id' => $this->empresaDefault->id, 'nombre' => 'Colmado Mayorista', 'activo' => true, 'lista_precio_id' => $lista->id]);
+
+        Livewire::actingAs($this->vendedor())
+            ->test(PuntoDeVenta::class)
+            ->call('agregarProducto', $producto->id)
+            ->assertSet('carrito.0.precio_unitario', '100.00')
+            ->call('seleccionarCliente', $mayorista->id)
+            ->assertSet('carrito.0.precio_unitario', '80.00')
+            // 80 + 18 % de ITBIS
+            ->assertSet('totales.total', '94.40')
+            ->call('quitarCliente')
+            ->assertSet('carrito.0.precio_unitario', '100.00')
+            ->assertSet('totales.total', '118.00');
+    }
+
+    public function test_una_lista_inactiva_o_de_otra_empresa_no_cambia_los_precios(): void
+    {
+        $producto = $this->producto();
+        $inactiva = ListaPrecio::create(['empresa_id' => $this->empresaDefault->id, 'nombre' => 'Vieja', 'activa' => false]);
+        $inactiva->productos()->attach($producto->id, ['precio' => 10]);
+        $otraEmpresa = Empresa::create(['razon_social' => 'Otra Empresa', 'rnc' => '131999998']);
+        $ajena = ListaPrecio::create(['empresa_id' => $otraEmpresa->id, 'nombre' => 'Ajena', 'activa' => true]);
+        $ajena->productos()->attach($producto->id, ['precio' => 5]);
+
+        $conInactiva = Cliente::create(['empresa_id' => $this->empresaDefault->id, 'nombre' => 'Cliente A', 'activo' => true, 'lista_precio_id' => $inactiva->id]);
+        $conAjena = Cliente::create(['empresa_id' => $this->empresaDefault->id, 'nombre' => 'Cliente B', 'activo' => true, 'lista_precio_id' => $ajena->id]);
+
+        Livewire::actingAs($this->vendedor())
+            ->test(PuntoDeVenta::class)
+            ->call('agregarProducto', $producto->id)
+            ->call('seleccionarCliente', $conInactiva->id)
+            ->assertSet('carrito.0.precio_unitario', '100.00')
+            ->call('seleccionarCliente', $conAjena->id)
+            ->assertSet('carrito.0.precio_unitario', '100.00');
+    }
+
+    public function test_el_precio_escrito_desde_el_navegador_no_se_usa_al_cobrar(): void
+    {
+        $usuario = $this->vendedor();
+        app(ArqueoCajaService::class)->abrir('500.00', $usuario->id, $this->empresaDefault);
+        $producto = $this->producto();
+
+        Livewire::actingAs($usuario)
+            ->test(PuntoDeVenta::class)
+            ->call('agregarProducto', $producto->id)
+            ->set('carrito.0.precio_unitario', '1.00')
+            ->assertSet('carrito.0.precio_unitario', '100.00')
+            ->assertSet('totales.total', '118.00');
     }
 
     public function test_un_descuento_de_otra_empresa_no_se_aplica(): void

@@ -70,7 +70,13 @@ class TicketLavanderiaService
         // Validar que todas las prendas y servicios pertenezcan a la empresa
         $this->validarDetallesPertenecenAEmpresa($empresa, $detalles);
 
-        return DB::transaction(function () use ($empresa, $recepcionista, $datos, $detalles) {
+        // Los roles son por empresa: fijar el equipo antes de consultar el permiso (fuera del
+        // panel —colas, comandos, tests— no viene fijado).
+        setPermissionsTeamId($empresa->id);
+        $recepcionista->unsetRelation('roles')->unsetRelation('permissions');
+        $puedePrecioManual = $recepcionista->can('lavanderia.precio_manual');
+
+        return DB::transaction(function () use ($empresa, $recepcionista, $datos, $detalles, $puedePrecioManual) {
             $ticket = TicketLavanderia::create([
                 'empresa_id' => $empresa->id,
                 'cliente_id' => $datos['cliente_id'] ?? null,
@@ -85,8 +91,13 @@ class TicketLavanderiaService
             foreach ($detalles as $linea) {
                 $servicio = ServicioLavanderia::lockForUpdate()->find($linea['servicio_lavanderia_id']);
 
-                // Prioridad de precio: 1) manual del formulario, 2) matriz prenda×servicio, 3) precio_base del servicio
-                $precioUnitario = $linea['precio_unitario']
+                // Prioridad de precio: 1) manual del formulario, SOLO si quien crea el ticket tiene
+                // `lavanderia.precio_manual` (el precio viene del navegador: sin permiso se ignora);
+                // 2) matriz prenda×servicio; 3) precio_base del servicio.
+                $precioManual = $puedePrecioManual && filled($linea['precio_unitario'] ?? null)
+                    ? $linea['precio_unitario']
+                    : null;
+                $precioUnitario = $precioManual
                     ?? PrecioLavanderia::precioParaCombinacion($empresa->id, $linea['tipo_prenda_id'], $linea['servicio_lavanderia_id'])
                     ?? $servicio->precio_base;
                 $cantidad = max(1, (int) $linea['cantidad']);
@@ -130,8 +141,8 @@ class TicketLavanderiaService
 
                     if ($montoEfectivo < $totalFinal) {
                         throw new RuntimeException(
-                            'El monto recibido (RD$ ' . number_format($montoEfectivo, 2)
-                            . ') no puede ser menor al total (RD$ ' . number_format($totalFinal, 2) . ').'
+                            'El monto recibido (RD$ '.number_format($montoEfectivo, 2)
+                            .') no puede ser menor al total (RD$ '.number_format($totalFinal, 2).').'
                         );
                     }
                 }
@@ -270,8 +281,8 @@ class TicketLavanderiaService
 
             if ($montoEfectivo < (float) $ticket->total) {
                 throw new RuntimeException(
-                    'El monto recibido (RD$ ' . number_format($montoEfectivo, 2)
-                    . ') no puede ser menor al total (RD$ ' . number_format((float) $ticket->total, 2) . ').'
+                    'El monto recibido (RD$ '.number_format($montoEfectivo, 2)
+                    .') no puede ser menor al total (RD$ '.number_format((float) $ticket->total, 2).').'
                 );
             }
         }
@@ -385,7 +396,7 @@ class TicketLavanderiaService
      */
     private function obtenerProductoServicio(Empresa $empresa, ServicioLavanderia $servicio): Producto
     {
-        $codigo = 'LAV-' . $servicio->id;
+        $codigo = 'LAV-'.$servicio->id;
         $tasa = $servicio->aplica_itbis ? TasaItbis::DIECIOCHO : TasaItbis::CERO;
 
         $producto = Producto::firstOrCreate(
@@ -394,7 +405,7 @@ class TicketLavanderiaService
                 'codigo' => $codigo,
             ],
             [
-                'nombre' => 'Lavandería: ' . $servicio->nombre,
+                'nombre' => 'Lavandería: '.$servicio->nombre,
                 'tipo' => TipoProducto::SERVICIO,
                 'costo' => 0,
                 'precio' => $servicio->precio_base,

@@ -414,13 +414,14 @@
                 <span class="hel-badge">{{ $presentacionActual->toppings_incluidos }} gratis</span>
               @endif
             </h2>
+            @if($presentacionActual->toppings_incluidos > 0)
+              <p class="hel-card-meta" style="margin: -0.4rem 0 0.75rem;">Si elige más de los incluidos, salen gratis los de menor precio.</p>
+            @endif
 
             <div class="hel-items-grid">
+              @php($toppingsGratis = $this->toppingsGratis())
               @foreach($this->toppings() as $t)
-                @php
-                  $esGratis = array_search($t->id, $toppingsSeleccionados) !== false
-                              && array_search($t->id, $toppingsSeleccionados) < $presentacionActual->toppings_incluidos;
-                @endphp
+                @php($esGratis = in_array($t->id, $toppingsGratis))
                 <button type="button" class="hel-card {{ in_array($t->id, $toppingsSeleccionados) ? 'selected' : '' }}"
                      aria-pressed="{{ in_array($t->id, $toppingsSeleccionados) ? 'true' : 'false' }}"
                      wire:click="toggleTopping({{ $t->id }})">

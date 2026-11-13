@@ -102,6 +102,12 @@ vuelven a leer de la base antes de calcular y de cobrar (`PuntoDeVenta::sanearCa
 `ventas.aplicar_descuento` en el servidor, no solo ocultar el campo. Un POS nuevo debe seguir la
 misma regla y cubrirla con un test de "carrito manipulado".
 
+Precio que vale en el POS, en este orden: lista de precio del cliente seleccionado (solo unidad
+base, lista activa y de la misma empresa) → precio de la presentación → precio del producto. En
+lavandería, el precio escrito a mano en el ticket solo cuenta con `lavanderia.precio_manual`; sin
+él manda la matriz prenda×servicio. En heladería salen gratis los toppings más baratos de los
+elegidos (`HeladeriaService::toppingsCobrados()` es la única fuente de esa regla).
+
 ## Regla de tenancy para features nuevas
 
 Toda tabla de negocio nueva (cabecera) DEBE llevar, desde el primer commit que la crea:

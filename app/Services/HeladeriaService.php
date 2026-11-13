@@ -67,19 +67,11 @@ class HeladeriaService
                           + ($premium * $config->precio_scoop_premium);
         }
 
-        // Toppings extras (los que exceden los incluidos en la presentación)
-        $toppingsExtras = max(0, count($toppingsIds) - $presentacion->toppings_incluidos);
-
-        if ($toppingsExtras > 0) {
-            $toppings = ToppingHelado::where('empresa_id', $empresa->id)
-                ->whereIn('id', $toppingsIds)
-                ->get();
-
-            // Los extras son los últimos seleccionados (los primeros van gratis)
-            $precioToppings = $toppings->sortByDesc('precio')
-                ->take($toppingsExtras)
-                ->sum('precio');
-        }
+        // Toppings: los incluidos en la presentación son los MÁS BARATOS de los elegidos; se
+        // cobran los demás. La pantalla marca "gratis" con esta misma regla (toppingsCobrados).
+        $precioToppings = ToppingHelado::where('empresa_id', $empresa->id)
+            ->whereIn('id', $this->toppingsCobrados($presentacion, $toppingsIds, $empresa))
+            ->sum('precio');
 
         $total = $precioBase + $precioScoops + $precioToppings;
 
@@ -108,6 +100,32 @@ class HeladeriaService
             'precio_toppings' => $precioToppings,
             'descripcion' => $descripcion,
         ];
+    }
+
+    /**
+     * Ids de los toppings elegidos que SÍ se cobran: todos menos los N más baratos, donde N son
+     * los toppings incluidos en la presentación. Es la única fuente de esta regla: la usan el
+     * cálculo del precio y la pantalla del POS, para que nunca muestren cosas distintas.
+     *
+     * @param  array<int>  $toppingsIds
+     * @return array<int>
+     */
+    public function toppingsCobrados(PresentacionHelado $presentacion, array $toppingsIds, Empresa $empresa): array
+    {
+        $extras = max(0, count($toppingsIds) - (int) $presentacion->toppings_incluidos);
+
+        if ($extras === 0) {
+            return [];
+        }
+
+        // Empate de precio: se desempata por id para que el resultado sea siempre el mismo.
+        return ToppingHelado::where('empresa_id', $empresa->id)
+            ->whereIn('id', $toppingsIds)
+            ->orderByDesc('precio')
+            ->orderByDesc('id')
+            ->limit($extras)
+            ->pluck('id')
+            ->all();
     }
 
     /**

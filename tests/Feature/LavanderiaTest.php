@@ -4,18 +4,20 @@ namespace Tests\Feature;
 
 use App\Enums\EstadoPagoTicket;
 use App\Enums\EstadoTicketLavanderia;
+use App\Enums\FormaPago;
 use App\Enums\PerfilEmpresa;
-use App\Models\DetalleTicketLavanderia;
 use App\Models\Empresa;
 use App\Models\PrecioLavanderia;
 use App\Models\ServicioLavanderia;
 use App\Models\TicketLavanderia;
 use App\Models\TipoPrenda;
 use App\Models\User;
+use App\Policies\PrecioLavanderiaPolicy;
 use App\Services\RolesEmpresaService;
 use App\Services\TicketLavanderiaService;
 use Database\Seeders\RolePermissionSeeder;
 use Filament\Facades\Filament;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use RuntimeException;
 use Tests\TestCase;
@@ -25,11 +27,17 @@ class LavanderiaTest extends TestCase
     use RefreshDatabase;
 
     private Empresa $empresa;
+
     private User $admin;
+
     private User $recepcionista;
+
     private User $operador;
+
     private TipoPrenda $tipoPrenda;
+
     private ServicioLavanderia $servicioConItbis;
+
     private ServicioLavanderia $servicioSinItbis;
 
     protected function setUp(): void
@@ -54,6 +62,9 @@ class LavanderiaTest extends TestCase
         $this->recepcionista = User::factory()->create(['empresa_id' => $this->empresa->id]);
         setPermissionsTeamId($this->empresa->id);
         $this->recepcionista->assignRole('Recepcionista Lavandería');
+        // Varios tests fijan el precio de la prenda a mano: eso exige el permiso. El caso sin
+        // permiso tiene su propio test (test_sin_permiso_el_precio_manual_se_ignora).
+        $this->recepcionista->givePermissionTo('lavanderia.precio_manual');
 
         // Operador
         $this->operador = User::factory()->create(['empresa_id' => $this->empresa->id]);
@@ -386,7 +397,7 @@ class LavanderiaTest extends TestCase
 
         // total = 2 × 150 = 300 + 54 ITBIS = 354
         $venta = app(TicketLavanderiaService::class)->cobrar($ticket, $this->empresa, [
-            'forma_pago' => \App\Enums\FormaPago::EFECTIVO,
+            'forma_pago' => FormaPago::EFECTIVO,
             'monto_efectivo' => 354.00,
             'user_id' => $this->admin->id,
         ]);
@@ -403,7 +414,7 @@ class LavanderiaTest extends TestCase
     {
         $ticket = $this->crearTicket();
         app(TicketLavanderiaService::class)->cobrar($ticket, $this->empresa, [
-            'forma_pago' => \App\Enums\FormaPago::EFECTIVO,
+            'forma_pago' => FormaPago::EFECTIVO,
             'monto_efectivo' => 354.00,
             'user_id' => $this->admin->id,
         ]);
@@ -413,7 +424,7 @@ class LavanderiaTest extends TestCase
         $this->expectExceptionMessage('ya fue cobrado');
 
         app(TicketLavanderiaService::class)->cobrar($ticket, $this->empresa, [
-            'forma_pago' => \App\Enums\FormaPago::EFECTIVO,
+            'forma_pago' => FormaPago::EFECTIVO,
             'monto_efectivo' => 354.00,
             'user_id' => $this->admin->id,
         ]);
@@ -917,6 +928,48 @@ class LavanderiaTest extends TestCase
         $this->assertEquals('200.00', $detalle->precio_unitario);
     }
 
+    public function test_sin_permiso_el_precio_manual_se_ignora(): void
+    {
+        PrecioLavanderia::create([
+            'empresa_id' => $this->empresa->id,
+            'tipo_prenda_id' => $this->tipoPrenda->id,
+            'servicio_lavanderia_id' => $this->servicioConItbis->id,
+            'precio' => 120.00,
+        ]);
+
+        $sinPermiso = User::factory()->create(['empresa_id' => $this->empresa->id]);
+        setPermissionsTeamId($this->empresa->id);
+        $sinPermiso->assignRole('Recepcionista Lavandería');
+
+        $this->assertFalse($sinPermiso->can('lavanderia.precio_manual'));
+
+        // Intenta cobrar RD$1 una prenda que la matriz valora en RD$120: vale la matriz.
+        $ticket = app(TicketLavanderiaService::class)->crear($this->empresa, $sinPermiso, $this->datosTicketBase([
+            'detalles' => [[
+                'tipo_prenda_id' => $this->tipoPrenda->id,
+                'servicio_lavanderia_id' => $this->servicioConItbis->id,
+                'cantidad' => 1,
+                'precio_unitario' => 1.00,
+            ]],
+        ]));
+
+        $this->assertEquals('120.00', $ticket->detalles->first()->precio_unitario);
+    }
+
+    public function test_el_administrador_si_puede_fijar_un_precio_manual(): void
+    {
+        $ticket = app(TicketLavanderiaService::class)->crear($this->empresa, $this->admin, $this->datosTicketBase([
+            'detalles' => [[
+                'tipo_prenda_id' => $this->tipoPrenda->id,
+                'servicio_lavanderia_id' => $this->servicioConItbis->id,
+                'cantidad' => 1,
+                'precio_unitario' => 200.00,
+            ]],
+        ]));
+
+        $this->assertEquals('200.00', $ticket->detalles->first()->precio_unitario);
+    }
+
     public function test_sin_precio_manual_ni_matriz_usa_precio_base_del_servicio(): void
     {
         // No hay entrada en la matriz → debe usar precio_base = 150
@@ -994,7 +1047,7 @@ class LavanderiaTest extends TestCase
             'precio' => 120.00,
         ]);
 
-        $this->expectException(\Illuminate\Database\QueryException::class);
+        $this->expectException(QueryException::class);
 
         PrecioLavanderia::create([
             'empresa_id' => $this->empresa->id,
@@ -1006,8 +1059,8 @@ class LavanderiaTest extends TestCase
 
     public function test_precio_lavanderia_policy_no_permite_delete(): void
     {
-        $policy = new \App\Policies\PrecioLavanderiaPolicy();
-        $this->assertFalse($policy->delete($this->admin, new PrecioLavanderia()));
+        $policy = new PrecioLavanderiaPolicy;
+        $this->assertFalse($policy->delete($this->admin, new PrecioLavanderia));
     }
 
     // ───────────────────────────────────────────────────────────────────
@@ -1022,7 +1075,7 @@ class LavanderiaTest extends TestCase
         $this->expectExceptionMessage('Debe ingresar el monto recibido');
 
         app(TicketLavanderiaService::class)->cobrar($ticket, $this->empresa, [
-            'forma_pago' => \App\Enums\FormaPago::EFECTIVO,
+            'forma_pago' => FormaPago::EFECTIVO,
             'monto_efectivo' => 0,
             'user_id' => $this->admin->id,
         ]);
@@ -1037,7 +1090,7 @@ class LavanderiaTest extends TestCase
         $this->expectExceptionMessage('no puede ser menor al total');
 
         app(TicketLavanderiaService::class)->cobrar($ticket, $this->empresa, [
-            'forma_pago' => \App\Enums\FormaPago::EFECTIVO,
+            'forma_pago' => FormaPago::EFECTIVO,
             'monto_efectivo' => 100.00,
             'user_id' => $this->admin->id,
         ]);
@@ -1048,7 +1101,7 @@ class LavanderiaTest extends TestCase
         $ticket = $this->crearTicket();
 
         $venta = app(TicketLavanderiaService::class)->cobrar($ticket, $this->empresa, [
-            'forma_pago' => \App\Enums\FormaPago::TARJETA,
+            'forma_pago' => FormaPago::TARJETA,
             'user_id' => $this->admin->id,
         ]);
 
@@ -1065,7 +1118,7 @@ class LavanderiaTest extends TestCase
         $this->crearTicket([
             'pagar_ahora' => true,
             'datos_venta' => [
-                'forma_pago' => \App\Enums\FormaPago::EFECTIVO,
+                'forma_pago' => FormaPago::EFECTIVO,
                 'monto_efectivo' => 0,
                 'user_id' => $this->admin->id,
             ],
@@ -1080,7 +1133,7 @@ class LavanderiaTest extends TestCase
         $this->crearTicket([
             'pagar_ahora' => true,
             'datos_venta' => [
-                'forma_pago' => \App\Enums\FormaPago::EFECTIVO,
+                'forma_pago' => FormaPago::EFECTIVO,
                 'monto_efectivo' => 50.00,
                 'user_id' => $this->admin->id,
             ],
@@ -1108,7 +1161,7 @@ class LavanderiaTest extends TestCase
 
         // Cobrar (ticket en LISTO, pago pendiente)
         $venta = $service->cobrar($ticket, $this->empresa, [
-            'forma_pago' => \App\Enums\FormaPago::EFECTIVO,
+            'forma_pago' => FormaPago::EFECTIVO,
             'monto_efectivo' => 400.00,
             'user_id' => $this->admin->id,
         ]);
@@ -1132,7 +1185,7 @@ class LavanderiaTest extends TestCase
         $ticket = $this->crearTicket([
             'pagar_ahora' => true,
             'datos_venta' => [
-                'forma_pago' => \App\Enums\FormaPago::EFECTIVO,
+                'forma_pago' => FormaPago::EFECTIVO,
                 'monto_efectivo' => 400.00,
                 'user_id' => $this->admin->id,
             ],
@@ -1201,7 +1254,7 @@ class LavanderiaTest extends TestCase
 
         // Cobrar (en estado RECIBIDO)
         $service->cobrar($ticket, $this->empresa, [
-            'forma_pago' => \App\Enums\FormaPago::TARJETA,
+            'forma_pago' => FormaPago::TARJETA,
             'user_id' => $this->admin->id,
         ]);
         $ticket->refresh();
@@ -1223,7 +1276,7 @@ class LavanderiaTest extends TestCase
 
         // Cobrar antes de entregar (ahora es obligatorio)
         $service->cobrar($ticket, $this->empresa, [
-            'forma_pago' => \App\Enums\FormaPago::TARJETA,
+            'forma_pago' => FormaPago::TARJETA,
             'user_id' => $this->admin->id,
         ]);
         $ticket->refresh();
@@ -1249,7 +1302,7 @@ class LavanderiaTest extends TestCase
         $this->expectExceptionMessage('ticket cancelado');
 
         $service->cobrar($ticket, $this->empresa, [
-            'forma_pago' => \App\Enums\FormaPago::EFECTIVO,
+            'forma_pago' => FormaPago::EFECTIVO,
             'monto_efectivo' => 354.00,
             'user_id' => $this->admin->id,
         ]);
@@ -1274,7 +1327,7 @@ class LavanderiaTest extends TestCase
         // total = 354.00
 
         $venta = app(TicketLavanderiaService::class)->cobrar($ticket, $this->empresa, [
-            'forma_pago' => \App\Enums\FormaPago::EFECTIVO,
+            'forma_pago' => FormaPago::EFECTIVO,
             'monto_efectivo' => 354.00,
             'user_id' => $this->admin->id,
         ]);
@@ -1289,7 +1342,7 @@ class LavanderiaTest extends TestCase
         // total = 354.00
 
         $venta = app(TicketLavanderiaService::class)->cobrar($ticket, $this->empresa, [
-            'forma_pago' => \App\Enums\FormaPago::EFECTIVO,
+            'forma_pago' => FormaPago::EFECTIVO,
             'monto_efectivo' => 500.00,
             'vuelto' => 146.00,
             'user_id' => $this->admin->id,
@@ -1304,7 +1357,7 @@ class LavanderiaTest extends TestCase
         $ticket = $this->crearTicket([
             'pagar_ahora' => true,
             'datos_venta' => [
-                'forma_pago' => \App\Enums\FormaPago::TARJETA,
+                'forma_pago' => FormaPago::TARJETA,
                 'user_id' => $this->admin->id,
             ],
         ]);
