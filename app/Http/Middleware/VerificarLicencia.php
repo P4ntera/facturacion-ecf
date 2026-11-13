@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
+use App\Filament\Pages\ManageEmpresa;
 use App\Services\LicenseService;
+use App\Support\LicenciaSoloLectura;
 use Closure;
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Illuminate\Http\Request;
+use Livewire\Mechanisms\ComponentRegistry;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -17,8 +20,16 @@ use Symfony\Component\HttpFoundation\Response;
  * (GET/HEAD/OPTIONS), implementando el modo "solo lectura".
  *
  * Las requests de Livewire/Filament son siempre POST (/livewire/update), así que se tratan
- * de forma especial: solo se bloquean las que parecen ser acciones de escritura (crear, editar,
- * guardar), no la mera navegación o carga de tablas.
+ * de forma especial, en dos capas:
+ *
+ * 1. Las que claramente son de escritura (crear, guardar, eliminar, ejecutar una acción) se cortan
+ *    aquí mismo con un 403 y una notificación.
+ * 2. El resto (navegar, paginar, filtrar... y también métodos propios como `cobrar`) se deja pasar
+ *    con el candado `LicenciaSoloLectura` activado: si termina intentando escribir una tabla de
+ *    negocio, la base de datos lo rechaza. Así el bloqueo no depende del nombre del método.
+ *
+ * Excepción: la página "Datos de la empresa" siempre puede guardar, porque es donde se registra
+ * la clave de licencia (si no, una empresa sin licencia no tendría cómo activarla).
  *
  * Se registra como middleware persistente en el panel, DESPUÉS de Authenticate y
  * EstablecerEmpresaPermisos.
@@ -27,6 +38,7 @@ class VerificarLicencia
 {
     public function __construct(
         private readonly LicenseService $licenseService,
+        private readonly LicenciaSoloLectura $soloLectura,
     ) {}
 
     public function handle(Request $request, Closure $next): Response
@@ -54,9 +66,16 @@ class VerificarLicencia
             return $next($request);
         }
 
-        // Para requests Livewire/update, solo bloquear acciones que sean de escritura.
         if ($this->isLivewireRequest($request)) {
+            // Registrar/cambiar la clave de licencia tiene que seguir siendo posible.
+            if ($this->esPantallaDeLicencia($request)) {
+                return $next($request);
+            }
+
+            // Lo que no parece escritura pasa, pero con el candado de base de datos puesto.
             if (! $this->isLivewireWriteAction($request)) {
+                $this->soloLectura->activar();
+
                 return $next($request);
             }
         }
@@ -91,13 +110,7 @@ class VerificarLicencia
      */
     private function isLivewireWriteAction(Request $request): bool
     {
-        $payload = $request->input('components.0.calls', []);
-
-        if (! is_array($payload)) {
-            return false;
-        }
-
-        foreach ($payload as $call) {
+        foreach ($this->llamadasLivewire($request) as $call) {
             $method = $call['method'] ?? '';
 
             // Métodos que indican escritura (crear, guardar, eliminar, enviar form).
@@ -112,5 +125,61 @@ class VerificarLicencia
         }
 
         return false;
+    }
+
+    /**
+     * Todas las llamadas a métodos de TODOS los componentes de la request (una request de
+     * Livewire puede traer varios componentes; mirar solo el primero dejaba pasar el resto).
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function llamadasLivewire(Request $request): array
+    {
+        $llamadas = [];
+
+        foreach ((array) $request->input('components', []) as $componente) {
+            foreach ((array) ($componente['calls'] ?? []) as $llamada) {
+                if (is_array($llamada)) {
+                    $llamadas[] = $llamada;
+                }
+            }
+        }
+
+        return $llamadas;
+    }
+
+    /**
+     * true si TODOS los componentes de la request son la página "Datos de la empresa". El nombre
+     * sale del snapshot, que Livewire firma con checksum: no se puede falsificar para colar otro
+     * componente.
+     */
+    private function esPantallaDeLicencia(Request $request): bool
+    {
+        $componentes = (array) $request->input('components', []);
+
+        if ($componentes === []) {
+            return false;
+        }
+
+        foreach ($componentes as $componente) {
+            $snapshot = json_decode((string) ($componente['snapshot'] ?? ''), true);
+            $nombre = $snapshot['memo']['name'] ?? null;
+
+            if (! is_string($nombre)) {
+                return false;
+            }
+
+            try {
+                $clase = app(ComponentRegistry::class)->getClass($nombre);
+            } catch (\Throwable) {
+                return false;
+            }
+
+            if ($clase !== ManageEmpresa::class) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

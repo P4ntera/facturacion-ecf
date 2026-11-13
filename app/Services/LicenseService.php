@@ -6,8 +6,8 @@ namespace App\Services;
 
 use App\Models\Empresa;
 use App\Models\EmpresaLicenseState;
-use Firebase\JWT\JWT;
-use Firebase\JWT\Key;
+use App\Support\JwtRs256;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -166,12 +166,20 @@ class LicenseService
                 return ['valid' => false, 'claims' => null];
             }
 
-            $claims = JWT::decode($token, new Key($publicKey, 'RS256'));
+            $claims = JwtRs256::decode($token, $this->normalizarClavePublica((string) $publicKey));
 
             return ['valid' => true, 'claims' => $claims];
         } catch (\Throwable) {
             return ['valid' => false, 'claims' => null];
         }
+    }
+
+    /**
+     * En el .env la clave PEM suele ir en una sola línea con los saltos escritos como "\n".
+     */
+    private function normalizarClavePublica(string $clave): string
+    {
+        return str_replace('\\n', "\n", trim($clave));
     }
 
     /**
@@ -212,11 +220,11 @@ class LicenseService
         // - exp (~48h) es el ciclo de revalidación, NO el vencimiento.
         // - license_expires_at es el vencimiento REAL de la licencia.
         $licenseExpiresAt = isset($claims->license_expires_at)
-            ? \Carbon\Carbon::parse($claims->license_expires_at)
-            : ($expiresAt !== null ? \Carbon\Carbon::parse($expiresAt) : null);
+            ? Carbon::parse($claims->license_expires_at)
+            : ($expiresAt !== null ? Carbon::parse($expiresAt) : null);
 
         $validUntil = isset($claims->exp)
-            ? \Carbon\Carbon::createFromTimestamp($claims->exp)
+            ? Carbon::createFromTimestamp($claims->exp)
             : null;
 
         $status = ($licenseExpiresAt !== null && $licenseExpiresAt->isFuture()) ? 'valid' : 'expired';

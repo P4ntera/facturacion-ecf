@@ -21,6 +21,7 @@ use Filament\Schemas\Components\Form;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 use UnitEnum;
@@ -256,7 +257,7 @@ class ManageEmpresa extends Page
                 'email' => $data['email'],
                 'logo' => $data['logo'],
             ]);
-        } catch (\Illuminate\Database\QueryException $e) {
+        } catch (QueryException $e) {
             $sqlState = $e->errorInfo[0] ?? '';
 
             if ($sqlState === '23505' && str_contains($e->errorInfo[2] ?? '', 'rnc')) {
@@ -307,10 +308,25 @@ class ManageEmpresa extends Page
         if (app(LicenseService::class)->isEnabled()) {
             $licenseKey = $data['license_key'] ?? null;
 
+            $claveAnterior = EmpresaLicenseState::where('empresa_id', $empresa->id)->value('license_key');
+
             EmpresaLicenseState::updateOrCreate(
                 ['empresa_id' => $empresa->id],
                 ['license_key' => $licenseKey]
             );
+
+            // Clave nueva o cambiada: validarla ya, sin esperar al `license:refresh` programado.
+            if (filled($licenseKey) && $licenseKey !== $claveAnterior) {
+                $resultado = app(LicenseService::class)->refreshForEmpresa($empresa);
+
+                if (! $resultado['valid']) {
+                    Notification::make()
+                        ->title('La licencia no se pudo validar')
+                        ->body('Verifique la clave y la conexión a internet. El sistema seguirá en modo solo lectura hasta validarla.')
+                        ->warning()
+                        ->send();
+                }
+            }
         }
 
         Notification::make()->title('Datos guardados')->success()->send();
@@ -404,7 +420,7 @@ class ManageEmpresa extends Page
         }
 
         // Error de tabla no encontrada (migraciones pendientes)
-        if ($e instanceof \Illuminate\Database\QueryException) {
+        if ($e instanceof QueryException) {
             $sqlState = $e->errorInfo[0] ?? '';
 
             if ($sqlState === '42P01') {

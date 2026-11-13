@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Models\User;
 use App\Policies\ActivityPolicy;
+use App\Support\LicenciaSoloLectura;
 use Filament\Events\TenantSet;
 use Filament\Pages\BasePage;
 use Filament\Schemas\Schema;
@@ -11,8 +12,8 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Number;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Number;
 use Illuminate\Support\ServiceProvider;
 use Spatie\Activitylog\Models\Activity;
 
@@ -23,6 +24,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        // Un candado por request: nunca debe sobrevivir de una request a la siguiente.
+        $this->app->scoped(LicenciaSoloLectura::class);
+
         //
     }
 

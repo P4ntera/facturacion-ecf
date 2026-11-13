@@ -46,6 +46,23 @@ la base de datos si los encuentra, para que no queden huérfanos.
   El seeder nunca pisa una contraseña existente; si en producción encuentra un super-admin que
   sigue con la demo, lo avisa en consola para cambiarla a mano.
 
+### Licencias (modo solo lectura)
+
+Con `LICENSE_ENABLED=true`, una empresa sin licencia vigente queda en solo lectura. Dos capas:
+
+- `VerificarLicencia` (middleware del panel) corta con 403 las acciones de Livewire que claramente
+  escriben (`create`, `save`, `delete`, `callMountedAction`...).
+- Todo lo demás pasa con el candado `App\Support\LicenciaSoloLectura` activado: cualquier
+  INSERT/UPDATE/DELETE sobre una tabla de negocio lanza `LicenciaSoloLecturaException` antes de
+  ejecutarse. Esta es la garantía real — no depende del nombre del método (`cobrar`, `facturar`...).
+  Una tabla nueva de infraestructura que deba escribirse siempre (no de negocio) se agrega a
+  `LicenciaSoloLectura::TABLAS_PERMITIDAS`.
+- "Datos de la empresa" (`ManageEmpresa`) siempre puede guardar: ahí se registra la clave, y al
+  cambiarla se valida en el momento.
+- La firma RS256 del token se verifica con `App\Support\JwtRs256` (solo `ext-openssl`); no hay que
+  instalar `firebase/php-jwt`.
+- Sin internet, una licencia ya validada sigue vigente hasta `license_expires_at`.
+
 ## Regla de tenancy para features nuevas
 
 Toda tabla de negocio nueva (cabecera) DEBE llevar, desde el primer commit que la crea:
