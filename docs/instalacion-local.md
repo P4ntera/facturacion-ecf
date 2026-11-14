@@ -90,7 +90,26 @@ php artisan config:cache
 php artisan erp:verificar-instalacion
 ```
 
-## 6. Qué necesita internet
+## 6. Logs y rendimiento
+
+- En producción use `LOG_STACK=daily` y `LOG_LEVEL=warning`: un archivo por día que se borra solo
+  a los 14 días. Con `single` el archivo crece sin límite.
+- `storage/logs/lento-AAAA-MM-DD.log` anota cada consulta de más de 500 ms y cada petición de más
+  de 2 s. Revíselo de vez en cuando con:
+
+  ```bash
+  php artisan erp:lentitud          # últimos 7 días
+  php artisan erp:lentitud --dias=30
+  ```
+
+  Si una pantalla aparece muchas veces ahí, ese es el problema a atacar.
+- Un error inesperado que vio un usuario trae una referencia (`ref. ABC123`): búsquela en
+  `storage/logs/laravel*.log` para ver el detalle.
+- Límites de uso por minuto (`LIMITE_LIVEWIRE`, `LIMITE_PDF`, `LIMITE_REPORTES_PDF`): los valores
+  por defecto están muy por encima del uso normal. Si un negocio comparte un mismo usuario entre
+  muchas cajas y ve el aviso "Demasiados intentos", suba `LIMITE_LIVEWIRE`.
+
+## 7. Qué necesita internet
 
 | Función | Sin internet |
 |---|---|

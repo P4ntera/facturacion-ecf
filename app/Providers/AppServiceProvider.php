@@ -5,16 +5,22 @@ namespace App\Providers;
 use App\Models\User;
 use App\Policies\ActivityPolicy;
 use App\Support\LicenciaSoloLectura;
+use App\Support\RegistroDeLentitud;
 use Filament\Events\TenantSet;
 use Filament\Pages\BasePage;
 use Filament\Schemas\Schema;
 use Filament\Tables\Table;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Number;
 use Illuminate\Support\ServiceProvider;
+use Livewire\Livewire;
 use Spatie\Activitylog\Models\Activity;
 
 class AppServiceProvider extends ServiceProvider
@@ -35,6 +41,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        $this->registrarLimitesDeUso();
+        RegistroDeLentitud::registrar();
+
         // Activity vive en el namespace del paquete spatie/activitylog, no en App\Models: la
         // convención de autodescubrimiento de Policies de Laravel (que solo mapea dentro del
         // propio namespace del modelo) nunca encuentra ActivityPolicy para él. Sin este registro
@@ -127,5 +136,24 @@ class AppServiceProvider extends ServiceProvider
             /** @var Builder $this */
             return $this->whereLikeSinAcentos($columna, $valor, 'or');
         });
+    }
+
+    /**
+     * Límites de uso por minuto (config/instalacion.php → limites). La clave es el usuario si hay
+     * sesión y la IP si no, para que un cajero no le gaste el cupo a otro detrás del mismo router.
+     */
+    private function registrarLimitesDeUso(): void
+    {
+        $por = fn (Request $request): string => (string) ($request->user()?->getAuthIdentifier() ?? $request->ip());
+
+        foreach (['livewire' => 'livewire', 'pdf' => 'pdf', 'reportes-pdf' => 'reportes_pdf'] as $nombre => $clave) {
+            RateLimiter::for($nombre, fn (Request $request) => Limit::perMinute(
+                max(1, (int) config("instalacion.limites.{$clave}"))
+            )->by($nombre.':'.$por($request)));
+        }
+
+        // Todas las acciones de Livewire (panel, POS, pantalla del cliente) pasan por esta ruta.
+        Livewire::setUpdateRoute(fn ($handle) => Route::post('/livewire/update', $handle)
+            ->middleware(['web', 'throttle:livewire']));
     }
 }

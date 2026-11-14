@@ -4,6 +4,7 @@ namespace App\Services\Dgii;
 
 use App\Enums\TipoDocumentoCliente;
 use App\Models\Empresa;
+use App\Support\ConsultaExterna;
 
 /**
  * Busca un documento en la DGII (RNC, 9 dígitos) o la JCE (Cédula, 11 dígitos) a través del PAC,
@@ -23,13 +24,19 @@ class ConsultaContribuyenteService
     public function buscar(string $documento, Empresa $empresa): ?array
     {
         $documento = preg_replace('/[^0-9]/', '', $documento) ?? '';
-        $gateway = $this->gatewayFactory->make($empresa);
+        if (! in_array(strlen($documento), [9, 11], true)) {
+            return null;
+        }
 
-        return match (strlen($documento)) {
-            9 => $this->normalizar($gateway->buscarContribuyente($documento), $documento, 'rnc', TipoDocumentoCliente::RNC),
-            11 => $this->normalizar($gateway->buscarCedulaJce($documento), $documento, 'cedula', TipoDocumentoCliente::CEDULA),
-            default => null,
-        };
+        // Caché de un día + límite por usuario: ver App\Support\ConsultaExterna.
+        return ConsultaExterna::conCacheYLimite('contribuyente', $documento, function () use ($documento, $empresa): ?array {
+            $gateway = $this->gatewayFactory->make($empresa);
+
+            return match (strlen($documento)) {
+                9 => $this->normalizar($gateway->buscarContribuyente($documento), $documento, 'rnc', TipoDocumentoCliente::RNC),
+                default => $this->normalizar($gateway->buscarCedulaJce($documento), $documento, 'cedula', TipoDocumentoCliente::CEDULA),
+            };
+        });
     }
 
     /** @param  array<string, mixed>|null  $datos */

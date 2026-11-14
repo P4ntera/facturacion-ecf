@@ -152,10 +152,12 @@ class HeladeriaService
         $config = $empresa->config();
         $estrategia = $config->precio_incluye_itbis ? new ConItbisIncluido : new SinItbisIncluido;
 
-        $directos = Producto::where('empresa_id', $empresa->id)
-            ->whereIn('id', collect($items)->pluck('detalle.producto_id')->filter()->all())
-            ->get()
-            ->keyBy('id');
+        // Solo los productos directos traen su propia tasa de ITBIS; sin ninguno no hay nada que
+        // consultar (el POS recalcula totales en cada render, también con el carrito vacío).
+        $idsDirectos = collect($items)->pluck('detalle.producto_id')->filter()->unique()->values()->all();
+        $directos = $idsDirectos === []
+            ? collect()
+            : Producto::where('empresa_id', $empresa->id)->whereIn('id', $idsDirectos)->get()->keyBy('id');
 
         $subtotal = '0.00';
         $itbis = '0.00';

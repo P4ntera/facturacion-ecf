@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Pages\Reportes;
 
 use App\Enums\Modulo;
-use App\Models\Producto;
+use App\Filament\Exports\HeladeriaVentasPorTipoExporter;
 use App\Services\ReporteService;
 use BackedEnum;
 use Filament\Facades\Filament;
@@ -16,7 +16,6 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Table;
 use Illuminate\Database\Query\Builder as QueryBuilder;
-use Illuminate\Support\Facades\DB;
 
 class ReporteHeladeriaVentasPorTipo extends ReportePage
 {
@@ -50,7 +49,7 @@ class ReporteHeladeriaVentasPorTipo extends ReportePage
             ))
             ->paginated(false)
             ->columns([
-                TextColumn::make('tipo')
+                TextColumn::make('grupo_heladeria')
                     ->label('Tipo')
                     ->sortable()
                     ->badge()
@@ -109,6 +108,6 @@ class ReporteHeladeriaVentasPorTipo extends ReportePage
 
     protected function exporterClass(): string
     {
-        return \App\Filament\Exports\HeladeriaVentasPorTipoExporter::class;
+        return HeladeriaVentasPorTipoExporter::class;
     }
 }

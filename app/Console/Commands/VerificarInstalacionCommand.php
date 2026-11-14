@@ -46,6 +46,10 @@ class VerificarInstalacionCommand extends Command
         $this->critico('Fuentes locales (public/fonts/erp)', is_file(public_path('fonts/erp/fuentes.css')));
         $this->aviso('Assets compilados (npm run build)', is_file(public_path('build/manifest.json')));
         $this->aviso('Enlace public/storage (php artisan storage:link)', file_exists(public_path('storage')));
+        $this->aviso(
+            'Logs por día (LOG_STACK=daily): con "single" el archivo crece sin límite',
+            ! app()->isProduction() || ! in_array('single', (array) config('logging.channels.stack.channels'), true),
+        );
 
         $this->newLine();
         $this->line('Seguridad');

@@ -1,8 +1,8 @@
 <?php
 
 use App\Http\Controllers\AprobacionComercialEcfController;
-use App\Http\Controllers\CotizacionPdfController;
 use App\Http\Controllers\ArqueoCajaPdfController;
+use App\Http\Controllers\CotizacionPdfController;
 use App\Http\Controllers\ImpresoraPruebaController;
 use App\Http\Controllers\OrdenCompraPdfController;
 use App\Http\Controllers\PedidoCompraPdfController;
@@ -12,20 +12,20 @@ use App\Http\Controllers\Reportes\ReporteComprasPdfController;
 use App\Http\Controllers\Reportes\ReporteCxcPdfController;
 use App\Http\Controllers\Reportes\ReporteCxpPdfController;
 use App\Http\Controllers\Reportes\ReporteFiscal607PdfController;
-use App\Http\Controllers\Reportes\ReporteInventarioPdfController;
-use App\Http\Controllers\Reportes\ReporteKardexPdfController;
-use App\Http\Controllers\Reportes\ReporteMargenPdfController;
-use App\Http\Controllers\Reportes\ReporteTopProductosPdfController;
-use App\Http\Controllers\Reportes\ReporteProduccionServicioPdfController;
 use App\Http\Controllers\Reportes\ReporteHeladeriaTopProductosPdfController;
 use App\Http\Controllers\Reportes\ReporteHeladeriaVentasDiariasPdfController;
 use App\Http\Controllers\Reportes\ReporteHeladeriaVentasPorTipoPdfController;
+use App\Http\Controllers\Reportes\ReporteInventarioPdfController;
+use App\Http\Controllers\Reportes\ReporteKardexPdfController;
+use App\Http\Controllers\Reportes\ReporteMargenPdfController;
+use App\Http\Controllers\Reportes\ReporteProduccionServicioPdfController;
 use App\Http\Controllers\Reportes\ReporteTicketsLavanderiaPdfController;
+use App\Http\Controllers\Reportes\ReporteTopProductosPdfController;
 use App\Http\Controllers\Reportes\ReporteVentasPdfController;
-use App\Http\Controllers\TicketLavanderiaReciboPdfController;
 use App\Http\Controllers\Reportes\ReporteVentasPorClientePdfController;
 use App\Http\Controllers\Reportes\ReporteVentasPorVendedorPdfController;
 use App\Http\Controllers\RncController;
+use App\Http\Controllers\TicketLavanderiaReciboPdfController;
 use App\Http\Controllers\VentaComprobanteController;
 use App\Http\Controllers\VentaEcfXmlController;
 use App\Http\Controllers\VentaTicketController;
@@ -36,9 +36,11 @@ use Illuminate\Support\Facades\Route;
 // La app es 100% panel de Filament: la raíz solo redirige a /admin (login incluido).
 Route::redirect('/', '/admin');
 
+// Consulta de RNC/cédula: solo con sesión iniciada. Antes era pública y cualquiera en internet
+// podía usar el servidor como buscador de contribuyentes.
 Route::get('/rnc/{rnc}', [RncController::class, 'consultar'])
     ->where('rnc', '[0-9]{9,11}')
-    ->middleware('throttle:10,1')
+    ->middleware(['auth', 'throttle:10,1'])
     ->name('rnc.consultar');
 
 // Rutas autenticadas fuera del panel de Filament (PDFs, tickets, exportaciones).
@@ -46,7 +48,8 @@ Route::get('/rnc/{rnc}', [RncController::class, 'consultar'])
 // necesita setPermissionsTeamId() para resolver permisos — en el panel lo aporta el middleware
 // registrado en AdminPanelProvider, pero estas rutas van por fuera; sin él, $user->can('...')
 // devuelve false para cualquier usuario normal y la ruta responde 403.
-Route::middleware(['auth', EstablecerEmpresaPermisos::class])->group(function () {
+// throttle:pdf — generar un PDF es de lo más costoso para el servidor (config/instalacion.php).
+Route::middleware(['auth', EstablecerEmpresaPermisos::class, 'throttle:pdf'])->group(function () {
     Route::get('/ventas/{venta}/pdf', VentaComprobanteController::class)
         ->middleware('can:ventas.imprimir')
         ->name('ventas.pdf');
@@ -85,7 +88,7 @@ Route::middleware(['auth', EstablecerEmpresaPermisos::class])->group(function ()
 
     // Todas las rutas de este grupo generan PDFs para descargar: es la acción "exportar", distinta
     // de solo ver el reporte en pantalla (reportes.ver, gateado a nivel de página).
-    Route::middleware('can:reportes.exportar')->prefix('reportes')->name('reportes.')->group(function () {
+    Route::middleware(['can:reportes.exportar', 'throttle:reportes-pdf'])->prefix('reportes')->name('reportes.')->group(function () {
         Route::get('/ventas/pdf', ReporteVentasPdfController::class)->name('ventas.pdf');
         Route::get('/top-productos/pdf', ReporteTopProductosPdfController::class)->name('top-productos.pdf');
         Route::get('/ventas-por-cliente/pdf', ReporteVentasPorClientePdfController::class)->name('ventas-por-cliente.pdf');

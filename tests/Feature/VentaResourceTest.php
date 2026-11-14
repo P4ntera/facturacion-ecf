@@ -17,7 +17,10 @@ use App\Models\User;
 use App\Models\Venta;
 use App\Services\ArqueoCajaService;
 use App\Services\VentaService;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Once;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
@@ -90,6 +93,40 @@ class VentaResourceTest extends TestCase
             ->test(ListVentas::class)
             ->assertSuccessful()
             ->assertCanSeeTableRecords(Venta::all());
+    }
+
+    public function test_el_listado_no_hace_mas_consultas_por_tener_mas_ventas(): void
+    {
+        Permission::firstOrCreate(['name' => 'ventas.imprimir', 'guard_name' => 'web']);
+        $usuario = $this->usuarioConPermisos(['ventas.ver', 'ventas.anular', 'ventas.imprimir']);
+
+        $contar = function () use ($usuario): int {
+            $consultas = 0;
+            DB::listen(function () use (&$consultas): void {
+                $consultas++;
+            });
+
+            Livewire::actingAs($usuario)->test(ListVentas::class)->assertSuccessful();
+
+            DB::getEventDispatcher()->forget(QueryExecuted::class);
+            Once::flush();
+
+            return $consultas;
+        };
+
+        $this->producto->update(['stock' => 100]);
+
+        $this->crearVenta();
+        $this->crearVenta();
+        $conDos = $contar();
+
+        foreach (range(1, 5) as $i) {
+            $this->crearVenta();
+        }
+        $conSiete = $contar();
+
+        // Antes: +2 consultas por cada venta listada (arqueo de caja e impresora por fila).
+        $this->assertSame($conDos, $conSiete, "El listado pasó de {$conDos} a {$conSiete} consultas al agregar 5 ventas (N+1).");
     }
 
     public function test_anular_repone_stock_y_marca_anulada(): void

@@ -84,6 +84,12 @@ class PosHeladeria extends Page
     /** Color accent del POS (hex) */
     public string $colorAccent = '#e85d9a';
 
+    /** Resultados de la petición en curso (no viajan al navegador: son privados). */
+    private ?array $memoOpcionesComprobante = null;
+
+    /** @var array{huella: string, totales: array{subtotal: string, itbis: string, total: string}}|null */
+    private ?array $memoTotales = null;
+
     /** Comprobante elegido para el cobro (valor de ComprobanteVenta::opciones()). */
     public string $comprobante = '';
 
@@ -103,7 +109,8 @@ class PosHeladeria extends Page
     /** @return array<string, string> */
     public function opcionesComprobante(): array
     {
-        return ComprobanteVenta::opciones($this->empresa());
+        // La vista lo pide varias veces por render: una sola consulta de secuencias por petición.
+        return $this->memoOpcionesComprobante ??= ComprobanteVenta::opciones($this->empresa());
     }
 
     public function conComprobante(): bool
@@ -464,7 +471,18 @@ class PosHeladeria extends Page
     /** @return array{subtotal: string, itbis: string, total: string} */
     public function totalesCarrito(): array
     {
-        return app(HeladeriaService::class)->calcularTotales($this->carrito, $this->empresa());
+        // La vista y cobrar() lo llaman varias veces por petición. Se guarda por CONTENIDO del
+        // carrito: si el carrito cambia a mitad de la petición (cobrar lo revalida), se recalcula.
+        $huella = md5(serialize($this->carrito));
+
+        if ($this->memoTotales === null || $this->memoTotales['huella'] !== $huella) {
+            $this->memoTotales = [
+                'huella' => $huella,
+                'totales' => app(HeladeriaService::class)->calcularTotales($this->carrito, $this->empresa()),
+            ];
+        }
+
+        return $this->memoTotales['totales'];
     }
 
     public function vaciarCarrito(): void

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\ConsultaExterna;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -17,23 +18,30 @@ class DgiiRncService
     {
         $rnc = preg_replace('/[^0-9]/', '', $rnc);
 
-        if (!$this->esRncValido($rnc)) {
+        if (! $this->esRncValido($rnc)) {
             return null;
         }
 
+        return ConsultaExterna::conCacheYLimite('rnc', $rnc, fn () => $this->consultarEnElServicio($rnc));
+    }
+
+    /** La consulta real al servicio externo (sin caché ni límite). */
+    private function consultarEnElServicio(string $rnc): ?array
+    {
+
         try {
             $response = Http::timeout(10)
-                ->get(self::BASE_URL . '/api/consulta', ['rnc' => $rnc]);
+                ->get(self::BASE_URL.'/api/consulta', ['rnc' => $rnc]);
 
             $data = $response->json();
 
             if ($response->successful() && isset($data['error']) && $data['error'] === false) {
                 return [
-                    'rnc'                 => preg_replace('/[^0-9]/', '', $data['cedula_rnc'] ?? $rnc),
-                    'nombre'              => $data['nombre_razon_social'] ?? '',
-                    'nombre_comercial'    => $data['nombre_comercial'] ?? null,
+                    'rnc' => preg_replace('/[^0-9]/', '', $data['cedula_rnc'] ?? $rnc),
+                    'nombre' => $data['nombre_razon_social'] ?? '',
+                    'nombre_comercial' => $data['nombre_comercial'] ?? null,
                     'actividad_economica' => $data['actividad_economica'] ?? null,
-                    'estado'              => $data['estado'] ?? 'ACTIVO',
+                    'estado' => $data['estado'] ?? 'ACTIVO',
                 ];
             }
 
@@ -41,7 +49,7 @@ class DgiiRncService
                 return null;
             }
         } catch (\Exception $e) {
-            Log::error('DgiiRncService error: ' . $e->getMessage());
+            Log::error('DgiiRncService error: '.$e->getMessage());
         }
 
         return null;
@@ -50,6 +58,7 @@ class DgiiRncService
     public function esRncValido(string $rnc): bool
     {
         $rnc = preg_replace('/[^0-9]/', '', $rnc);
+
         return in_array(strlen($rnc), [9, 11]);
     }
 }

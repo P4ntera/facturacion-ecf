@@ -216,7 +216,9 @@ class VentaResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()->with(['cliente', 'user']);
+        // arqueoCaja: lo consulta la visibilidad de "Anular" en CADA fila; sin precargarlo era
+        // una consulta por venta listada (N+1).
+        return parent::getEloquentQuery()->with(['cliente', 'user', 'arqueoCaja']);
     }
 
     public static function table(Table $table): Table
@@ -581,7 +583,10 @@ class VentaResource extends Resource
                 Notification::make()->title('No se pudo imprimir el ticket')->body($resultado['error'])->danger()->send();
             })
             ->url(function (Venta $record) {
-                $impresora = app(ImpresionService::class)->resolverImpresora(ModuloImpresion::FACTURACION, auth()->user());
+                // Se evalúa por cada fila del listado: la impresora es la misma para todas, así
+                // que se resuelve una sola vez por petición (antes, una consulta por venta).
+                $usuario = auth()->user();
+                $impresora = once(fn () => app(ImpresionService::class)->resolverImpresora(ModuloImpresion::FACTURACION, $usuario));
 
                 return $impresora?->esDeRed()
                     ? null

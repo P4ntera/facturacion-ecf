@@ -17,6 +17,27 @@ return [
     'postgres_minimo' => 18,
 
     /*
+     * Registro de lentitud (storage/logs/lento-AAAA-MM-DD.log, resumen con `erp:lentitud`).
+     * Se anota toda consulta y toda petición que supere su umbral en milisegundos. 0 = apagado.
+     */
+    'lento' => [
+        'consulta_ms' => (int) env('LENTO_CONSULTA_MS', 500),
+        'peticion_ms' => (int) env('LENTO_PETICION_MS', 2000),
+    ],
+
+    /*
+     * Límites de uso (peticiones por minuto, por usuario o por IP si no hay sesión). Protegen al
+     * servidor de un script o de un doble clic compulsivo; están muy por encima del uso normal.
+     * - livewire: toda acción del panel y del POS (un cajero rápido no pasa de ~180 por minuto).
+     * - pdf: comprobantes, tickets y recibos. - reportes_pdf: reportes, que son los más pesados.
+     */
+    'limites' => [
+        'livewire' => (int) env('LIMITE_LIVEWIRE', 900),
+        'pdf' => (int) env('LIMITE_PDF', 30),
+        'reportes_pdf' => (int) env('LIMITE_REPORTES_PDF', 10),
+    ],
+
+    /*
      * Respaldo automático (`php artisan erp:respaldo`, programado a diario). Pensado para las
      * instalaciones locales, donde no hay nadie más cuidando la base de datos.
      *

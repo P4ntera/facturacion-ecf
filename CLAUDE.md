@@ -108,6 +108,30 @@ lavandería, el precio escrito a mano en el ticket solo cuenta con `lavanderia.p
 él manda la matriz prenda×servicio. En heladería salen gratis los toppings más baratos de los
 elegidos (`HeladeriaService::toppingsCobrados()` es la única fuente de esa regla).
 
+### Rendimiento, logs y límites de uso
+
+- N+1: toda relación que una columna, acción o `visible()` de una tabla lea por fila va en el
+  `with()` de `getEloquentQuery()`. Lo que es igual para todas las filas (p. ej. la impresora del
+  usuario) se resuelve una vez por petición con `once()`. `VentaResourceTest` comprueba que el
+  listado hace las mismas consultas con 2 ventas que con 7.
+- Consultas agregadas que se hidratan como un modelo (reportes con `fromSub`): usar
+  `Modelo::withoutGlobalScopes()` en la consulta externa (el scope de empresa del panel agregaría
+  `tabla.empresa_id` sobre un resultado que no tiene esa columna) y no nombrar una columna
+  calculada igual que un atributo con cast del modelo (`tipo`, `tipo_venta` en Producto).
+  Probar estos reportes CON datos y dentro del panel: vacíos no fallan.
+- Índices: PostgreSQL no indexa las claves foráneas. Una tabla hija nueva (detalles, pagos) lleva
+  índice por su padre desde su migración.
+- Servicios de terceros (RNC, cédula): siempre por `App\Support\ConsultaExterna` (caché de un
+  día + máximo de consultas nuevas por minuto por usuario).
+- Lentitud: `App\Support\RegistroDeLentitud` anota en `storage/logs/lento-*.log` toda consulta de
+  más de 500 ms y toda petición de más de 2 s (sin valores, solo el SQL). Resumen:
+  `php artisan erp:lentitud`. Umbrales y límites en `config/instalacion.php`.
+- Límites por minuto (por usuario, o IP sin sesión): `throttle:livewire` (900) en toda acción de
+  Livewire, `throttle:pdf` (30) en comprobantes y tickets, `throttle:reportes-pdf` (10) en
+  reportes, login de Filament (5 intentos). Una ruta nueva fuera del panel lleva su `throttle`.
+- Sin sesión, las rutas con `auth` redirigen al login del panel (`redirectGuestsTo` en
+  `bootstrap/app.php`); la app no tiene ruta `login`.
+
 ## Regla de tenancy para features nuevas
 
 Toda tabla de negocio nueva (cabecera) DEBE llevar, desde el primer commit que la crea:

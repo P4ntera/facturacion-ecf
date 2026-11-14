@@ -73,6 +73,15 @@ return [
             'replace_placeholders' => true,
         ],
 
+        // Consultas y peticiones lentas (App\Support\RegistroDeLentitud). Un archivo por día.
+        'lento' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/lento.log'),
+            'level' => 'warning',
+            'days' => env('LOG_DAILY_DAYS', 14),
+            'replace_placeholders' => true,
+        ],
+
         'slack' => [
             'driver' => 'slack',
             'url' => env('LOG_SLACK_WEBHOOK_URL'),

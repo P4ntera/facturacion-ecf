@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\EstablecerEmpresaPermisos;
+use Filament\Notifications\Notification;
 use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Application;
@@ -26,6 +27,11 @@ return Application::configure(basePath: dirname(__DIR__))
         // La DGII llama estas dos URLs directamente (sin sesión de nuestro panel, no hay forma de
         // que traigan un token CSRF): la seguridad la da RecepcionEcfService (RNC/tamaño/registro),
         // no la sesión.
+        // La app no tiene una ruta llamada "login" (el login es el del panel de Filament). Sin
+        // esto, abrir un PDF o cualquier ruta con `auth` con la sesión vencida daba error 500
+        // ("Route [login] not defined") en vez de llevar al login.
+        $middleware->redirectGuestsTo(fn () => route('filament.admin.auth.login'));
+
         $middleware->validateCsrfTokens(except: [
             'fe/recepcion/api/ecf',
             'fe/aprobacioncomercial/api/ecf',
@@ -55,7 +61,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withExceptions(function (Exceptions $exceptions) {
         $exceptions->renderable(function (UniqueConstraintViolationException $e) {
             if (request()->expectsJson() || request()->header('X-Livewire')) {
-                \Filament\Notifications\Notification::make()
+                Notification::make()
                     ->title('Registro duplicado')
                     ->body('Ya existe un registro con estos datos. Verifica los campos únicos e intenta de nuevo.')
                     ->danger()

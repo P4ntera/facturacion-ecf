@@ -17,7 +17,7 @@ class HeladeriaVentasPorTipoExporter extends Exporter
     public static function getColumns(): array
     {
         return [
-            ExportColumn::make('tipo')
+            ExportColumn::make('grupo_heladeria')
                 ->label('Tipo'),
             ExportColumn::make('cantidad')
                 ->label('Unidades'),

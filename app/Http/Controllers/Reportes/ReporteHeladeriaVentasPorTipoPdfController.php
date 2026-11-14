@@ -20,7 +20,7 @@ class ReporteHeladeriaVentasPorTipoPdfController extends ReportePdfController
             ->get();
 
         $filas = $filas_raw->map(fn (object $fila) => [
-            'tipo' => $fila->tipo,
+            'tipo' => $fila->grupo_heladeria,
             'cantidad' => rtrim(rtrim(number_format((float) $fila->cantidad, 3, '.', ''), '0'), '.'),
             'ingresos' => number_format((float) $fila->ingresos, 2),
         ])->all();

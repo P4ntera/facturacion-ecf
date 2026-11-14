@@ -10,8 +10,8 @@ use App\Enums\FormaPago;
 use App\Enums\TipoComprobante;
 use App\Enums\TipoDocumentoCliente;
 use App\Enums\TipoPago;
-use App\Models\Compra;
 use App\Models\ArqueoCaja;
+use App\Models\Compra;
 use App\Models\CuentaPorCobrar;
 use App\Models\CuentaPorPagar;
 use App\Models\MovimientoInventario;
@@ -170,14 +170,14 @@ class ReporteService
         foreach ($ventas as $venta) {
             /** @var Venta $venta */
             $rncCedula = $this->rncCedula607($venta->cliente?->tipo_documento, $venta->cliente?->documento);
-            $tipoId    = $this->tipoIdentificacion607($venta->cliente?->tipo_documento);
+            $tipoId = $this->tipoIdentificacion607($venta->cliente?->tipo_documento);
 
             // Formas de pago (cols 17-23): el monto incluye impuestos → va el total.
             // Si es crédito, todo va a la columna 20.
-            $efectivo      = '0.00';
+            $efectivo = '0.00';
             $transferencia = '0.00';
-            $tarjeta       = '0.00';
-            $credito       = '0.00';
+            $tarjeta = '0.00';
+            $credito = '0.00';
 
             if ($venta->tipo_pago === TipoPago::CREDITO) {
                 $credito = number_format((float) $venta->total, 2, '.', '');
@@ -199,7 +199,7 @@ class ReporteService
                         // el vuelto del efectivo reportado.
                         $vuelto = (float) ($venta->vuelto ?? 0);
                         $efectivo = number_format((float) ($venta->monto_efectivo ?? 0) - $vuelto, 2, '.', '');
-                        $tarjeta  = number_format((float) ($venta->monto_tarjeta ?? 0), 2, '.', '');
+                        $tarjeta = number_format((float) ($venta->monto_tarjeta ?? 0), 2, '.', '');
                         break;
                     default:
                         // Fallback: todo a efectivo.
@@ -847,13 +847,18 @@ class ReporteService
                 ->orWhere('productos.nombre', 'LIKE', 'Heladería:%'))
             ->groupByRaw($tipoCase)
             ->selectRaw("ROW_NUMBER() OVER (ORDER BY ({$tipoCase})) as id")
-            ->selectRaw("{$tipoCase} as tipo")
+            // "grupo_heladeria" y no "tipo" ni "tipo_venta": el resultado se hidrata como Producto,
+            // que convierte esos dos atributos a enums y revienta con "Armado"/"Combo"/"Directo".
+            ->selectRaw("{$tipoCase} as grupo_heladeria")
             ->selectRaw('COALESCE(SUM(detalle_ventas.cantidad), 0) as cantidad')
             ->selectRaw('COALESCE(SUM(detalle_ventas.subtotal), 0) as ingresos');
 
         // Envolver como subquery para que Filament ordene por el "id" sintético (ROW_NUMBER),
         // no por productos.id que no está en el GROUP BY (evita error 42803).
-        return Producto::query()->setQuery(
+        // withoutGlobalScopes: dentro del panel, Producto lleva el scope de empresa de Filament, que
+        // agregaría `productos.empresa_id` sobre este resultado agregado (que no tiene esa columna)
+        // y rompía la consulta. El filtro por empresa ya va dentro de la subconsulta.
+        return Producto::withoutGlobalScopes()->setQuery(
             DB::query()->fromSub($sub->toBase(), 'productos')
         );
     }
@@ -873,14 +878,17 @@ class ReporteService
             ->where(fn (Builder $q) => $q
                 ->where('productos.codigo', 'LIKE', 'HEL-%')
                 ->orWhere('productos.nombre', 'LIKE', 'Heladería:%'))
-            ->groupByRaw("DATE(ventas.fecha)")
-            ->selectRaw("ROW_NUMBER() OVER (ORDER BY DATE(ventas.fecha)) as id")
-            ->selectRaw("DATE(ventas.fecha) as dia")
+            ->groupByRaw('DATE(ventas.fecha)')
+            ->selectRaw('ROW_NUMBER() OVER (ORDER BY DATE(ventas.fecha)) as id')
+            ->selectRaw('DATE(ventas.fecha) as dia')
             ->selectRaw('COALESCE(SUM(detalle_ventas.cantidad), 0) as unidades')
             ->selectRaw('COUNT(DISTINCT ventas.id) as transacciones')
             ->selectRaw('COALESCE(SUM(detalle_ventas.subtotal), 0) as ingresos');
 
-        return Producto::query()->setQuery(
+        // withoutGlobalScopes: dentro del panel, Producto lleva el scope de empresa de Filament, que
+        // agregaría `productos.empresa_id` sobre este resultado agregado (que no tiene esa columna)
+        // y rompía la consulta. El filtro por empresa ya va dentro de la subconsulta.
+        return Producto::withoutGlobalScopes()->setQuery(
             DB::query()->fromSub($sub->toBase(), 'productos')
         );
     }
